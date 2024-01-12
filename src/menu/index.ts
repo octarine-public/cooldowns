@@ -1,14 +1,12 @@
 import { Menu } from "github.com/octarine-public/wrapper/index"
 
 import { ItemMenu } from "./items"
-import { LanternMenu } from "./lantern"
 import { SpellMenu } from "./spells"
 
 export class MenuManager {
 	public readonly State: Menu.Toggle
 	public readonly ItemMenu: ItemMenu
 	public readonly SpellMenu: SpellMenu
-	public readonly LanternMenu: LanternMenu
 
 	private readonly visual = Menu.AddEntry("Visual")
 	private readonly baseNode: Menu.Node
@@ -24,6 +22,5 @@ export class MenuManager {
 
 		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.SpellMenu = new SpellMenu(this.baseNode)
-		this.LanternMenu = new LanternMenu(this.baseNode)
 	}
 }
