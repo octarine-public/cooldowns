@@ -8,13 +8,11 @@ import {
 } from "github.com/octarine-public/wrapper/index"
 
 import { MenuManager } from "./menu/index"
-import { RespawnManager } from "./modules/respawn"
 import { SpellManager } from "./modules/spells"
 
 const bootstrap = new (class CCooldowns {
 	private readonly menuManager = new MenuManager()
 	private readonly spellManager = new SpellManager(this.menuManager)
-	private readonly respawnManager = new RespawnManager(this.menuManager.RespawnMenu)
 
 	protected get State() {
 		return this.menuManager.State.value
@@ -23,7 +21,6 @@ const bootstrap = new (class CCooldowns {
 	public Draw() {
 		if (this.State) {
 			this.spellManager.Draw()
-			this.respawnManager.Draw()
 		}
 	}
 
