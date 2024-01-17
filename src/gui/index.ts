@@ -203,9 +203,9 @@ export class BaseGUI {
 			.SubtractScalarX(((size.x + border) * count) / 2)
 			.AddForThis(additionalPosition)
 			.AddScalarX(index * (size.x + border))
-			.DivideScalarX(GUIInfo.GetWidthScale())
-			.DivideScalarY(GUIInfo.GetHeightScale())
-			.RoundForThis(1)
+		// .DivideScalarX(GUIInfo.GetWidthScale())
+		// .DivideScalarY(GUIInfo.GetHeightScale())
+		// .RoundForThis(1)
 	}
 
 	protected SquareLevel(
