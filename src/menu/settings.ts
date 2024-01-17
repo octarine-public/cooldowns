@@ -1,4 +1,9 @@
-import { ImageData, Menu, Vector2 } from "github.com/octarine-public/wrapper/index"
+import {
+	GUIInfo,
+	ImageData,
+	Menu,
+	Vector2
+} from "github.com/octarine-public/wrapper/index"
 
 interface IBaseSettingsMenu {
 	node: Menu.Node
@@ -38,7 +43,10 @@ export abstract class BaseSettingsMenu {
 	}
 
 	public get Position() {
-		return new Vector2(this.PositionX.value, this.PositionY.value)
+		return new Vector2(
+			GUIInfo.ScaleWidth(this.PositionX.value),
+			GUIInfo.ScaleHeight(this.PositionY.value)
+		)
 	}
 
 	public MenuChanged(callback: () => void) {
