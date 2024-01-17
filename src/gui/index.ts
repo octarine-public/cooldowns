@@ -55,8 +55,7 @@ export class BaseGUI {
 		spells: Ability[],
 		additionalPosition: Vector2
 	) {
-		const isVertical = false,
-			vecSize = this.spellSize,
+		const vecSize = this.spellSize,
 			recPosition = this.position,
 			modeImage = menu.ModeImage.SelectedID
 
@@ -67,7 +66,6 @@ export class BaseGUI {
 				recPosition,
 				vecSize,
 				border,
-				isVertical,
 				spells.length,
 				index,
 				additionalPosition
@@ -137,7 +135,6 @@ export class BaseGUI {
 		items: Item[],
 		additionalPosition: Vector2
 	) {
-		const isVertical = false
 		const baseSize = this.itemSize
 		const recPosition = this.position
 		const borderSize = GUIInfo.ScaleHeight(BaseGUI.border / 2)
@@ -148,7 +145,6 @@ export class BaseGUI {
 				recPosition,
 				baseSize,
 				borderSize,
-				isVertical,
 				items.length,
 				index,
 				additionalPosition
@@ -199,22 +195,14 @@ export class BaseGUI {
 		rec: Rectangle,
 		size: Vector2,
 		border: number,
-		isVertical: boolean,
-		abilCount: number,
+		count: number,
 		index: number,
 		additionalPosition: Vector2
 	) {
-		const center = new Vector2(
-			rec.x + (rec.Width + border) / 2,
-			rec.y - size.y - border * 2
-		)
-			.SubtractScalarX(((size.x + border) * (!isVertical ? abilCount : 0)) / 2)
+		return new Vector2(rec.x + (rec.Width + border) / 2, rec.y - size.y - border * 2)
+			.SubtractScalarX(((size.x + border) * count) / 2)
 			.AddForThis(additionalPosition)
-		return (
-			!isVertical
-				? center.AddScalarX(index * (size.x + border))
-				: center.AddScalarY(index * (size.y + border))
-		)
+			.AddScalarX(index * (size.x + border))
 			.DivideScalarX(GUIInfo.GetWidthScale())
 			.DivideScalarY(GUIInfo.GetHeightScale())
 			.RoundForThis(1)

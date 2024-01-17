@@ -29,7 +29,13 @@ export class UnitData {
 		}
 
 		const owner = this.Owner
-		if (!owner.IsVisible || !owner.IsAlive || (owner.IsCreep && !owner.IsSpawned)) {
+		const isVisible = owner.IsFogVisible || owner.IsVisible
+
+		if (!isVisible || !owner.IsAlive || owner.HideHud) {
+			return
+		}
+
+		if (owner.IsCreep && !owner.IsSpawned) {
 			return
 		}
 
