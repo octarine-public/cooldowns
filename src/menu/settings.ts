@@ -73,7 +73,7 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
+		super.ResetSettings()
 		this.PositionY.value = 0
 	}
 }
@@ -96,7 +96,7 @@ export class BearSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
+		super.ResetSettings()
 		this.PositionY.value = this.isItem ? -32 : -3
 	}
 }
@@ -119,7 +119,7 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
+		super.ResetSettings()
 		this.PositionY.value = this.isItem ? -25 : 4
 	}
 }
@@ -155,7 +155,7 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
+		super.ResetSettings()
 		this.PositionY.value = this.isItem ? -35 : -6
 	}
 }
@@ -175,7 +175,7 @@ export class FamiliarSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
+		super.ResetSettings()
 		this.PositionY.value = -3
 	}
 }

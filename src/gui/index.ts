@@ -62,6 +62,7 @@ export class BaseGUI {
 	) {
 		const vecSize = this.spellSize,
 			recPosition = this.position,
+			modeImage = menu.ModeImage.SelectedID,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
 
 		for (let index = spells.length - 1; index > -1; index--) {
@@ -83,8 +84,9 @@ export class BaseGUI {
 			const cooldown = spell.Cooldown,
 				texture = spell.TexturePath,
 				currCharges = spell.CurrentCharges,
+				grayScale = spell.Level === 0 || isDisable,
 				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
-				modeImage = menu.ModeImage.SelectedID
+				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
 
 			if (modeImage === EModeImage.Minimilistic) {
 				this.Minimilistic(
@@ -106,8 +108,8 @@ export class BaseGUI {
 					border,
 					cooldown,
 					modeImage,
-					spell.Level === 0 || isDisable,
-					spell.IsInAbilityPhase || spell.IsChanneling,
+					grayScale,
+					isInPhase,
 					isDisable,
 					noMana
 				)
@@ -125,7 +127,7 @@ export class BaseGUI {
 			switch (levelType) {
 				case ELevelType.Square:
 					// draw level by square
-					this.SquareLevel(spell, vecPos, vecSize, levelColor)
+					this.SquareLevel(spell, vecPos, vecSize, modeImage, levelColor)
 					break
 				default: {
 					// draw level by text
@@ -166,6 +168,7 @@ export class BaseGUI {
 			if (GUIInfo.Contains(vecPosition)) {
 				continue
 			}
+			// TODO: add circle image
 			this.SquareItems(item, vecPosition, baseSize, border)
 		}
 	}
@@ -245,7 +248,6 @@ export class BaseGUI {
 			const noCharge = charge === 0
 			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
-
 			// TODO: add text scale right offset
 			this.Text(cdText, position, flags)
 		}
@@ -282,6 +284,7 @@ export class BaseGUI {
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
+		modeImage: EModeImage,
 		levelColor: Color
 	) {
 		const currLvl = spell.Level
@@ -301,7 +304,6 @@ export class BaseGUI {
 		}
 
 		const squarePosition = position.Clone()
-
 		squarePosition.Height /= 4
 		squarePosition.y += squarePosition.Width - squarePosition.Height
 
@@ -312,6 +314,13 @@ export class BaseGUI {
 		const boxOffset = squarePosition.Height * 0.75
 
 		const size = new Vector2(boxOffset, boxOffset)
+
+		const fieldColor =
+			modeImage === EModeImage.Minimilistic &&
+			(spell.Owner?.Mana ?? 0) < spell.ManaCost
+				? BaseGUI.noManaOutlineColor
+				: levelColor
+
 		for (let index = 0; index < currLvl; index++) {
 			const center = new Vector2(
 				squarePosition.x + border + Math.floor(squarePosition.Width / 2),
@@ -321,7 +330,7 @@ export class BaseGUI {
 				.AddScalarX(index * (size.x + border))
 				.FloorForThis()
 
-			RendererSDK.FilledRect(center, size, levelColor)
+			RendererSDK.FilledRect(center, size, fieldColor)
 			RendererSDK.OutlinedRect(center, size, size.y / 2, Color.Black)
 		}
 	}
@@ -340,12 +349,14 @@ export class BaseGUI {
 		noMana?: boolean
 	) {
 		let outlinedColor = Color.Black
+
+		const noManaColor = BaseGUI.noManaOutlineColor
 		const isCircle = modeImage === EModeImage.Round ? 0 : -1
 
 		// color for outline
 		switch (true) {
 			case noMana:
-				outlinedColor = BaseGUI.noManaOutlineColor
+				outlinedColor = noManaColor
 				break
 			case isInPhase:
 				outlinedColor = Color.Green
@@ -357,7 +368,6 @@ export class BaseGUI {
 				outlinedColor = Color.Black
 				break
 		}
-
 		// draw outline
 		switch (modeImage) {
 			case EModeImage.Round:
@@ -378,12 +388,13 @@ export class BaseGUI {
 				break
 		}
 		// draw texture spell / item
+		const imageColor = noMana ? noManaColor : Color.White
 		RendererSDK.Image(
 			texture,
 			vecPos,
 			isCircle,
 			vecSize,
-			Color.White,
+			imageColor,
 			undefined,
 			undefined,
 			grayScale
