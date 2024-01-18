@@ -60,7 +60,8 @@ export class BaseGUI {
 	) {
 		const vecSize = this.spellSize,
 			recPosition = this.position,
-			border = GUIInfo.ScaleHeight(BaseGUI.border)
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
+
 		for (let index = spells.length - 1; index > -1; index--) {
 			const spell = spells[index]
 			const vecPos = this.GetPosition(
@@ -75,7 +76,65 @@ export class BaseGUI {
 			if (GUIInfo.Contains(vecPos)) {
 				continue
 			}
-			this.SpellMode(menu, spell, vecPos, vecSize, border, isDisable)
+			// width of outlined
+			const width = Math.round(border)
+			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
+
+			const cooldown = spell.Cooldown,
+				currCharges = spell.CurrentCharges,
+				modeImage = menu.ModeImage.SelectedID
+
+			if (modeImage === EModeImage.Minimilistic) {
+				this.GetMinimilistic(
+					spell,
+					vecPos,
+					vecSize,
+					width,
+					position,
+					cooldown,
+					modeImage,
+					isDisable
+				)
+			} else {
+				this.Image(
+					spell.TexturePath,
+					vecPos,
+					vecSize,
+					width,
+					cooldown,
+					modeImage,
+					spell.Level === 0 || isDisable,
+					spell.IsInAbilityPhase || spell.IsChanneling,
+					isDisable
+				)
+			}
+
+			const levelType = menu.LevelType.SelectedID,
+				levelColor = menu.LevelColor.SelectedColor,
+				chargeColor = menu.ChargeColor.SelectedColor
+
+			// draw charges
+			if (currCharges !== 0) {
+				this.textChargeOrLevel(currCharges, true, position, chargeColor)
+			}
+
+			switch (levelType) {
+				case ELevelType.Square:
+					// draw level by square
+					this.SquareLevel(spell, vecPos, vecSize, levelColor)
+					break
+				default: {
+					// draw level by text
+					this.textChargeOrLevel(spell.Level, false, position, levelColor)
+					break
+				}
+			}
+
+			// draw cooldown text
+			if (cooldown !== 0) {
+				const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
+				this.Text(cdText, position, TextFlags.Center)
+			}
 		}
 	}
 
@@ -87,14 +146,14 @@ export class BaseGUI {
 	) {
 		const baseSize = this.itemSize
 		const recPosition = this.position
-		const borderSize = GUIInfo.ScaleHeight(BaseGUI.border / 2)
+		const border = GUIInfo.ScaleHeight(BaseGUI.border / 2)
 
 		for (let index = items.length - 1; index > -1; index--) {
 			const item = items[index]
 			const vecPosition = this.GetPosition(
 				recPosition,
 				baseSize,
-				borderSize,
+				border,
 				items.length,
 				index,
 				additionalPosition
@@ -103,81 +162,7 @@ export class BaseGUI {
 			if (GUIInfo.Contains(vecPosition)) {
 				continue
 			}
-			this.SquareItems(item, vecPosition, baseSize)
-		}
-	}
-
-	protected SpellMode(
-		menu: SpellMenu,
-		spell: Ability,
-		vecPos: Vector2,
-		vecSize: Vector2,
-		border: number,
-		isDisable: boolean
-	) {
-		// width of outlined
-		const width = Math.floor((vecSize.y + border) / 5)
-		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-
-		const cooldown = spell.Cooldown,
-			currCharges = spell.CurrentCharges,
-			modeImage = menu.ModeImage.SelectedID
-
-		if (modeImage === EModeImage.Minimilistic) {
-			this.GetMinimilistic(
-				spell,
-				vecPos,
-				vecSize,
-				width,
-				position,
-				cooldown,
-				modeImage,
-				isDisable
-			)
-		} else {
-			this.Image(
-				spell.TexturePath,
-				vecPos,
-				vecSize,
-				width,
-				cooldown,
-				modeImage,
-				spell.Level === 0 || isDisable,
-				spell.IsInAbilityPhase || spell.IsChanneling,
-				isDisable
-			)
-		}
-
-		const levelType = menu.LevelType.SelectedID,
-			levelColor = menu.LevelColor.SelectedColor,
-			chargeColor = menu.ChargeColor.SelectedColor
-
-		// draw cooldown text
-		if (cooldown !== 0) {
-			const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
-			this.Text(cdText, position, TextFlags.Center)
-		}
-
-		// draw charges
-		if (currCharges !== 0) {
-			this.textChargeOrLevel(currCharges, true, position, chargeColor)
-		}
-
-		// don't draw level if max level or level = 0
-		if (spell.MaxLevel <= 0 || spell.Level === 0) {
-			return
-		}
-
-		switch (levelType) {
-			case ELevelType.Square:
-				// draw level by square
-				this.SquareLevel(spell, levelColor, vecPos, vecSize)
-				break
-			default: {
-				// draw level by text
-				this.textChargeOrLevel(spell.Level, false, position, levelColor)
-				break
-			}
+			this.SquareItems(item, vecPosition, baseSize, border)
 		}
 	}
 
@@ -191,18 +176,18 @@ export class BaseGUI {
 		modeImage: EModeImage,
 		isDisable: boolean
 	) {
-		const milimilistic = position.Clone(),
-			ingoreMilimilistic = this.ingoreSpellMinimilistic(spell)
+		const minimalistic = position.Clone(),
+			ignoreMinimalistic = this.ignoreSpellMinimalistic(spell)
 
 		if (cooldown === 0) {
-			milimilistic.Height /= 4
-			milimilistic.y += position.Width - milimilistic.Height
+			minimalistic.Height /= 4
+			minimalistic.y += position.Width - minimalistic.Height
 		}
 
-		if (cooldown === 0 || !ingoreMilimilistic) {
+		if (cooldown === 0 || !ignoreMinimalistic) {
 			RendererSDK.FilledRect(
-				milimilistic.pos1,
-				milimilistic.Size,
+				minimalistic.pos1,
+				minimalistic.Size,
 				Color.Black.SetA(180)
 			)
 			return
@@ -221,27 +206,33 @@ export class BaseGUI {
 		)
 	}
 
-	protected SquareItems(item: Item, calcPosition: Vector2, baseSize: Vector2) {
+	protected SquareItems(item: Item, vecPos: Vector2, vecSize: Vector2, border: number) {
 		const cooldown = item.Cooldown,
-			currCharges = item.CurrentCharges
+			charge = item.CurrentCharges
 
 		// draw image item
-		RendererSDK.Image(item.TexturePath, calcPosition, -1, baseSize)
+		RendererSDK.Image(item.TexturePath, vecPos, -1, vecSize)
 
-		if (!currCharges && !cooldown) {
+		// draw outline
+		const width = Math.round(border)
+		RendererSDK.OutlinedRect(vecPos, vecSize, width, new Color(35, 38, 40))
+
+		if (!charge && !cooldown) {
 			return
 		}
 
-		const position = new Rectangle(calcPosition, calcPosition.Add(baseSize))
+		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
 
-		if (cooldown !== 0) {
-			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
-			this.Text(cdText, position, TextFlags.Left | TextFlags.Top)
+		if (charge !== 0) {
+			const charges = charge.toString()
+			this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
 		}
 
-		if (currCharges !== 0) {
-			const charges = currCharges.toString()
-			this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
+		if (cooldown !== 0) {
+			// if no charge draw cooldown by center
+			const flags = charge <= 0 ? TextFlags.Center : TextFlags.Left | TextFlags.Top
+			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
+			this.Text(cdText, position, flags)
 		}
 	}
 
@@ -267,15 +258,16 @@ export class BaseGUI {
 		const posY = rec.y - size.y - border * 2
 		return new Vector2(posX, posY)
 			.SubtractScalarX(((size.x + border) * count) / 2)
-			.AddForThis(additionalPosition)
 			.AddScalarX(index * (size.x + border))
+			.AddForThis(additionalPosition)
+			.RoundForThis(1)
 	}
 
 	protected SquareLevel(
 		spell: Ability,
-		levelColor: Color,
 		vecPos: Vector2,
-		vecSize: Vector2
+		vecSize: Vector2,
+		levelColor: Color
 	) {
 		const currLvl = spell.Level
 		if (spell.MaxLevel === 0 || spell.Level === 0) {
@@ -284,30 +276,32 @@ export class BaseGUI {
 
 		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
 
-		// if invoker
+		// if invoker abilities draw level by text
 		if (
-			spell instanceof invoker_quas ||
 			spell instanceof invoker_wex ||
+			spell instanceof invoker_quas ||
 			spell instanceof invoker_exort
 		) {
 			this.Text(currLvl.toString(), position, TextFlags.Right | TextFlags.Bottom)
 			return
 		}
 
-		position.Height /= 4
-		position.y += position.Width - position.Height
+		const squarePosition = position.Clone()
+
+		squarePosition.Height /= 4
+		squarePosition.y += squarePosition.Width - squarePosition.Height
 
 		// debug
 		// RendererSDK.FilledRect(imagePosition.pos1, imagePosition.Size, Color.Red)
 
 		const border = GUIInfo.ScaleHeight(1)
-		const boxOffset = position.Height * 0.75
+		const boxOffset = squarePosition.Height * 0.75
 
 		const size = new Vector2(boxOffset, boxOffset)
 		for (let index = 0; index < currLvl; index++) {
 			const center = new Vector2(
-				position.x + border + Math.floor(position.Width / 2),
-				position.y + border
+				squarePosition.x + border + Math.floor(squarePosition.Width / 2),
+				squarePosition.y + border
 			)
 				.SubtractScalarX(((size.x + border) * currLvl) / 2)
 				.AddScalarX(index * (size.x + border))
@@ -375,13 +369,16 @@ export class BaseGUI {
 		position: Rectangle,
 		color: Color
 	) {
+		if (value === 0) {
+			return
+		}
 		const flags = isCharge
 			? TextFlags.Right | TextFlags.Top
 			: TextFlags.Right | TextFlags.Bottom
 		this.Text(value.toString(), position, flags, 2, color)
 	}
 
-	private ingoreSpellMinimilistic(spell: Ability) {
+	private ignoreSpellMinimalistic(spell: Ability) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false

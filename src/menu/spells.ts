@@ -37,7 +37,7 @@ export class SpellMenu extends BaseMenu {
 		this.ModeImage = this.Tree.AddDropdown("Mode images", [
 			"Square",
 			"Circle",
-			"Minimilistic"
+			"Minimalistic"
 		])
 
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])

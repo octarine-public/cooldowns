@@ -39,7 +39,7 @@ export abstract class BaseSettingsMenu {
 		this.State = this.Tree.AddToggle("State", options.defaultState ?? true)
 
 		this.PositionX = this.Tree.AddSlider("Position: X", options.defaultX, -50, 150)
-		this.PositionY = this.Tree.AddSlider("Position: Y", options.defaultY, -50, 150)
+		this.PositionY = this.Tree.AddSlider("Position: Y", options.defaultY, -100, 150)
 	}
 
 	public get Position() {
