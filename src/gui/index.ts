@@ -124,7 +124,7 @@ export class BaseGUI {
 			modeImage = menu.ModeImage.SelectedID
 
 		if (modeImage === EModeImage.Minimilistic) {
-			this.GetMilimilistic(
+			this.GetMinimilistic(
 				spell,
 				vecPos,
 				vecSize,
@@ -181,7 +181,7 @@ export class BaseGUI {
 		}
 	}
 
-	protected GetMilimilistic(
+	protected GetMinimilistic(
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -192,7 +192,7 @@ export class BaseGUI {
 		isDisable: boolean
 	) {
 		const milimilistic = position.Clone(),
-			ingoreMilimilistic = this.ingoreSpellMilimilistic(spell)
+			ingoreMilimilistic = this.ingoreSpellMinimilistic(spell)
 
 		if (cooldown === 0) {
 			milimilistic.Height /= 4
@@ -381,7 +381,7 @@ export class BaseGUI {
 		this.Text(value.toString(), position, flags, 2, color)
 	}
 
-	private ingoreSpellMilimilistic(spell: Ability) {
+	private ingoreSpellMinimilistic(spell: Ability) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false
