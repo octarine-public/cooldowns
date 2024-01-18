@@ -21,7 +21,7 @@ import { SpellMenu } from "../menu/spells"
 
 export class BaseGUI {
 	private static readonly border = 2
-	private static readonly fontWidth = 400
+	private static readonly fontWidth = 500
 	private static readonly minItemSize = 16
 	private static readonly minSpellSize = 18
 
