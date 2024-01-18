@@ -68,6 +68,7 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 			node,
 			isItem,
 			nodeName: "Creeps",
+			defaultState: false,
 			texture: ImageData.Paths.Icons.icon_svg_creep
 		})
 	}

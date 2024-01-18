@@ -5,6 +5,7 @@ import {
 	Sleeper
 } from "github.com/octarine-public/wrapper/index"
 
+import { ETeamState } from "../enum"
 import { ItemMenu } from "./items"
 import { SpellMenu } from "./spells"
 
@@ -36,8 +37,8 @@ export class MenuManager {
 		this.baseNode.SortNodes = false
 
 		this.State = this.baseNode.AddToggle("State", true)
-		this.Local = this.baseNode.AddToggle("Your hero", true)
-		this.Team = this.baseNode.AddDropdown("Team", this.teamArray)
+		this.Local = this.baseNode.AddToggle("Your hero", false)
+		this.Team = this.baseNode.AddDropdown("Team", this.teamArray, ETeamState.Enemy)
 
 		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.SpellMenu = new SpellMenu(this.baseNode)
@@ -54,6 +55,7 @@ export class MenuManager {
 	public MenuChnaged(callback: () => void) {
 		this.Team.OnValue(() => callback())
 		this.Local.OnValue(() => callback())
+		this.reset.OnValue(() => callback())
 
 		this.ItemMenu.MenuChanged(callback)
 		this.SpellMenu.MenuChanged(callback)
