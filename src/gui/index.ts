@@ -6,6 +6,9 @@ import {
 	invoker_quas,
 	invoker_wex,
 	Item,
+	npc_dota_hero_doom_bringer,
+	npc_dota_hero_invoker,
+	npc_dota_hero_rubick,
 	Rectangle,
 	RendererSDK,
 	TextFlags,
@@ -57,9 +60,7 @@ export class BaseGUI {
 	) {
 		const vecSize = this.spellSize,
 			recPosition = this.position,
-			modeImage = menu.ModeImage.SelectedID
-
-		const border = GUIInfo.ScaleHeight(BaseGUI.border)
+			border = GUIInfo.ScaleHeight(BaseGUI.border)
 		for (let index = spells.length - 1; index > -1; index--) {
 			const spell = spells[index]
 			const vecPos = this.GetPosition(
@@ -70,62 +71,11 @@ export class BaseGUI {
 				index,
 				additionalPosition
 			)
-
 			// hide item if contains dota hud
 			if (GUIInfo.Contains(vecPos)) {
 				continue
 			}
-
-			const cooldown = spell.Cooldown,
-				currCharges = spell.CurrentCharges
-
-			// width of outlined
-			const width = Math.floor((vecSize.y + border) / 5)
-			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-
-			this.Image(
-				spell.TexturePath,
-				vecPos,
-				vecSize,
-				width,
-				cooldown,
-				modeImage,
-				spell.Level === 0 || isDisable,
-				spell.IsInAbilityPhase || spell.IsChanneling,
-				isDisable
-			)
-
-			const levelType = menu.LevelType.SelectedID,
-				levelColor = menu.LevelColor.SelectedColor,
-				chargeColor = menu.ChargeColor.SelectedColor
-
-			// draw cooldown text
-			if (cooldown !== 0) {
-				const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
-				this.Text(cdText, position, TextFlags.Center)
-			}
-
-			// draw charges
-			if (currCharges !== 0) {
-				this.textChargeOrLevel(currCharges, true, position, chargeColor)
-			}
-
-			// don't draw level if max level or level = 0
-			if (spell.MaxLevel <= 1 || spell.Level === 0) {
-				continue
-			}
-
-			switch (levelType) {
-				case ELevelType.Square:
-					// draw level by square
-					this.SquareLevel(spell, levelColor, vecPos, vecSize)
-					break
-				default: {
-					// draw level by text
-					this.textChargeOrLevel(spell.Level, false, position, levelColor)
-					break
-				}
-			}
+			this.SpellMode(menu, spell, vecPos, vecSize, border, isDisable)
 		}
 	}
 
@@ -155,6 +105,120 @@ export class BaseGUI {
 			}
 			this.SquareItems(item, vecPosition, baseSize)
 		}
+	}
+
+	protected SpellMode(
+		menu: SpellMenu,
+		spell: Ability,
+		vecPos: Vector2,
+		vecSize: Vector2,
+		border: number,
+		isDisable: boolean
+	) {
+		// width of outlined
+		const width = Math.floor((vecSize.y + border) / 5)
+		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
+
+		const cooldown = spell.Cooldown,
+			currCharges = spell.CurrentCharges,
+			modeImage = menu.ModeImage.SelectedID
+
+		if (modeImage === EModeImage.Minimilistic) {
+			this.GetMilimilistic(
+				spell,
+				vecPos,
+				vecSize,
+				width,
+				position,
+				cooldown,
+				modeImage,
+				isDisable
+			)
+		} else {
+			this.Image(
+				spell.TexturePath,
+				vecPos,
+				vecSize,
+				width,
+				cooldown,
+				modeImage,
+				spell.Level === 0 || isDisable,
+				spell.IsInAbilityPhase || spell.IsChanneling,
+				isDisable
+			)
+		}
+
+		const levelType = menu.LevelType.SelectedID,
+			levelColor = menu.LevelColor.SelectedColor,
+			chargeColor = menu.ChargeColor.SelectedColor
+
+		// draw cooldown text
+		if (cooldown !== 0) {
+			const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
+			this.Text(cdText, position, TextFlags.Center)
+		}
+
+		// draw charges
+		if (currCharges !== 0) {
+			this.textChargeOrLevel(currCharges, true, position, chargeColor)
+		}
+
+		// don't draw level if max level or level = 0
+		if (spell.MaxLevel <= 0 || spell.Level === 0) {
+			return
+		}
+
+		switch (levelType) {
+			case ELevelType.Square:
+				// draw level by square
+				this.SquareLevel(spell, levelColor, vecPos, vecSize)
+				break
+			default: {
+				// draw level by text
+				this.textChargeOrLevel(spell.Level, false, position, levelColor)
+				break
+			}
+		}
+	}
+
+	protected GetMilimilistic(
+		spell: Ability,
+		vecPos: Vector2,
+		vecSize: Vector2,
+		width: number,
+		position: Rectangle,
+		cooldown: number,
+		modeImage: EModeImage,
+		isDisable: boolean
+	) {
+		const milimilistic = position.Clone(),
+			ingoreMilimilistic = this.ingoreSpellMilimilistic(spell)
+
+		if (cooldown === 0) {
+			milimilistic.Height /= 4
+			milimilistic.y += position.Width - milimilistic.Height
+		}
+
+		if (cooldown === 0 || !ingoreMilimilistic) {
+			RendererSDK.FilledRect(
+				milimilistic.pos1,
+				milimilistic.Size,
+				Color.Black.SetA(180)
+			)
+			return
+		}
+
+		this.Image(
+			spell.TexturePath,
+			vecPos,
+			vecSize,
+			width,
+			cooldown,
+			modeImage,
+			spell.Level === 0 || isDisable,
+			spell.IsInAbilityPhase || spell.IsChanneling,
+			isDisable
+		)
 	}
 
 	protected SquareItems(item: Item, calcPosition: Vector2, baseSize: Vector2) {
@@ -199,13 +263,12 @@ export class BaseGUI {
 		index: number,
 		additionalPosition: Vector2
 	) {
-		return new Vector2(rec.x + (rec.Width + border) / 2, rec.y - size.y - border * 2)
+		const posX = rec.x + (rec.Width + border) / 2
+		const posY = rec.y - size.y - border * 2
+		return new Vector2(posX, posY)
 			.SubtractScalarX(((size.x + border) * count) / 2)
 			.AddForThis(additionalPosition)
 			.AddScalarX(index * (size.x + border))
-		// .DivideScalarX(GUIInfo.GetWidthScale())
-		// .DivideScalarY(GUIInfo.GetHeightScale())
-		// .RoundForThis(1)
 	}
 
 	protected SquareLevel(
@@ -215,7 +278,7 @@ export class BaseGUI {
 		vecSize: Vector2
 	) {
 		const currLvl = spell.Level
-		if (spell.MaxLevel === 1 || spell.Level === 0) {
+		if (spell.MaxLevel === 0 || spell.Level === 0) {
 			return
 		}
 
@@ -316,5 +379,20 @@ export class BaseGUI {
 			? TextFlags.Right | TextFlags.Top
 			: TextFlags.Right | TextFlags.Bottom
 		this.Text(value.toString(), position, flags, 2, color)
+	}
+
+	private ingoreSpellMilimilistic(spell: Ability) {
+		const owner = spell.Owner
+		if (owner === undefined || owner.IsNeutral) {
+			return false
+		}
+		if (
+			owner instanceof npc_dota_hero_rubick ||
+			owner instanceof npc_dota_hero_invoker ||
+			owner instanceof npc_dota_hero_doom_bringer
+		) {
+			return spell.AbilitySlot >= 3 && spell.AbilitySlot <= 4
+		}
+		return false
 	}
 }

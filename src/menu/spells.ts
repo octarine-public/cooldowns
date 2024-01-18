@@ -34,7 +34,12 @@ export class SpellMenu extends BaseMenu {
 
 		this.Tree.SortNodes = false
 
-		this.ModeImage = this.Tree.AddDropdown("Mode images", ["Square", "Circle"])
+		this.ModeImage = this.Tree.AddDropdown("Mode images", [
+			"Square",
+			"Circle",
+			"Minimilistic"
+		])
+
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
 
 		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Green)

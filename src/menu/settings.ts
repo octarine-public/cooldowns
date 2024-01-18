@@ -112,6 +112,7 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 		super({
 			node,
 			isItem,
+			defaultState: isItem,
 			defaultY: isItem ? -25 : 4,
 			nodeName: "npc_dota_courier",
 			texture: ImageData.Paths.Icons.icon_svg_courier

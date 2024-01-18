@@ -6,7 +6,8 @@ export const enum ETeamState {
 
 export const enum EModeImage {
 	Square,
-	Round
+	Round,
+	Minimilistic
 }
 
 export const enum ELevelType {
