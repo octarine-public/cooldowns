@@ -24,6 +24,8 @@ export class BaseGUI {
 	private static readonly fontWidth = 500
 	private static readonly minItemSize = 16
 	private static readonly minSpellSize = 18
+	private static readonly itemOutlineColor = new Color(35, 38, 40)
+	private static readonly noManaOutlineColor = new Color(77, 131, 247)
 
 	private readonly itemSize = new Vector2()
 	private readonly spellSize = new Vector2()
@@ -48,7 +50,7 @@ export class BaseGUI {
 
 		if (itemState) {
 			const itemSize = BaseGUI.minItemSize + additionalSizeItem
-			this.itemSize.CopyFrom(GUIInfo.ScaleVector(itemSize * 1.3, itemSize))
+			this.itemSize.CopyFrom(GUIInfo.ScaleVector(itemSize * (88 / 64), itemSize))
 		}
 	}
 
@@ -77,35 +79,37 @@ export class BaseGUI {
 				continue
 			}
 			// width of outlined
-			const width = Math.round(border)
 			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-
 			const cooldown = spell.Cooldown,
+				texture = spell.TexturePath,
 				currCharges = spell.CurrentCharges,
+				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
 				modeImage = menu.ModeImage.SelectedID
 
 			if (modeImage === EModeImage.Minimilistic) {
-				this.GetMinimilistic(
+				this.Minimilistic(
 					spell,
 					vecPos,
 					vecSize,
-					width,
+					border,
 					position,
 					cooldown,
 					modeImage,
-					isDisable
+					isDisable,
+					noMana
 				)
 			} else {
 				this.Image(
-					spell.TexturePath,
+					texture,
 					vecPos,
 					vecSize,
-					width,
+					border,
 					cooldown,
 					modeImage,
 					spell.Level === 0 || isDisable,
 					spell.IsInAbilityPhase || spell.IsChanneling,
-					isDisable
+					isDisable,
+					noMana
 				)
 			}
 
@@ -166,7 +170,7 @@ export class BaseGUI {
 		}
 	}
 
-	protected GetMinimilistic(
+	protected Minimilistic(
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -174,10 +178,14 @@ export class BaseGUI {
 		position: Rectangle,
 		cooldown: number,
 		modeImage: EModeImage,
-		isDisable: boolean
+		isDisable: boolean,
+		noMana: boolean
 	) {
 		const minimalistic = position.Clone(),
-			ignoreMinimalistic = this.ignoreSpellMinimalistic(spell)
+			ignoreMinimalistic = this.ignoreSpellMinimalistic(spell),
+			outlinedColor = noMana
+				? BaseGUI.noManaOutlineColor.SetA(180)
+				: Color.Black.SetA(180)
 
 		if (cooldown === 0) {
 			minimalistic.Height /= 4
@@ -185,24 +193,25 @@ export class BaseGUI {
 		}
 
 		if (cooldown === 0 || !ignoreMinimalistic) {
-			RendererSDK.FilledRect(
-				minimalistic.pos1,
-				minimalistic.Size,
-				Color.Black.SetA(180)
-			)
+			RendererSDK.FilledRect(minimalistic.pos1, minimalistic.Size, outlinedColor)
 			return
 		}
 
+		const texture = spell.TexturePath,
+			grayScale = spell.Level === 0 || isDisable,
+			isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
+
 		this.Image(
-			spell.TexturePath,
+			texture,
 			vecPos,
 			vecSize,
 			width,
 			cooldown,
 			modeImage,
-			spell.Level === 0 || isDisable,
-			spell.IsInAbilityPhase || spell.IsChanneling,
-			isDisable
+			grayScale,
+			isInPhase,
+			isDisable,
+			noMana
 		)
 	}
 
@@ -214,15 +223,18 @@ export class BaseGUI {
 		RendererSDK.Image(item.TexturePath, vecPos, -1, vecSize)
 
 		// draw outline
-		const width = Math.round(border)
-		RendererSDK.OutlinedRect(vecPos, vecSize, width, new Color(35, 38, 40))
+		RendererSDK.OutlinedRect(
+			vecPos,
+			vecSize,
+			Math.round(border),
+			BaseGUI.itemOutlineColor
+		)
 
 		if (!charge && !cooldown) {
 			return
 		}
 
 		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-
 		if (charge !== 0) {
 			const charges = charge.toString()
 			this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
@@ -230,8 +242,11 @@ export class BaseGUI {
 
 		if (cooldown !== 0) {
 			// if no charge draw cooldown by center
-			const flags = charge <= 0 ? TextFlags.Center : TextFlags.Left | TextFlags.Top
+			const noCharge = charge === 0
+			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
+
+			// TODO: add text scale right offset
 			this.Text(cdText, position, flags)
 		}
 	}
@@ -241,7 +256,7 @@ export class BaseGUI {
 		position: Rectangle,
 		flags: TextFlags,
 		division = 2,
-		color: Color = Color.White
+		color = Color.White
 	) {
 		RendererSDK.TextByFlags(text, position, color, division, flags, BaseGUI.fontWidth)
 	}
@@ -260,7 +275,7 @@ export class BaseGUI {
 			.SubtractScalarX(((size.x + border) * count) / 2)
 			.AddScalarX(index * (size.x + border))
 			.AddForThis(additionalPosition)
-			.RoundForThis(1)
+			.RoundForThis()
 	}
 
 	protected SquareLevel(
@@ -275,7 +290,6 @@ export class BaseGUI {
 		}
 
 		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-
 		// if invoker abilities draw level by text
 		if (
 			spell instanceof invoker_wex ||
@@ -312,31 +326,55 @@ export class BaseGUI {
 		}
 	}
 
+	// TODO: add no mana engoy color
 	protected Image(
 		texture: string,
 		vecPos: Vector2,
 		vecSize: Vector2,
-		width: number,
+		border: number,
 		cooldown: number,
 		modeImage: EModeImage,
 		grayScale: boolean,
 		isInPhase?: boolean,
-		isDisable?: boolean
+		isDisable?: boolean,
+		noMana?: boolean
 	) {
-		const isCircle = modeImage === EModeImage.Round ? 0 : -1,
-			outlinedColor =
-				cooldown !== 0 || isDisable
-					? Color.Red
-					: isInPhase
-						? Color.Green
-						: Color.Black
+		let outlinedColor = Color.Black
+		const isCircle = modeImage === EModeImage.Round ? 0 : -1
 
-		switch (modeImage) {
-			case EModeImage.Round:
-				RendererSDK.OutlinedCircle(vecPos, vecSize, outlinedColor, width)
+		// color for outline
+		switch (true) {
+			case noMana:
+				outlinedColor = BaseGUI.noManaOutlineColor
+				break
+			case isInPhase:
+				outlinedColor = Color.Green
+				break
+			case cooldown !== 0 || isDisable:
+				outlinedColor = Color.Red
 				break
 			default:
-				RendererSDK.OutlinedRect(vecPos, vecSize, width, outlinedColor)
+				outlinedColor = Color.Black
+				break
+		}
+
+		// draw outline
+		switch (modeImage) {
+			case EModeImage.Round:
+				RendererSDK.OutlinedCircle(
+					vecPos,
+					vecSize,
+					outlinedColor,
+					Math.round(border)
+				)
+				break
+			default:
+				RendererSDK.OutlinedRect(
+					vecPos,
+					vecSize,
+					Math.round(border),
+					outlinedColor
+				)
 				break
 		}
 		// draw texture spell / item
