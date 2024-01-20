@@ -1,4 +1,5 @@
 import {
+	ImageData,
 	Menu,
 	NotificationsSDK,
 	ResetSettingsUpdated,
@@ -24,15 +25,11 @@ export class MenuManager {
 	private readonly sleeper = new Sleeper()
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
-	private readonly nodeImage =
-		"panorama/images/hud/reborn/icon_attack_speed2_psd.vtex_c"
-
 	constructor() {
 		this.baseNode = this.visual.AddNode(
 			"Cooldowns",
-			this.nodeImage,
-			"Displays cooldowns for spells and items",
-			0
+			ImageData.Paths.Icons.icon_svg_time_fast,
+			"Displays cooldowns for spells and items"
 		)
 		this.baseNode.SortNodes = false
 
