@@ -55,7 +55,7 @@ export class UnitData {
 			return
 		}
 
-		this.UpdateGUI(position, itemMenu, spellMenu)
+		this.UpdateGUI(position, itemMenu, spellMenu, modifierMenu)
 
 		if (itemState && this.items.length) {
 			this.itemGUI.Draw(
@@ -120,20 +120,17 @@ export class UnitData {
 		}
 	}
 
-	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu) {
+	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
 		const owner = this.Owner
-
 		if (
 			owner instanceof npc_dota_visage_familiar &&
 			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
 		) {
 			return menu.Familiar.Position
 		}
-
 		if (owner.IsCreep && menu instanceof SpellMenu) {
 			return menu.Creep.Position
 		}
-
 		switch (true) {
 			case owner.IsHero:
 				return menu.Hero.Position
@@ -148,9 +145,15 @@ export class UnitData {
 		}
 	}
 
-	protected UpdateGUI(position: Vector2, itemMenu: ItemMenu, spellMenu: SpellMenu) {
+	protected UpdateGUI(
+		position: Vector2,
+		itemMenu: ItemMenu,
+		spellMenu: SpellMenu,
+		modifierMenu: ModifierMenu
+	) {
 		const itemState = itemMenu.State.value,
 			spellState = spellMenu.State.value,
+			modifierState = modifierMenu.State.value,
 			healthBarSize = this.Owner.HealthBarSize
 
 		if (itemState) {
@@ -159,6 +162,10 @@ export class UnitData {
 
 		if (spellState) {
 			this.spellGUI.Update(position, healthBarSize, spellMenu.Size.value)
+		}
+
+		if (modifierState) {
+			this.modifierGUI.Update(position, healthBarSize, modifierMenu.Size.value)
 		}
 	}
 }

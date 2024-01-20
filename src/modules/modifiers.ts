@@ -7,7 +7,10 @@ import {
 import { MenuManager } from "../menu"
 
 export class ModifierManager {
-	private readonly ignoreList = new Set<string>(["modifier_lion_finger_of_death"])
+	private readonly ignoreList = new Set<string>([
+		"modifier_lion_finger_of_death",
+		"modifier_special_bonus_attributes"
+	])
 
 	private readonly allowAuraList = new Set<string>([
 		"modifier_nevermore_presence",

@@ -135,7 +135,7 @@ export class SpellGUI extends BaseGUI {
 		noMana: boolean
 	) {
 		const minimalistic = position.Clone(),
-			ignoreMinimalistic = this.ignoreSpellMinimalistic(spell),
+			ignoreMinimalistic = this.ignoreMinimalistic(spell),
 			outlinedColor = noMana
 				? BaseGUI.noManaOutlineColor.SetA(180)
 				: Color.Black.SetA(180)
@@ -168,7 +168,6 @@ export class SpellGUI extends BaseGUI {
 		)
 	}
 
-	// TODO: add no mana engoy color
 	private Image(
 		texture: string,
 		vecPos: Vector2,
@@ -300,7 +299,7 @@ export class SpellGUI extends BaseGUI {
 		}
 	}
 
-	private ignoreSpellMinimalistic(spell: Ability) {
+	private ignoreMinimalistic(spell: Ability) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false

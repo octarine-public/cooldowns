@@ -87,6 +87,13 @@ const bootstrap = new (class CCooldowns {
 			this.updateAllManagers(entity)
 		}
 	}
+	public AbilityHiddenChanged(abil: Ability) {
+		const owner = abil.Owner
+		if (owner === undefined || !this.ShouldUnit(owner)) {
+			return
+		}
+		this.GetOrAddUnitData(owner)?.UnitAbilitiesChanged(this.spellManager.Get(owner))
+	}
 
 	public UnitItemsChanged(unit: Unit) {
 		if (this.ShouldUnit(unit)) {
@@ -94,37 +101,30 @@ const bootstrap = new (class CCooldowns {
 		}
 	}
 
-	public AbilityHiddenChanged(abil: Ability) {
-		const owner = abil.Owner
-		if (owner === undefined) {
-			return
-		}
-		if (this.ShouldUnit(owner)) {
-			this.updateAllManagers(owner)
-		}
-	}
-
 	public UnitAbilitiesChanged(unit: Unit) {
-		if (!this.ShouldUnit(unit)) {
-			return
+		if (this.ShouldUnit(unit)) {
+			this.GetOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
 		}
-		this.GetOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
 	}
 
 	public ModifierCreated(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldUnit(owner) || !this.modifierManager.Should(owner, modifier)) {
+		if (!this.ShouldUnit(owner)) {
 			return
 		}
-		this.GetOrAddUnitData(owner)?.ModifierCreated(modifier)
+		if (this.modifierManager.Should(owner, modifier)) {
+			this.GetOrAddUnitData(owner)?.ModifierCreated(modifier)
+		}
 	}
 
 	public ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldUnit(owner) || !this.modifierManager.Should(owner, modifier)) {
+		if (!this.ShouldUnit(owner)) {
 			return
 		}
-		this.GetOrAddUnitData(owner)?.ModifierRemoved(modifier)
+		if (this.modifierManager.Should(owner, modifier)) {
+			this.GetOrAddUnitData(owner)?.ModifierRemoved(modifier)
+		}
 	}
 
 	public GameChanged() {
@@ -190,7 +190,7 @@ const bootstrap = new (class CCooldowns {
 		const unitData = this.GetOrAddUnitData(entity)
 		unitData?.ModifierRestart()
 		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
-		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
+		unitData?.UnitAbilitiesChanged(this.spellManager.Get(entity))
 	}
 
 	private menuChanged() {

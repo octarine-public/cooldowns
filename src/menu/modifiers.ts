@@ -11,7 +11,7 @@ import {
 
 export class ModifierMenu extends BaseMenu {
 	public readonly ModeImage: Menu.Dropdown
-	private readonly modeImageNames = ["Square", "Circle", "Minimalistic"]
+	private readonly modeImageNames = ["Square", "Circle"]
 
 	public readonly Hero: HeroSettingsMenu
 	public readonly Roshan: RoshanSettingsMenu
