@@ -26,12 +26,11 @@ export class MenuManager {
 	private readonly baseNode: Menu.Node
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
-	constructor(private readonly sleeper: Sleeper) {
+	constructor() {
 		this.baseNode = this.visual.AddNode(
 			"Cooldowns",
-			ImageData.Paths.Icons.icon_svg_duration,
-			"Displays cooldowns for spells and items",
-			0
+			ImageData.Paths.Icons.icon_svg_time_fast,
+			"Displays cooldowns for spells and items"
 		)
 		this.baseNode.SortNodes = false
 
