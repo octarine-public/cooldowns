@@ -1,6 +1,7 @@
 import {
 	Ability,
 	Item,
+	Modifier,
 	npc_dota_visage_familiar,
 	Unit,
 	Vector2
@@ -14,6 +15,8 @@ import { SpellMenu } from "../menu/spells"
 export class UnitData {
 	protected items: Item[] = []
 	protected spells: Ability[] = []
+	protected modifiers: Modifier[] = []
+
 	protected readonly gui = new BaseGUI()
 
 	constructor(public readonly Owner: Unit) {}

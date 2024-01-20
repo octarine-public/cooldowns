@@ -13,6 +13,7 @@ import {
 	GameRules,
 	GameState,
 	high_five,
+	Modifier,
 	npc_dota_brewmaster_earth,
 	npc_dota_brewmaster_storm,
 	npc_dota_brewmaster_void,
@@ -33,9 +34,6 @@ const bootstrap = new (class CCooldowns {
 	private readonly units = new Map<Unit, UnitData>()
 
 	constructor() {
-		const globalThisAny = globalThis as any
-		globalThisAny.CCooldowns = this.units
-
 		this.menu.MenuChnaged(() => this.menuChanged())
 	}
 
@@ -108,6 +106,18 @@ const bootstrap = new (class CCooldowns {
 			return
 		}
 		this.GetOrAddUnitData(unit)?.UnitAbilitiesChanged(this.getSpells(unit))
+	}
+
+	public ModifierCreated(modifier: Modifier) {
+		/** todo */
+	}
+
+	public ModifierRemoved(modifier: Modifier) {
+		// const owner = modifier.Parent
+		// if (owner === undefined) {
+		// 	return
+		// }
+		//this.GetOrAddUnitData(owner)?.ModifierRemoved(modifier)
 	}
 
 	public GameChanged() {
@@ -203,10 +213,10 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	private shouldExcludeSpells(unit: Unit, abil: Ability) {
-		if (abil.MaxLevel === 0 || abil.IsHidden || abil.IsAttributes) {
+		if (abil.MaxLevel === 0 || abil.IsAttributes) {
 			return true
 		}
-		if (abil.Name.includes("seasonal_")) {
+		if ((abil.IsHidden && !abil.IsEmpty) || abil.Name.includes("seasonal_")) {
 			return true
 		}
 		if (unit.IsCreep && unit.IsNeutral) {
@@ -286,3 +296,7 @@ EventsSDK.on("UnitAbilitiesChanged", unit => bootstrap.UnitAbilitiesChanged(unit
 EventsSDK.on("UnitPropertyChanged", unit => bootstrap.UnitPropertyChanged(unit))
 
 EventsSDK.on("AbilityHiddenChanged", abil => bootstrap.AbilityHiddenChanged(abil))
+
+EventsSDK.on("ModifierCreated", modifier => bootstrap.ModifierCreated(modifier))
+
+EventsSDK.on("ModifierRemoved", modifier => bootstrap.ModifierRemoved(modifier))
