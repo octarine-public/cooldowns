@@ -7,9 +7,12 @@ import {
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
-import { BaseGUI } from "../gui/index"
+import { ItemGUI } from "../gui/items"
+import { ModifierGUI } from "../gui/modifiers"
+import { SpellGUI } from "../gui/spells"
 import { MenuManager } from "../menu"
 import { ItemMenu } from "../menu/items"
+import { ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 
 export class UnitData {
@@ -17,17 +20,22 @@ export class UnitData {
 	protected spells: Ability[] = []
 	protected modifiers: Modifier[] = []
 
-	protected readonly gui = new BaseGUI()
+	private readonly itemGUI = new ItemGUI()
+	private readonly spellGUI = new SpellGUI()
+	private readonly modifierGUI = new ModifierGUI()
 
 	constructor(public readonly Owner: Unit) {}
 
 	public Draw(menu: MenuManager) {
 		const itemMenu = menu.ItemMenu,
-			spellMenu = menu.SpellMenu
+			spellMenu = menu.SpellMenu,
+			modifierMenu = menu.ModifierMenu
 
-		const itemState = itemMenu.State.value
-		const spellState = spellMenu.State.value
-		if (!itemState && !spellState) {
+		const itemState = itemMenu.State.value,
+			spellState = spellMenu.State.value,
+			modifierState = modifierMenu.State.value
+
+		if (!itemState && !spellState && !modifierState) {
 			return
 		}
 
@@ -47,30 +55,31 @@ export class UnitData {
 			return
 		}
 
-		this.gui.Update(
-			position,
-			this.Owner.HealthBarSize,
-			itemMenu.Size.value,
-			spellMenu.Size.value,
-			itemState,
-			spellState
-		)
+		this.UpdateGUI(position, itemMenu, spellMenu)
 
 		if (itemState && this.items.length) {
-			this.gui.DrawItems(
+			this.itemGUI.Draw(
 				itemMenu,
-				owner.IsMuted,
 				this.items,
-				this.GetAdditionalPosition(itemMenu)
+				this.GetAdditionalPosition(itemMenu),
+				owner.IsMuted
 			)
 		}
 
 		if (spellState && this.spells.length) {
-			this.gui.DrawSpells(
+			this.spellGUI.Draw(
 				spellMenu,
-				owner.IsSilenced,
 				this.spells,
-				this.GetAdditionalPosition(spellMenu)
+				this.GetAdditionalPosition(spellMenu),
+				owner.IsSilenced
+			)
+		}
+
+		if (modifierState && this.modifiers.length) {
+			this.modifierGUI.Draw(
+				modifierMenu,
+				this.modifiers,
+				this.GetAdditionalPosition(itemMenu)
 			)
 		}
 	}
@@ -82,6 +91,20 @@ export class UnitData {
 	public UnitAbilitiesChanged(newAbils: Ability[]) {
 		this.spells = newAbils
 		this.spells.orderBy(x => x.IsUltimate)
+	}
+
+	public ModifierCreated(modifier: Modifier) {
+		if (!this.modifiers.includes(modifier)) {
+			this.modifiers.push(modifier)
+		}
+	}
+
+	public ModifierRemoved(modifier: Modifier) {
+		this.modifiers.remove(modifier)
+	}
+
+	public ModifierRestart() {
+		this.modifiers = this.Owner.Buffs
 	}
 
 	public EntityDestroyed(entity: Item | Ability) {
@@ -99,14 +122,21 @@ export class UnitData {
 
 	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu) {
 		const owner = this.Owner
+
+		if (
+			owner instanceof npc_dota_visage_familiar &&
+			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
+		) {
+			return menu.Familiar.Position
+		}
+
+		if (owner.IsCreep && menu instanceof SpellMenu) {
+			return menu.Creep.Position
+		}
+
 		switch (true) {
 			case owner.IsHero:
 				return menu.Hero.Position
-			case menu.IsSpellMenu<SpellMenu>(menu) &&
-				owner instanceof npc_dota_visage_familiar:
-				return menu.Familiar.Position
-			case menu.IsSpellMenu<SpellMenu>(menu) && owner.IsCreep:
-				return menu.Creep.Position
 			case owner.IsRoshan:
 				return menu.Roshan.Position
 			case owner.IsCourier:
@@ -115,6 +145,20 @@ export class UnitData {
 				return menu.SpiritBear.Position
 			default:
 				return new Vector2()
+		}
+	}
+
+	protected UpdateGUI(position: Vector2, itemMenu: ItemMenu, spellMenu: SpellMenu) {
+		const itemState = itemMenu.State.value,
+			spellState = spellMenu.State.value,
+			healthBarSize = this.Owner.HealthBarSize
+
+		if (itemState) {
+			this.itemGUI.Update(position, healthBarSize, itemMenu.Size.value)
+		}
+
+		if (spellState) {
+			this.spellGUI.Update(position, healthBarSize, spellMenu.Size.value)
 		}
 	}
 }

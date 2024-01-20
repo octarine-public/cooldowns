@@ -1,4 +1,5 @@
 import {
+	ImageData,
 	Menu,
 	NotificationsSDK,
 	ResetSettingsUpdated,
@@ -7,6 +8,7 @@ import {
 
 import { ETeamState } from "../enum"
 import { ItemMenu } from "./items"
+import { ModifierMenu } from "./modifiers"
 import { SpellMenu } from "./spells"
 
 export class MenuManager {
@@ -16,21 +18,18 @@ export class MenuManager {
 
 	public readonly ItemMenu: ItemMenu
 	public readonly SpellMenu: SpellMenu
+	public readonly ModifierMenu: ModifierMenu
 
 	private readonly reset: Menu.Button
 
 	private readonly visual = Menu.AddEntry("Visual")
 	private readonly baseNode: Menu.Node
-	private readonly sleeper = new Sleeper()
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
-	private readonly nodeImage =
-		"panorama/images/hud/reborn/icon_attack_speed2_psd.vtex_c"
-
-	constructor() {
+	constructor(private readonly sleeper: Sleeper) {
 		this.baseNode = this.visual.AddNode(
 			"Cooldowns",
-			this.nodeImage,
+			ImageData.Paths.Icons.icon_svg_duration,
 			"Displays cooldowns for spells and items",
 			0
 		)
@@ -42,6 +41,7 @@ export class MenuManager {
 
 		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.SpellMenu = new SpellMenu(this.baseNode)
+		this.ModifierMenu = new ModifierMenu(this.baseNode)
 
 		this.reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
 		this.reset.OnValue(() => this.ResetSettings())
@@ -59,6 +59,7 @@ export class MenuManager {
 
 		this.ItemMenu.MenuChanged(callback)
 		this.SpellMenu.MenuChanged(callback)
+		this.ModifierMenu.MenuChanged(callback)
 	}
 
 	public ResetSettings() {
@@ -67,6 +68,7 @@ export class MenuManager {
 		}
 		this.ItemMenu.ResetSettings()
 		this.SpellMenu.ResetSettings()
+		this.ModifierMenu.ResetSettings()
 		this.State.value = this.State.defaultValue
 		this.Local.value = this.Local.defaultValue
 		this.Team.SelectedID = this.Team.defaultValue

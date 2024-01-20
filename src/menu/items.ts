@@ -27,10 +27,6 @@ export class ItemMenu extends BaseMenu {
 		this.SpiritBear = new BearSettingsMenu(this.Tree, true)
 	}
 
-	public IsSpellMenu<T extends BaseMenu>(menu: BaseMenu): menu is T {
-		return false
-	}
-
 	public MenuChanged(callback: () => void) {
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)

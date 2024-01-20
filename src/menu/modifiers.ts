@@ -1,54 +1,39 @@
-import { Color, Menu } from "github.com/octarine-public/wrapper/index"
+import { Menu } from "github.com/octarine-public/wrapper/index"
 
 import { BaseMenu } from "./base"
 import {
 	BearSettingsMenu,
 	CourierSettingsMenu,
-	CreepSettingsMenu,
 	FamiliarSettingsMenu,
 	HeroSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
 
-export class SpellMenu extends BaseMenu {
+export class ModifierMenu extends BaseMenu {
 	public readonly ModeImage: Menu.Dropdown
-	public readonly LevelType: Menu.Dropdown
-	public readonly LevelColor: Menu.ColorPicker
-	public readonly ChargeColor: Menu.ColorPicker
+	private readonly modeImageNames = ["Square", "Circle", "Minimalistic"]
 
 	public readonly Hero: HeroSettingsMenu
-	public readonly Creep: CreepSettingsMenu
 	public readonly Roshan: RoshanSettingsMenu
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
 
-	private readonly modeImageNames = ["Square", "Circle", "Minimalistic"]
-
 	constructor(node: Menu.Node) {
-		super({ node, defaultSize: 6, nodeName: "Spells" })
-		this.Tree.SortNodes = false
+		super({ node, nodeName: "Modifiers" })
+
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
-		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
-		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Green)
-		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
 		this.Hero = new HeroSettingsMenu(this.Tree)
-		this.Creep = new CreepSettingsMenu(this.Tree)
 		this.Roshan = new RoshanSettingsMenu(this.Tree)
+		this.Familiar = new BearSettingsMenu(this.Tree)
 		this.Courier = new CourierSettingsMenu(this.Tree)
 		this.SpiritBear = new BearSettingsMenu(this.Tree)
-		this.Familiar = new FamiliarSettingsMenu(this.Tree)
-	}
-
-	public IsSpellMenu<T extends BaseMenu>(menu: BaseMenu): menu is T {
-		return true
 	}
 
 	public MenuChanged(callback: () => void) {
 		this.ModeImage.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
-		this.Creep.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
 		this.Familiar.MenuChanged(callback)
@@ -58,16 +43,11 @@ export class SpellMenu extends BaseMenu {
 	public ResetSettings() {
 		super.ResetSettings()
 		this.Hero.ResetSettings()
-		this.Creep.ResetSettings()
 		this.Roshan.ResetSettings()
 		this.Courier.ResetSettings()
 		this.Familiar.ResetSettings()
 		this.SpiritBear.ResetSettings()
-
 		this.Size.value = this.Size.defaultValue
-		this.LevelType.SelectedID = this.LevelType.defaultValue
 		this.ModeImage.SelectedID = this.ModeImage.defaultValue
-		this.LevelColor.SelectedColor.CopyFrom(this.LevelColor.defaultColor)
-		this.ChargeColor.SelectedColor.CopyFrom(this.ChargeColor.defaultColor)
 	}
 }
