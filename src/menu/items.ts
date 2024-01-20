@@ -1,4 +1,4 @@
-import { ImageData, Menu } from "github.com/octarine-public/wrapper/index"
+import { Menu } from "github.com/octarine-public/wrapper/index"
 
 import { BaseMenu } from "./base"
 import {
@@ -14,15 +14,13 @@ export class ItemMenu extends BaseMenu {
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 
+	public readonly ModeImage: Menu.Dropdown
+	private readonly modeImageNames = ["Square", "Circle"]
+
 	constructor(node: Menu.Node) {
-		super({
-			node,
-			nodeName: "Items",
-			texture: ImageData.Paths.Icons.icon_svg_hamburger
-		})
-
+		super({ node, nodeName: "Items" })
 		this.Tree.SortNodes = false
-
+		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
 		this.Hero = new HeroSettingsMenu(this.Tree, true)
 		this.Roshan = new RoshanSettingsMenu(this.Tree, true)
 		this.Courier = new CourierSettingsMenu(this.Tree, true)

@@ -1,6 +1,7 @@
 import {
 	Ability,
 	Color,
+	EAbilitySlot,
 	GUIInfo,
 	invoker_exort,
 	invoker_quas,
@@ -24,10 +25,14 @@ export class BaseGUI {
 	private static readonly fontWidth = 500
 	private static readonly minItemSize = 16
 	private static readonly minSpellSize = 18
+	private static readonly minRoundItemSize = this.minSpellSize
+
 	private static readonly itemOutlineColor = new Color(35, 38, 40)
 	private static readonly noManaOutlineColor = new Color(77, 131, 247)
 
 	private readonly itemSize = new Vector2()
+	private readonly roundItemSize = new Vector2()
+
 	private readonly spellSize = new Vector2()
 	private readonly position = new Rectangle()
 
@@ -35,8 +40,8 @@ export class BaseGUI {
 	public Update(
 		healthBarPosition: Vector2,
 		healthBarSize: Vector2,
-		additionalSizeItem: number,
-		additionalSizeSpell: number,
+		additionalItemSize: number,
+		additionalSpellSize: number,
 		itemState: boolean,
 		spellState: boolean
 	) {
@@ -44,13 +49,15 @@ export class BaseGUI {
 		this.position.pos2.CopyFrom(healthBarPosition.Add(healthBarSize))
 
 		if (spellState) {
-			const spellSize = BaseGUI.minSpellSize + additionalSizeSpell
+			const spellSize = BaseGUI.minSpellSize + additionalSpellSize
 			this.spellSize.CopyFrom(GUIInfo.ScaleVector(spellSize, spellSize))
 		}
 
 		if (itemState) {
-			const itemSize = BaseGUI.minItemSize + additionalSizeItem
-			this.itemSize.CopyFrom(GUIInfo.ScaleVector(itemSize * (88 / 64), itemSize))
+			const square = BaseGUI.minItemSize + additionalItemSize
+			const rounded = BaseGUI.minRoundItemSize + additionalItemSize
+			this.itemSize.CopyFrom(GUIInfo.ScaleVector(square * (88 / 64), square))
+			this.roundItemSize.CopyFrom(GUIInfo.ScaleVector(rounded, rounded))
 		}
 	}
 
@@ -145,31 +152,82 @@ export class BaseGUI {
 	}
 
 	public DrawItems(
-		_menu: ItemMenu,
-		_isDisabled: boolean,
+		menu: ItemMenu,
+		isDisabled: boolean,
 		items: Item[],
 		additionalPosition: Vector2
 	) {
-		const baseSize = this.itemSize
-		const recPosition = this.position
-		const border = GUIInfo.ScaleHeight(BaseGUI.border / 2)
+		const recPosition = this.position,
+			additionalSizeItem = menu.Size.value,
+			modeImage = menu.ModeImage.SelectedID,
+			isRound = modeImage === EModeImage.Round,
+			vecSize = isRound ? this.roundItemSize : this.itemSize,
+			border = GUIInfo.ScaleHeight(BaseGUI.border / 2)
 
 		for (let index = items.length - 1; index > -1; index--) {
 			const item = items[index]
-			const vecPosition = this.GetPosition(
+			const vecPos = this.GetPosition(
 				recPosition,
-				baseSize,
+				vecSize,
 				border,
 				items.length,
 				index,
 				additionalPosition
 			)
 			// hide item if contains dota hud
-			if (GUIInfo.Contains(vecPosition)) {
+			if (GUIInfo.Contains(vecPos)) {
 				continue
 			}
-			// TODO: add circle image
-			this.SquareItems(item, vecPosition, baseSize, border)
+
+			const cooldown = item.Cooldown,
+				charge = item.CurrentCharges
+
+			const outlineColor =
+				isDisabled || item.IsMuted ? Color.Red : BaseGUI.itemOutlineColor
+
+			// draw image item
+			RendererSDK.Image(item.TexturePath, vecPos, isRound ? 0 : -1, vecSize)
+
+			// draw outline
+			if (!isRound) {
+				RendererSDK.OutlinedRect(
+					vecPos,
+					vecSize,
+					Math.round(border),
+					outlineColor
+				)
+			} else {
+				RendererSDK.OutlinedCircle(
+					vecPos,
+					vecSize,
+					outlineColor,
+					Math.round(border)
+				)
+			}
+
+			if (!charge && !cooldown) {
+				return
+			}
+
+			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
+			if (charge !== 0) {
+				const charges = charge.toString()
+				this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
+			}
+
+			if (cooldown !== 0) {
+				const minOffset = 3
+				const noCharge = charge === 0
+				// if no charge draw cooldown by center
+				const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
+				const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
+				const canOffset = !noCharge && additionalSizeItem >= minOffset
+				const textPosition = canOffset ? position.Clone() : position
+				if (canOffset) {
+					textPosition.Add(GUIInfo.ScaleVector(minOffset, minOffset))
+				}
+				this.Text(cdText, textPosition, flags)
+			}
 		}
 	}
 
@@ -216,41 +274,6 @@ export class BaseGUI {
 			isDisable,
 			noMana
 		)
-	}
-
-	protected SquareItems(item: Item, vecPos: Vector2, vecSize: Vector2, border: number) {
-		const cooldown = item.Cooldown,
-			charge = item.CurrentCharges
-
-		// draw image item
-		RendererSDK.Image(item.TexturePath, vecPos, -1, vecSize)
-
-		// draw outline
-		RendererSDK.OutlinedRect(
-			vecPos,
-			vecSize,
-			Math.round(border),
-			BaseGUI.itemOutlineColor
-		)
-
-		if (!charge && !cooldown) {
-			return
-		}
-
-		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
-		if (charge !== 0) {
-			const charges = charge.toString()
-			this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
-		}
-
-		if (cooldown !== 0) {
-			// if no charge draw cooldown by center
-			const noCharge = charge === 0
-			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
-			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
-			// TODO: add text scale right offset
-			this.Text(cdText, position, flags)
-		}
 	}
 
 	protected Text(
@@ -437,7 +460,10 @@ export class BaseGUI {
 			owner instanceof npc_dota_hero_invoker ||
 			owner instanceof npc_dota_hero_doom_bringer
 		) {
-			return spell.AbilitySlot >= 3 && spell.AbilitySlot <= 4
+			return (
+				spell.AbilitySlot === EAbilitySlot.DOTA_SPELL_SLOT_4 ||
+				spell.AbilitySlot === EAbilitySlot.DOTA_SPELL_SLOT_5
+			)
 		}
 		return false
 	}

@@ -58,7 +58,7 @@ export class UnitData {
 				itemMenu,
 				owner.IsMuted,
 				this.items,
-				this.GetAdditional(itemMenu)
+				this.GetAdditionalPosition(itemMenu)
 			)
 		}
 
@@ -67,7 +67,7 @@ export class UnitData {
 				spellMenu,
 				owner.IsSilenced,
 				this.spells,
-				this.GetAdditional(spellMenu)
+				this.GetAdditionalPosition(spellMenu)
 			)
 		}
 	}
@@ -94,7 +94,7 @@ export class UnitData {
 		}
 	}
 
-	protected GetAdditional(menu: ItemMenu | SpellMenu) {
+	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu) {
 		const owner = this.Owner
 		switch (true) {
 			case owner.IsHero:

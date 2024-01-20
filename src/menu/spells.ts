@@ -1,4 +1,4 @@
-import { Color, ImageData, Menu } from "github.com/octarine-public/wrapper/index"
+import { Color, Menu } from "github.com/octarine-public/wrapper/index"
 
 import { BaseMenu } from "./base"
 import {
@@ -12,8 +12,6 @@ import {
 
 export class SpellMenu extends BaseMenu {
 	public readonly LevelType: Menu.Dropdown
-	public readonly ModeImage: Menu.Dropdown
-
 	public readonly LevelColor: Menu.ColorPicker
 	public readonly ChargeColor: Menu.ColorPicker
 
@@ -24,27 +22,16 @@ export class SpellMenu extends BaseMenu {
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
 
+	public readonly ModeImage: Menu.Dropdown
+	private readonly modeImageNames = ["Square", "Circle", "Minimalistic"]
+
 	constructor(node: Menu.Node) {
-		super({
-			node,
-			defaultSize: 6,
-			nodeName: "Spells",
-			texture: ImageData.Paths.Icons.icon_svg_hamburger
-		})
-
+		super({ node, defaultSize: 6, nodeName: "Spells" })
 		this.Tree.SortNodes = false
-
-		this.ModeImage = this.Tree.AddDropdown("Mode images", [
-			"Square",
-			"Circle",
-			"Minimalistic"
-		])
-
+		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
-
 		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Green)
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
-
 		this.Hero = new HeroSettingsMenu(this.Tree)
 		this.Creep = new CreepSettingsMenu(this.Tree)
 		this.Roshan = new RoshanSettingsMenu(this.Tree)

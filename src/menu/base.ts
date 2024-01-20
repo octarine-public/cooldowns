@@ -1,4 +1,4 @@
-import { Menu } from "github.com/octarine-public/wrapper/index"
+import { ImageData, Menu } from "github.com/octarine-public/wrapper/index"
 
 interface IBaseBaseMenu {
 	node: Menu.Node
@@ -18,7 +18,7 @@ export class BaseMenu {
 	constructor(options: IBaseBaseMenu) {
 		this.Tree = options.node.AddNode(
 			options.nodeName,
-			options.texture,
+			options.texture ?? ImageData.Paths.Icons.icon_svg_hamburger,
 			options.tooltip,
 			options.iconRound ?? -1
 		)
