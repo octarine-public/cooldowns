@@ -50,9 +50,10 @@ export class SpellGUI extends BaseGUI {
 				recPosition,
 				vecSize,
 				border,
-				spells.length,
 				index,
-				additionalPosition
+				additionalPosition,
+				false, // vertical
+				spells.length
 			)
 			// hide item if contains dota hud
 			if (GUIInfo.Contains(vecPos)) {

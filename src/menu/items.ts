@@ -1,5 +1,6 @@
 import { Menu } from "github.com/octarine-public/wrapper/index"
 
+import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
 import {
 	BearSettingsMenu,
@@ -21,10 +22,10 @@ export class ItemMenu extends BaseMenu {
 		super({ node, nodeName: "Items" })
 		this.Tree.SortNodes = false
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
-		this.Hero = new HeroSettingsMenu(this.Tree, true)
-		this.Roshan = new RoshanSettingsMenu(this.Tree, true)
-		this.Courier = new CourierSettingsMenu(this.Tree, true)
-		this.SpiritBear = new BearSettingsMenu(this.Tree, true)
+		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Item)
+		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Item)
+		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Item)
+		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Item)
 	}
 
 	public MenuChanged(callback: () => void) {
@@ -34,11 +35,11 @@ export class ItemMenu extends BaseMenu {
 		this.SpiritBear.MenuChanged(callback)
 	}
 
-	public ResetSettings() {
-		super.ResetSettings()
-		this.Hero.ResetSettings()
-		this.Roshan.ResetSettings()
-		this.Courier.ResetSettings()
-		this.SpiritBear.ResetSettings()
+	public ResetSettings(callback: () => void) {
+		super.ResetSettings(callback)
+		this.Hero.ResetSettings(callback)
+		this.Roshan.ResetSettings(callback)
+		this.Courier.ResetSettings(callback)
+		this.SpiritBear.ResetSettings(callback)
 	}
 }

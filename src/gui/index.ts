@@ -43,10 +43,10 @@ export abstract class BaseGUI {
 		rec: Rectangle,
 		size: Vector2,
 		border: number,
-		count: number,
 		index: number,
 		additionalPosition: Vector2,
-		vertical = false
+		vertical = false,
+		count: number = 0
 	) {
 		const posX = rec.x + (rec.Width + border) / 2
 		const posY = rec.y - size.y - border * 2
@@ -54,7 +54,7 @@ export abstract class BaseGUI {
 			((size.x + border) * (vertical ? 0 : count)) / 2
 		)
 		if (vertical) {
-			center.AddScalarY(index * (size.x + border))
+			center.AddScalarY(index * (size.y + border))
 		} else {
 			center.AddScalarX(index * (size.x + border))
 		}

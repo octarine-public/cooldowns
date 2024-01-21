@@ -20,13 +20,13 @@ export class MenuManager {
 	public readonly SpellMenu: SpellMenu
 	public readonly ModifierMenu: ModifierMenu
 
-	private readonly reset: Menu.Button
+	public readonly Reset: Menu.Button
 
 	private readonly visual = Menu.AddEntry("Visual")
 	private readonly baseNode: Menu.Node
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
-	constructor() {
+	constructor(private readonly sleeper: Sleeper) {
 		this.baseNode = this.visual.AddNode(
 			"Cooldowns",
 			ImageData.Paths.Icons.icon_svg_time_fast,
@@ -42,8 +42,7 @@ export class MenuManager {
 		this.SpellMenu = new SpellMenu(this.baseNode)
 		this.ModifierMenu = new ModifierMenu(this.baseNode)
 
-		this.reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
-		this.reset.OnValue(() => this.ResetSettings())
+		this.Reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
 
 		this.Team.OnValue(call => {
 			this.Local.IsHidden = call.SelectedID !== 0
@@ -54,20 +53,20 @@ export class MenuManager {
 	public MenuChnaged(callback: () => void) {
 		this.Team.OnValue(() => callback())
 		this.Local.OnValue(() => callback())
-		this.reset.OnValue(() => callback())
 
 		this.ItemMenu.MenuChanged(callback)
 		this.SpellMenu.MenuChanged(callback)
 		this.ModifierMenu.MenuChanged(callback)
+		this.Reset.OnValue(() => this.ResetSettings(callback))
 	}
 
-	public ResetSettings() {
+	public ResetSettings(callback: () => void) {
 		if (this.sleeper.Sleeping("ResetSettings")) {
 			return
 		}
-		this.ItemMenu.ResetSettings()
-		this.SpellMenu.ResetSettings()
-		this.ModifierMenu.ResetSettings()
+		this.ItemMenu.ResetSettings(callback)
+		this.SpellMenu.ResetSettings(callback)
+		this.ModifierMenu.ResetSettings(callback)
 		this.State.value = this.State.defaultValue
 		this.Local.value = this.Local.defaultValue
 		this.Team.SelectedID = this.Team.defaultValue

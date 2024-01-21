@@ -1,5 +1,6 @@
 import { Color, Menu } from "github.com/octarine-public/wrapper/index"
 
+import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
 import {
 	BearSettingsMenu,
@@ -32,16 +33,13 @@ export class SpellMenu extends BaseMenu {
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
 		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Green)
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
-		this.Hero = new HeroSettingsMenu(this.Tree)
-		this.Creep = new CreepSettingsMenu(this.Tree)
-		this.Roshan = new RoshanSettingsMenu(this.Tree)
-		this.Courier = new CourierSettingsMenu(this.Tree)
-		this.SpiritBear = new BearSettingsMenu(this.Tree)
-		this.Familiar = new FamiliarSettingsMenu(this.Tree)
-	}
 
-	public IsSpellMenu<T extends BaseMenu>(menu: BaseMenu): menu is T {
-		return true
+		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Spell)
+		this.Creep = new CreepSettingsMenu(this.Tree, EMenuType.Spell)
+		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Spell)
+		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Spell)
+		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Spell)
+		this.Familiar = new FamiliarSettingsMenu(this.Tree, EMenuType.Spell)
 	}
 
 	public MenuChanged(callback: () => void) {
@@ -55,14 +53,14 @@ export class SpellMenu extends BaseMenu {
 		this.SpiritBear.MenuChanged(callback)
 	}
 
-	public ResetSettings() {
-		super.ResetSettings()
-		this.Hero.ResetSettings()
-		this.Creep.ResetSettings()
-		this.Roshan.ResetSettings()
-		this.Courier.ResetSettings()
-		this.Familiar.ResetSettings()
-		this.SpiritBear.ResetSettings()
+	public ResetSettings(callback: () => void) {
+		super.ResetSettings(callback)
+		this.Hero.ResetSettings(callback)
+		this.Creep.ResetSettings(callback)
+		this.Roshan.ResetSettings(callback)
+		this.Courier.ResetSettings(callback)
+		this.Familiar.ResetSettings(callback)
+		this.SpiritBear.ResetSettings(callback)
 
 		this.Size.value = this.Size.defaultValue
 		this.LevelType.SelectedID = this.LevelType.defaultValue

@@ -65,13 +65,13 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	public EntityCreated(entity: Entity) {
-		if (this.ShouldUnit(entity)) {
+		if (this.ShouldBeUnit(entity)) {
 			this.updateAllManagers(entity)
 		}
 	}
 
 	public EntityDestroyed(entity: Entity) {
-		if (this.ShouldUnit(entity)) {
+		if (this.ShouldBeUnit(entity)) {
 			this.units.delete(entity)
 		}
 	}
@@ -87,42 +87,64 @@ const bootstrap = new (class CCooldowns {
 			this.updateAllManagers(entity)
 		}
 	}
+
 	public AbilityHiddenChanged(abil: Ability) {
 		const owner = abil.Owner
-		if (owner === undefined || !this.ShouldUnit(owner)) {
+		if (!this.ShouldBeUnit(owner)) {
 			return
 		}
 		this.GetOrAddUnitData(owner)?.UnitAbilitiesChanged(this.spellManager.Get(owner))
 	}
 
 	public UnitItemsChanged(unit: Unit) {
-		if (this.ShouldUnit(unit)) {
+		if (this.ShouldBeUnit(unit)) {
 			this.GetOrAddUnitData(unit)?.UnitItemsChanged(this.itemManager.Get(unit))
 		}
 	}
 
 	public UnitAbilitiesChanged(unit: Unit) {
-		if (this.ShouldUnit(unit)) {
+		if (this.ShouldBeUnit(unit)) {
 			this.GetOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
+		}
+	}
+
+	public ModifierChanged(modifier: Modifier) {
+		const owner = modifier.Parent
+		if (!this.ShouldBeUnit(owner)) {
+			return
+		}
+		const unitData = this.GetOrAddUnitData(owner)
+		if (unitData === undefined) {
+			return
+		}
+		// console.log(
+		// 	modifier.Name,
+		// 	modifier.StackCount,
+		// 	this.modifierManager.ShouldBeValid(owner, modifier) ? "add" : "remove"
+		// )
+		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
+			unitData.ModifierCreated(modifier)
+		} else {
+			unitData.ModifierRemoved(modifier)
 		}
 	}
 
 	public ModifierCreated(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldUnit(owner)) {
+		if (!this.ShouldBeUnit(owner)) {
 			return
 		}
-		if (this.modifierManager.Should(owner, modifier)) {
+		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
 			this.GetOrAddUnitData(owner)?.ModifierCreated(modifier)
 		}
 	}
 
 	public ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldUnit(owner)) {
+		if (!this.ShouldBeUnit(owner)) {
 			return
 		}
-		if (this.modifierManager.Should(owner, modifier)) {
+		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
 			this.GetOrAddUnitData(owner)?.ModifierRemoved(modifier)
 		}
 	}
@@ -158,7 +180,7 @@ const bootstrap = new (class CCooldowns {
 		return getUnitData
 	}
 
-	protected ShouldUnit(entity: Nullable<Entity>): entity is Unit {
+	protected ShouldBeUnit(entity: Nullable<Entity>): entity is Unit {
 		// todo Entity#IsUnit() ?
 		if (!(entity instanceof Unit)) {
 			return false
@@ -188,8 +210,8 @@ const bootstrap = new (class CCooldowns {
 
 	private updateAllManagers(entity: Unit) {
 		const unitData = this.GetOrAddUnitData(entity)
-		unitData?.ModifierRestart()
 		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
+		unitData?.ModifierRestart(this.modifierManager.Get(entity))
 		unitData?.UnitAbilitiesChanged(this.spellManager.Get(entity))
 	}
 
@@ -197,7 +219,7 @@ const bootstrap = new (class CCooldowns {
 		const units = EntityManager.GetEntitiesByClass(Unit)
 		for (let index = units.length - 1; index > -1; index--) {
 			const unit = units[index]
-			if (this.ShouldUnit(unit)) {
+			if (this.ShouldBeUnit(unit)) {
 				this.updateAllManagers(unit)
 			}
 		}
@@ -217,6 +239,8 @@ EventsSDK.on("EntityDestroyed", entity => bootstrap.EntityDestroyed(entity))
 EventsSDK.on("UnitItemsChanged", unit => bootstrap.UnitItemsChanged(unit))
 
 EventsSDK.on("ModifierCreated", modifier => bootstrap.ModifierCreated(modifier))
+
+EventsSDK.on("ModifierChanged", modifier => bootstrap.ModifierChanged(modifier))
 
 EventsSDK.on("ModifierRemoved", modifier => bootstrap.ModifierRemoved(modifier))
 

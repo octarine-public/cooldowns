@@ -1,15 +1,19 @@
 import {
+	Color,
 	GUIInfo,
 	Modifier,
-	TickSleeper,
+	Rectangle,
+	RendererSDK,
+	TextFlags,
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
+import { EModeImage, EPositionType } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"
 import { BaseGUI } from "./index"
 
 export class ModifierGUI extends BaseGUI {
-	private static readonly minSize = 16
+	private static readonly minSize = 18
 	private readonly size = new Vector2()
 
 	public Update(
@@ -23,30 +27,159 @@ export class ModifierGUI extends BaseGUI {
 	}
 
 	public Draw(
-		_menu: ModifierMenu,
+		menu: ModifierMenu,
 		modifiers: Modifier[],
-		_additionalPosition: Vector2
+		additionalPosition: Vector2
 	): void {
-		const newModifiers = this.GetModifiers(modifiers)
+		const vecSize = this.size,
+			recPosition = this.position,
+			additionalSize = menu.Size.value,
+			modeImage = menu.ModeImage.SelectedID,
+			modePos = menu.ModePosition.SelectedID,
+			border = GUIInfo.ScaleHeight(BaseGUI.border)
 
-		this.Log(newModifiers)
+		const isRound = modeImage === EModeImage.Round,
+			vertical = modePos === EPositionType.Vertical
 
-		for (let index = newModifiers.length - 1; index > -1; index--) {
-			const modifier = newModifiers[index]
+		for (let index = modifiers.length - 1; index > -1; index--) {
+			const modifier = modifiers[index],
+				ability = modifier.Ability
+			if (ability === undefined) {
+				continue
+			}
+			const vecPos = this.GetPosition(
+				recPosition,
+				vecSize,
+				border,
+				index,
+				additionalPosition,
+				vertical
+			)
+
+			// hide item if contains dota hud
+			if (GUIInfo.Contains(vecPos)) {
+				continue
+			}
+
+			const duration = modifier.Duration,
+				charge = modifier.StackCount,
+				cooldown = modifier.RemainingTime,
+				ratio = Math.max(100 * (cooldown / duration), 0)
+
+			const position = new Rectangle(vecPos, vecPos.Add(vecSize)),
+				outlinedColor = modifier.IsEnemy() ? Color.Red : Color.Green
+
+			// draw image item
+			RendererSDK.Image(ability.TexturePath, vecPos, isRound ? 0 : -1, vecSize)
+
+			// draw outline
+			this.outline(ratio, border, position, modeImage, outlinedColor)
+
+			if (charge !== 0) {
+				const charges = charge.toString()
+				this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
+			}
+
+			if (cooldown <= 0) {
+				continue
+			}
+
+			const minOffset = 3
+			const noCharge = charge === 0
+			// if no charge draw cooldown by center
+			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
+			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
+			const canOffset = !noCharge && additionalSize >= minOffset
+			const textPosition = canOffset ? position.Clone() : position
+			if (canOffset) {
+				textPosition.Add(GUIInfo.ScaleVector(minOffset, minOffset))
+			}
+			this.Text(cdText, textPosition, flags, 2.66)
 		}
 	}
 
-	private GetModifiers(modifiers: Modifier[]): Modifier[] {
-		const maxModifiers = 1
-
-		return modifiers.filter((_, i) => i >= maxModifiers) // TODO
+	protected GetPosition(
+		rec: Rectangle,
+		size: Vector2,
+		border: number,
+		index: number,
+		additional: Vector2,
+		vertical = false
+	) {
+		const pos1 = new Vector2(rec.x, rec.y)
+		if (vertical) {
+			pos1.AddScalarY(index * (size.y + border))
+		} else {
+			pos1.AddScalarX(index * (size.x + border * 2))
+		}
+		return pos1.AddForThis(additional).RoundForThis()
 	}
 
-	private readonly sleeper = new TickSleeper()
-	private Log(...args: any[]): void {
-		if (!this.sleeper.Sleeping) {
-			console.log(...args)
-			this.sleeper.Sleep(1000)
+	private outline(
+		ratio: number,
+		border: number,
+		position: Rectangle,
+		modeImage: EModeImage,
+		outlinedColor: Color
+	) {
+		const outlineBorder = Math.round(border),
+			isCircle = modeImage === EModeImage.Round
+
+		if (isCircle) {
+			RendererSDK.Arc(
+				-90,
+				100,
+				position.pos1,
+				position.Size,
+				false,
+				outlineBorder,
+				Color.Black,
+				0,
+				undefined,
+				false,
+				true
+			)
+			RendererSDK.Arc(
+				-90,
+				ratio,
+				position.pos1,
+				position.Size,
+				false,
+				outlineBorder,
+				outlinedColor,
+				0,
+				undefined,
+				false,
+				true
+			)
+			return
 		}
+		// inner
+		RendererSDK.Radial(
+			-90,
+			100,
+			position.pos1,
+			position.Size,
+			Color.Black,
+			undefined,
+			undefined,
+			Color.Black,
+			false,
+			outlineBorder,
+			true
+		)
+		RendererSDK.Radial(
+			-90,
+			ratio,
+			position.pos1,
+			position.Size,
+			outlinedColor,
+			undefined,
+			undefined,
+			outlinedColor,
+			false,
+			outlineBorder,
+			true
+		)
 	}
 }

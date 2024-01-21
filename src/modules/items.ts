@@ -1,6 +1,6 @@
 import { DOTAScriptInventorySlot, Unit } from "github.com/octarine-public/wrapper/index"
 
-import { MenuManager } from "../menu"
+import { MenuManager } from "../menu/index"
 
 export class ItemManager {
 	constructor(private readonly menu: MenuManager) {}

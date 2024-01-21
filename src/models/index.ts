@@ -10,15 +10,15 @@ import {
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
-import { MenuManager } from "../menu"
+import { MenuManager } from "../menu/index"
 import { ItemMenu } from "../menu/items"
 import { ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 
 export class UnitData {
-	protected items: Item[] = []
-	protected spells: Ability[] = []
-	protected modifiers: Modifier[] = []
+	private items: Item[] = []
+	private spells: Ability[] = []
+	private modifiers: Modifier[] = []
 
 	private readonly itemGUI = new ItemGUI()
 	private readonly spellGUI = new SpellGUI()
@@ -79,18 +79,19 @@ export class UnitData {
 			this.modifierGUI.Draw(
 				modifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(itemMenu)
+				this.GetAdditionalPosition(modifierMenu)
 			)
 		}
 	}
 
 	public UnitItemsChanged(newItems: Item[]) {
 		this.items = newItems
+		this.items.orderBy(x => x.ItemSlot)
 	}
 
 	public UnitAbilitiesChanged(newAbils: Ability[]) {
 		this.spells = newAbils
-		this.spells.orderBy(x => x.IsUltimate)
+		this.spells.orderBy(x => x.AbilitySlot)
 	}
 
 	public ModifierCreated(modifier: Modifier) {
@@ -103,19 +104,19 @@ export class UnitData {
 		this.modifiers.remove(modifier)
 	}
 
-	public ModifierRestart() {
-		this.modifiers = this.Owner.Buffs
+	public ModifierRestart(newModifiers: Modifier[]) {
+		this.modifiers = newModifiers
 	}
 
 	public EntityDestroyed(entity: Item | Ability) {
 		switch (true) {
 			case entity instanceof Item:
 				this.items.remove(entity)
-				this.items.orderBy(x => -x.ItemSlot)
+				this.items.orderBy(x => x.ItemSlot)
 				break
 			case entity instanceof Ability:
 				this.spells.remove(entity)
-				this.spells.orderBy(x => -x.AbilitySlot)
+				this.spells.orderBy(x => x.AbilitySlot)
 				break
 		}
 	}

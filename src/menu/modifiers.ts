@@ -1,5 +1,6 @@
 import { Menu } from "github.com/octarine-public/wrapper/index"
 
+import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
 import {
 	BearSettingsMenu,
@@ -11,7 +12,10 @@ import {
 
 export class ModifierMenu extends BaseMenu {
 	public readonly ModeImage: Menu.Dropdown
+	public readonly ModePosition: Menu.Dropdown
+
 	private readonly modeImageNames = ["Square", "Circle"]
+	private readonly positionNames = ["Vertical", "Horizontal"]
 
 	public readonly Hero: HeroSettingsMenu
 	public readonly Roshan: RoshanSettingsMenu
@@ -23,15 +27,18 @@ export class ModifierMenu extends BaseMenu {
 		super({ node, nodeName: "Modifiers" })
 
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
-		this.Hero = new HeroSettingsMenu(this.Tree)
-		this.Roshan = new RoshanSettingsMenu(this.Tree)
-		this.Familiar = new BearSettingsMenu(this.Tree)
-		this.Courier = new CourierSettingsMenu(this.Tree)
-		this.SpiritBear = new BearSettingsMenu(this.Tree)
+		this.ModePosition = this.Tree.AddDropdown("Position", this.positionNames)
+
+		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Modifier)
+		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Modifier)
+		this.Familiar = new FamiliarSettingsMenu(this.Tree, EMenuType.Modifier)
+		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Modifier)
+		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Modifier)
 	}
 
 	public MenuChanged(callback: () => void) {
 		this.ModeImage.OnValue(() => callback())
+		this.ModePosition.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
@@ -40,13 +47,13 @@ export class ModifierMenu extends BaseMenu {
 		this.SpiritBear.MenuChanged(callback)
 	}
 
-	public ResetSettings() {
-		super.ResetSettings()
-		this.Hero.ResetSettings()
-		this.Roshan.ResetSettings()
-		this.Courier.ResetSettings()
-		this.Familiar.ResetSettings()
-		this.SpiritBear.ResetSettings()
+	public ResetSettings(callback: () => void) {
+		super.ResetSettings(callback)
+		this.Hero.ResetSettings(callback)
+		this.Roshan.ResetSettings(callback)
+		this.Courier.ResetSettings(callback)
+		this.Familiar.ResetSettings(callback)
+		this.SpiritBear.ResetSettings(callback)
 		this.Size.value = this.Size.defaultValue
 		this.ModeImage.SelectedID = this.ModeImage.defaultValue
 	}

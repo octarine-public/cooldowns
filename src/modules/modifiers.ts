@@ -4,49 +4,61 @@ import {
 	Unit
 } from "github.com/octarine-public/wrapper/index"
 
-import { MenuManager } from "../menu"
+import { MenuManager } from "../menu/index"
 
 export class ModifierManager {
+	// check by stack count changed
+	private readonly checkStateList = new Set<string>([
+		"modifier_slardar_bash_active",
+		"modifier_slark_essence_shift",
+		"modifier_bristleback_warpath",
+		"modifier_shredder_reactive_armor",
+		"modifier_huskar_burning_spear_debuff",
+		"modifier_slark_essence_shift_permanent_debuff"
+	])
+	// full ignore modifier name list
 	private readonly ignoreList = new Set<string>([
+		"modifier_razor_static_link",
+		"modifier_razor_link_vision",
 		"modifier_lion_finger_of_death",
+		"modifier_slark_essence_shift_buff",
+		"modifier_slark_essence_shift_debuff",
 		"modifier_special_bonus_attributes"
 	])
-
-	private readonly allowAuraList = new Set<string>([
-		"modifier_nevermore_presence",
-		"modifier_necrolyte_heartstopper_aura_effect"
-	])
-
-	private readonly allowDurationList = new Set<string>([
-		"modifier_slardar_bash_active",
-		"modifier_life_stealer_infest_effect",
-		"modifier_spirit_breaker_charge_of_darkness_vision"
-	])
+	// ignore ends with modifier name
+	private readonly ignoreByEnds: string[] = ["_stack", "_counter", "_pull", "_push"]
 
 	constructor(private readonly menu: MenuManager) {}
 
-	public Should(unit: Nullable<Unit>, modifier: Modifier) {
-		return this.stateByMenu(unit) && this.shouldExclude(modifier)
+	public ShouldBeValid(owner: Nullable<Unit>, modifier: Modifier) {
+		return this.stateByMenu(owner) && this.shouldBeValid(modifier)
 	}
 
-	private shouldExclude(modifier: Modifier) {
-		switch (true) {
-			case modifier.IsAura && !this.allowAuraList.has(modifier.Name):
-				return false
-			case modifier.Duration === -1 && !this.allowDurationList.has(modifier.Name):
-				return false
-			case modifier.Name.endsWith("_counter") || this.ignoreList.has(modifier.Name):
-				return false
-			default:
-				return true
+	public Get(owner: Nullable<Unit>) {
+		if (owner === undefined || !this.stateByMenu(owner)) {
+			return []
 		}
+		return owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
+	}
+
+	private shouldBeValid(modifier: Modifier) {
+		if (modifier.IsAura || this.ignoreList.has(modifier.Name)) {
+			return false
+		}
+		if (this.checkStateList.has(modifier.Name)) {
+			return modifier.StackCount !== 0
+		}
+		if (this.isPostfix(modifier.Name)) {
+			return false
+		}
+		return modifier.Duration !== -1
 	}
 
 	private stateByMenu(entity: Nullable<Unit>) {
 		if (entity === undefined) {
 			return false
 		}
-		const menu = this.menu.SpellMenu
+		const menu = this.menu.ModifierMenu
 		switch (true) {
 			case entity.IsHero:
 				return menu.Hero.State.value
@@ -61,5 +73,9 @@ export class ModifierManager {
 			default:
 				return false
 		}
+	}
+
+	private isPostfix(modifierName: string) {
+		return this.ignoreByEnds.some(endName => modifierName.endsWith(endName))
 	}
 }

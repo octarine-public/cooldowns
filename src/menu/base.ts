@@ -31,9 +31,10 @@ export class BaseMenu {
 		)
 	}
 
-	public ResetSettings() {
+	public ResetSettings(callback: () => void) {
 		this.Size.value = this.Size.defaultValue
 		this.State.value = this.State.defaultValue
 		this.Tree.Update()
+		callback()
 	}
 }

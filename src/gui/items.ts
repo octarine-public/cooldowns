@@ -39,7 +39,7 @@ export class ItemGUI extends BaseGUI {
 		isDisable: boolean
 	): void {
 		const recPosition = this.position,
-			additionalSizeItem = menu.Size.value,
+			additionalSize = menu.Size.value,
 			modeImage = menu.ModeImage.SelectedID,
 			isRound = modeImage === EModeImage.Round,
 			vecSize = isRound ? this.roundSize : this.size,
@@ -51,9 +51,10 @@ export class ItemGUI extends BaseGUI {
 				recPosition,
 				vecSize,
 				border,
-				items.length,
 				index,
-				additionalPosition
+				additionalPosition,
+				false, // vertical
+				items.length
 			)
 			// hide item if contains dota hud
 			if (GUIInfo.Contains(vecPos)) {
@@ -87,7 +88,7 @@ export class ItemGUI extends BaseGUI {
 			}
 
 			if (!charge && !cooldown) {
-				return
+				continue
 			}
 
 			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
@@ -105,7 +106,7 @@ export class ItemGUI extends BaseGUI {
 			// if no charge draw cooldown by center
 			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
-			const canOffset = !noCharge && additionalSizeItem >= minOffset
+			const canOffset = !noCharge && additionalSize >= minOffset
 			const textPosition = canOffset ? position.Clone() : position
 			if (canOffset) {
 				textPosition.Add(GUIInfo.ScaleVector(minOffset, minOffset))

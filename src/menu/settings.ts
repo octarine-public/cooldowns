@@ -5,16 +5,15 @@ import {
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
+import { EMenuType } from "../enum"
+
 interface IBaseSettingsMenu {
 	node: Menu.Node
 	nodeName: string
-	isItem: boolean
-	defaultState?: boolean
+	menuType: EMenuType
 	texture?: string
 	round?: number
 	tooltip?: string
-	defaultX?: number
-	defaultY?: number
 }
 
 export abstract class BaseSettingsMenu {
@@ -32,14 +31,11 @@ export abstract class BaseSettingsMenu {
 			options.round ?? -1
 		)
 
-		options.defaultX ??= 0
-		options.defaultY ??= options.isItem ? -40 : -10
-
 		this.Tree.SortNodes = false
-		this.State = this.Tree.AddToggle("State", options.defaultState ?? true)
+		this.State = this.Tree.AddToggle("State", this.defaultState ?? true)
 
-		this.PositionX = this.Tree.AddSlider("Position: X", options.defaultX, -50, 150)
-		this.PositionY = this.Tree.AddSlider("Position: Y", options.defaultY, -100, 150)
+		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -250, 250)
+		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -250, 250)
 	}
 
 	public get Position() {
@@ -49,13 +45,31 @@ export abstract class BaseSettingsMenu {
 		)
 	}
 
-	public MenuChanged(callback: () => void) {
-		this.State.OnValue(() => callback())
+	protected get defaultState(): boolean {
+		return true
 	}
 
-	public ResetSettings() {
-		this.PositionX.value = this.PositionX.defaultValue
-		this.PositionY.value = this.options.isItem ? -40 : -10
+	protected get defaultX(): number {
+		return 0
+	}
+
+	protected get defaultY(): number {
+		switch (this.options.menuType) {
+			case EMenuType.Item:
+				return -41
+			case EMenuType.Spell:
+				return -10
+			case EMenuType.Modifier:
+				return 41
+			default:
+				return 0
+		}
+	}
+
+	public abstract ResetSettings(callback: () => void): void
+
+	public MenuChanged(callback: () => void) {
+		this.State.OnValue(() => callback())
 	}
 }
 
@@ -63,18 +77,24 @@ export abstract class BaseSettingsMenu {
  * @description Offset & State from Creeps
  */
 export class CreepSettingsMenu extends BaseSettingsMenu {
-	constructor(node: Menu.Node, isItem = false) {
+	constructor(node: Menu.Node, menuType = EMenuType.Spell) {
 		super({
 			node,
-			isItem,
+			menuType,
 			nodeName: "Creeps",
-			defaultState: false,
 			texture: ImageData.Paths.Icons.icon_svg_creep
 		})
 	}
-	public ResetSettings() {
-		super.ResetSettings()
-		this.PositionY.value = 0
+
+	protected get defaultState() {
+		return false
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
 
@@ -84,20 +104,34 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 export class BearSettingsMenu extends BaseSettingsMenu {
 	constructor(
 		node: Menu.Node,
-		private readonly isItem = false
+		private readonly menuType = EMenuType.Spell
 	) {
 		super({
 			node,
-			isItem,
+			menuType,
 			round: 0,
 			nodeName: "Bear",
-			defaultY: isItem ? -32 : -3,
 			texture: ImageData.GetBearTexture()
 		})
 	}
-	public ResetSettings() {
-		super.ResetSettings()
-		this.PositionY.value = this.isItem ? -32 : -3
+
+	protected get defaultY() {
+		switch (this.menuType) {
+			case EMenuType.Item:
+				return -32
+			case EMenuType.Spell:
+			case EMenuType.Modifier:
+				return -3
+			default:
+				return 0
+		}
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
 
@@ -107,20 +141,53 @@ export class BearSettingsMenu extends BaseSettingsMenu {
 export class CourierSettingsMenu extends BaseSettingsMenu {
 	constructor(
 		node: Menu.Node,
-		private readonly isItem = false
+		private readonly menuType = EMenuType.Spell
 	) {
 		super({
 			node,
-			isItem,
-			defaultState: isItem,
-			defaultY: isItem ? -25 : 4,
+			menuType,
 			nodeName: "npc_dota_courier",
 			texture: ImageData.Paths.Icons.icon_svg_courier
 		})
 	}
-	public ResetSettings() {
-		super.ResetSettings()
-		this.PositionY.value = this.isItem ? -25 : 4
+
+	protected get defaultState() {
+		switch (this.menuType) {
+			case EMenuType.Item:
+			case EMenuType.Modifier:
+				return true
+			default:
+				return false
+		}
+	}
+
+	protected get defaultX() {
+		switch (this.menuType) {
+			case EMenuType.Modifier:
+				return 25
+			default:
+				return 0
+		}
+	}
+
+	protected get defaultY() {
+		switch (this.menuType) {
+			case EMenuType.Item:
+				return -26
+			case EMenuType.Spell:
+				return 4
+			case EMenuType.Modifier:
+				return 38
+			default:
+				return 0
+		}
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
 
@@ -128,13 +195,36 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Heroes
  */
 export class HeroSettingsMenu extends BaseSettingsMenu {
-	constructor(node: Menu.Node, isItem = false) {
+	constructor(
+		node: Menu.Node,
+		private readonly menuType = EMenuType.Spell
+	) {
 		super({
 			node,
-			isItem,
+			menuType,
 			nodeName: "Heroes",
 			texture: "menu/icons/juggernaut.svg"
 		})
+	}
+
+	protected get defaultY() {
+		switch (this.menuType) {
+			case EMenuType.Item:
+				return -41
+			case EMenuType.Spell:
+				return -10
+			case EMenuType.Modifier:
+				return 41
+			default:
+				return 0
+		}
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
 
@@ -144,19 +234,32 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 export class RoshanSettingsMenu extends BaseSettingsMenu {
 	constructor(
 		node: Menu.Node,
-		private readonly isItem = false
+		private readonly menuType = EMenuType.Spell
 	) {
 		super({
 			node,
-			isItem,
-			defaultY: isItem ? -35 : -6,
+			menuType,
 			nodeName: "npc_dota_roshan",
 			texture: ImageData.Paths.Icons.icon_roshan
 		})
 	}
-	public ResetSettings() {
-		super.ResetSettings()
-		this.PositionY.value = this.isItem ? -35 : -6
+
+	protected get defaultY() {
+		switch (this.menuType) {
+			case EMenuType.Item:
+				return -35
+			case EMenuType.Spell:
+				return -6
+			default:
+				return 0
+		}
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
 
@@ -164,18 +267,24 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Familiars
  */
 export class FamiliarSettingsMenu extends BaseSettingsMenu {
-	constructor(node: Menu.Node, isItem = false) {
+	constructor(node: Menu.Node, menuType = EMenuType.Spell) {
 		super({
 			node,
-			isItem,
+			menuType,
 			round: 0,
-			defaultY: -3,
 			nodeName: "Familiars",
 			texture: ImageData.GetHeroTexture("npc_dota_visage_familiar")
 		})
 	}
-	public ResetSettings() {
-		super.ResetSettings()
-		this.PositionY.value = -3
+
+	protected get defaultY() {
+		return -3
+	}
+
+	public ResetSettings(callback: () => void): void {
+		this.State.value = this.defaultState
+		this.PositionX.value = this.defaultX
+		this.PositionY.value = this.defaultY
+		callback()
 	}
 }
