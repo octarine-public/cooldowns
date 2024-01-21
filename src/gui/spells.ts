@@ -26,14 +26,16 @@ export class SpellGUI extends BaseGUI {
 	public Update(
 		healthBarPosition: Vector2,
 		healthBarSize: Vector2,
-		additionalSize: number
+		additionalSize: number,
+		scale: number
 	) {
-		super.Update(healthBarPosition, healthBarSize, additionalSize)
+		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
 		const size = SpellGUI.minSize + additionalSize
-		this.size.CopyFrom(GUIInfo.ScaleVector(size, size))
+		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 	}
 
 	public Draw(
+		alpha: number,
 		menu: SpellMenu,
 		spells: Ability[],
 		additionalPosition: Vector2,
@@ -68,31 +70,36 @@ export class SpellGUI extends BaseGUI {
 				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
 				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
 
-			if (modeImage === EModeImage.Minimilistic) {
-				this.Minimilistic(
-					spell,
-					vecPos,
-					vecSize,
-					border,
-					position,
-					cooldown,
-					modeImage,
-					isDisable,
-					noMana
-				)
-			} else {
-				this.Image(
-					texture,
-					vecPos,
-					vecSize,
-					border,
-					cooldown,
-					modeImage,
-					grayScale,
-					isInPhase,
-					isDisable,
-					noMana
-				)
+			switch (modeImage) {
+				case EModeImage.Minimilistic:
+					this.Minimilistic(
+						alpha,
+						spell,
+						vecPos,
+						vecSize,
+						border,
+						position,
+						cooldown,
+						modeImage,
+						isDisable,
+						noMana
+					)
+					break
+				default:
+					this.Image(
+						alpha,
+						texture,
+						vecPos,
+						vecSize,
+						border,
+						cooldown,
+						modeImage,
+						grayScale,
+						isInPhase,
+						isDisable,
+						noMana
+					)
+					break
 			}
 
 			const levelType = menu.LevelType.SelectedID,
@@ -125,6 +132,7 @@ export class SpellGUI extends BaseGUI {
 	}
 
 	private Minimilistic(
+		alpha: number,
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -156,6 +164,7 @@ export class SpellGUI extends BaseGUI {
 			isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
 
 		this.Image(
+			alpha,
 			texture,
 			vecPos,
 			vecSize,
@@ -170,6 +179,7 @@ export class SpellGUI extends BaseGUI {
 	}
 
 	private Image(
+		alpha: number,
 		texture: string,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -207,7 +217,7 @@ export class SpellGUI extends BaseGUI {
 				RendererSDK.OutlinedCircle(
 					vecPos,
 					vecSize,
-					outlinedColor,
+					outlinedColor.SetA(alpha),
 					Math.round(border)
 				)
 				break
@@ -216,12 +226,12 @@ export class SpellGUI extends BaseGUI {
 					vecPos,
 					vecSize,
 					Math.round(border),
-					outlinedColor
+					outlinedColor.SetA(alpha)
 				)
 				break
 		}
 		// draw texture spell / item
-		const imageColor = noMana ? noManaColor : Color.White
+		const imageColor = (noMana ? noManaColor : Color.White).SetA(alpha)
 		RendererSDK.Image(
 			texture,
 			vecPos,

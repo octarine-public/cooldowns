@@ -23,16 +23,21 @@ export class ItemGUI extends BaseGUI {
 	public Update(
 		healthBarPosition: Vector2,
 		healthBarSize: Vector2,
-		additionalSize: number
+		additionalSize: number,
+		scale: number
 	) {
-		super.Update(healthBarPosition, healthBarSize, additionalSize)
+		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
 		const square = ItemGUI.minSize + additionalSize
 		const rounded = ItemGUI.minRoundSize + additionalSize
-		this.size.CopyFrom(GUIInfo.ScaleVector(square * (88 / 64), square))
-		this.roundSize.CopyFrom(GUIInfo.ScaleVector(rounded, rounded))
+
+		this.size.CopyFrom(
+			GUIInfo.ScaleVector(square * (88 / 64) * scale, square * scale)
+		)
+		this.roundSize.CopyFrom(GUIInfo.ScaleVector(rounded * scale, rounded * scale))
 	}
 
 	public Draw(
+		alpha: number,
 		menu: ItemMenu,
 		items: Item[],
 		additionalPosition: Vector2,
@@ -60,15 +65,21 @@ export class ItemGUI extends BaseGUI {
 			if (GUIInfo.Contains(vecPos)) {
 				continue
 			}
-
 			const cooldown = item.Cooldown,
 				charge = item.CurrentCharges
 
-			const outlineColor =
+			const outlineColor = (
 				isDisable || item.IsMuted ? Color.Red : ItemGUI.outlineColor
+			).SetA(alpha)
 
 			// draw image item
-			RendererSDK.Image(item.TexturePath, vecPos, isRound ? 0 : -1, vecSize)
+			RendererSDK.Image(
+				item.TexturePath,
+				vecPos,
+				isRound ? 0 : -1,
+				vecSize,
+				Color.White.SetA(alpha)
+			)
 
 			// draw outline
 			if (!isRound) {

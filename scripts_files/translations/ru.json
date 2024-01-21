@@ -3,6 +3,7 @@
 	"State": "Состояние",
 	"Bear": "Медведь",
 	"Heroes": "Герои",
+	"Scale": "Масштаб",
 	"Cooldowns": "Кулдауны",
 	"Watchers": "Смотрители",
 	"Spells": "Способности",
@@ -19,7 +20,10 @@
 	"Position": "Позиция",
 	"Vertical": "Вертикально",
 	"Horizontal": "Горизонтально",
-	"Displays cooldowns for spells and items": "Отображает время восстановления\nспособностей и предметов",
+	"Opacity on hover": "Прозрачность при наведении",
 	"Reset settings to default values": "Сбросить настройки на значения по умолчанию",
-	"Additional timer size and hero image": "Доп. Размер таймера и изображения героя"
+	"Additional timer size and hero image": "Доп. Размер таймера и изображения героя",
+	"Displays cooldowns for spells and items": "Отображает время восстановления\nспособностей и предметов",
+	"Scales abilities, items and modifiers\nnear the mouse": "Масштабирует способности, предметы и модификаторы\n рядом с мышкой",
+	"Opacity abilities, items and modifiers\nnear the mouse": "Прозрачность способностей, предметов и модификаторов\n рядом с мышкой"
 }

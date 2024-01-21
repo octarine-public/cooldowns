@@ -13,17 +13,20 @@ import { SpellMenu } from "./spells"
 
 export class MenuManager {
 	public readonly State: Menu.Toggle
+	public readonly Scale: Menu.Toggle
+	public readonly OpacityByCursor: Menu.Toggle
+
 	public readonly Team: Menu.Dropdown
 	public readonly Local: Menu.Toggle
+	public readonly Opacity: Menu.Slider
 
 	public readonly ItemMenu: ItemMenu
 	public readonly SpellMenu: SpellMenu
 	public readonly ModifierMenu: ModifierMenu
 
 	public readonly Reset: Menu.Button
-
-	private readonly visual = Menu.AddEntry("Visual")
 	private readonly baseNode: Menu.Node
+	private readonly visual = Menu.AddEntry("Visual")
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
 	constructor(private readonly sleeper: Sleeper) {
@@ -35,6 +38,18 @@ export class MenuManager {
 		this.baseNode.SortNodes = false
 
 		this.State = this.baseNode.AddToggle("State", true)
+		this.Scale = this.baseNode.AddToggle(
+			"Scale",
+			false,
+			"Scales abilities, items and modifiers\nnear the mouse"
+		)
+		this.OpacityByCursor = this.baseNode.AddToggle(
+			"Opacity on hover",
+			false,
+			"Opacity abilities, items and modifiers\nnear the mouse"
+		)
+		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 0, 100)
+
 		this.Local = this.baseNode.AddToggle("Your hero", false)
 		this.Team = this.baseNode.AddDropdown("Team", this.teamArray, ETeamState.Enemy)
 
@@ -46,6 +61,11 @@ export class MenuManager {
 
 		this.Team.OnValue(call => {
 			this.Local.IsHidden = call.SelectedID !== 0
+			this.baseNode.Update()
+		})
+
+		this.OpacityByCursor.OnValue(call => {
+			this.Opacity.IsHidden = call.value
 			this.baseNode.Update()
 		})
 	}
@@ -69,7 +89,10 @@ export class MenuManager {
 		this.ModifierMenu.ResetSettings(callback)
 		this.State.value = this.State.defaultValue
 		this.Local.value = this.Local.defaultValue
+		this.Scale.value = this.Scale.defaultValue
 		this.Team.SelectedID = this.Team.defaultValue
+		this.Opacity.value = this.Opacity.defaultValue
+		this.OpacityByCursor.value = this.OpacityByCursor.defaultValue
 		NotificationsSDK.Push(new ResetSettingsUpdated())
 		this.sleeper.Sleep(2 * 1000, "ResetSettings")
 	}

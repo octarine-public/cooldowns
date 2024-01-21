@@ -19,14 +19,16 @@ export class ModifierGUI extends BaseGUI {
 	public Update(
 		healthBarPosition: Vector2,
 		healthBarSize: Vector2,
-		additionalSize: number
+		additionalSize: number,
+		scale: number
 	): void {
-		super.Update(healthBarPosition, healthBarSize, additionalSize)
+		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
 		const size = ModifierGUI.minSize + additionalSize
-		this.size.CopyFrom(GUIInfo.ScaleVector(size, size))
+		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 	}
 
 	public Draw(
+		alpha: number,
 		menu: ModifierMenu,
 		modifiers: Modifier[],
 		additionalPosition: Vector2
@@ -67,13 +69,19 @@ export class ModifierGUI extends BaseGUI {
 				ratio = Math.max(100 * (cooldown / duration), 0)
 
 			const position = new Rectangle(vecPos, vecPos.Add(vecSize)),
-				outlinedColor = modifier.IsEnemy() ? Color.Red : Color.Green
+				outlinedColor = (modifier.IsEnemy() ? Color.Red : Color.Green).SetA(alpha)
 
 			// draw image item
-			RendererSDK.Image(ability.TexturePath, vecPos, isRound ? 0 : -1, vecSize)
+			RendererSDK.Image(
+				ability.TexturePath,
+				vecPos,
+				isRound ? 0 : -1,
+				vecSize,
+				Color.White.SetA(alpha)
+			)
 
 			// draw outline
-			this.outline(ratio, border, position, modeImage, outlinedColor)
+			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 
 			if (charge !== 0) {
 				const charges = charge.toString()
@@ -108,14 +116,15 @@ export class ModifierGUI extends BaseGUI {
 	) {
 		const pos1 = new Vector2(rec.x, rec.y)
 		if (vertical) {
-			pos1.AddScalarY(index * (size.y + border))
+			pos1.AddScalarY(index * (size.y + border * 2)) // border 2 * 2
 		} else {
-			pos1.AddScalarX(index * (size.x + border * 2))
+			pos1.AddScalarX(index * (size.x + border * 2)) // border 2 * 2
 		}
 		return pos1.AddForThis(additional).RoundForThis()
 	}
 
 	private outline(
+		alpha: number,
 		ratio: number,
 		border: number,
 		position: Rectangle,
@@ -133,7 +142,7 @@ export class ModifierGUI extends BaseGUI {
 				position.Size,
 				false,
 				outlineBorder,
-				Color.Black,
+				Color.Black.SetA(alpha),
 				0,
 				undefined,
 				false,
@@ -163,7 +172,7 @@ export class ModifierGUI extends BaseGUI {
 			Color.Black,
 			undefined,
 			undefined,
-			Color.Black,
+			Color.Black.SetA(alpha),
 			false,
 			outlineBorder,
 			true

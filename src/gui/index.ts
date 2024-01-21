@@ -17,12 +17,18 @@ export abstract class BaseGUI {
 
 	protected readonly position = new Rectangle()
 
-	public Update(position: Vector2, size: Vector2, _additionalSize: number): void {
+	public Update(
+		position: Vector2,
+		size: Vector2,
+		_additionalSize: number,
+		_scale: number
+	): void {
 		this.position.pos1.CopyFrom(position)
 		this.position.pos2.CopyFrom(position.Add(size))
 	}
 
 	public abstract Draw(
+		alpha: number,
 		menu: BaseMenu,
 		data: Ability[] | Modifier[],
 		additionalPosition: Vector2,

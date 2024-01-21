@@ -1,5 +1,6 @@
 import {
 	Ability,
+	Input,
 	Item,
 	Modifier,
 	npc_dota_visage_familiar,
@@ -38,27 +39,33 @@ export class UnitData {
 		if (!itemState && !spellState && !modifierState) {
 			return
 		}
-
 		const owner = this.Owner
 		const isVisible = owner.IsFogVisible || owner.IsVisible
-
 		if (!isVisible || !owner.IsAlive || owner.HideHud) {
 			return
 		}
-
 		if (owner.IsCreep && !owner.IsSpawned) {
 			return
 		}
-
 		const position = owner.HealthBarPosition()
 		if (position === undefined) {
 			return
 		}
 
-		this.UpdateGUI(position, itemMenu, spellMenu, modifierMenu)
+		const cursor = Input.CursorOnScreen
+		const distance = cursor.Distance(position)
+
+		const scale = menu.Scale.value ? this.CalculateScale(distance) : 1
+		const alpha =
+			(menu.OpacityByCursor.value
+				? this.CalculateScale(distance)
+				: Math.max(menu.Opacity.value, 40) / 100) * 255
+
+		this.UpdateGUI(scale, position, itemMenu, spellMenu, modifierMenu)
 
 		if (itemState && this.items.length) {
 			this.itemGUI.Draw(
+				alpha,
 				itemMenu,
 				this.items,
 				this.GetAdditionalPosition(itemMenu),
@@ -68,6 +75,7 @@ export class UnitData {
 
 		if (spellState && this.spells.length) {
 			this.spellGUI.Draw(
+				alpha,
 				spellMenu,
 				this.spells,
 				this.GetAdditionalPosition(spellMenu),
@@ -77,6 +85,7 @@ export class UnitData {
 
 		if (modifierState && this.modifiers.length) {
 			this.modifierGUI.Draw(
+				alpha,
 				modifierMenu,
 				this.modifiers,
 				this.GetAdditionalPosition(modifierMenu)
@@ -147,6 +156,7 @@ export class UnitData {
 	}
 
 	protected UpdateGUI(
+		scale: number,
 		position: Vector2,
 		itemMenu: ItemMenu,
 		spellMenu: SpellMenu,
@@ -158,15 +168,24 @@ export class UnitData {
 			healthBarSize = this.Owner.HealthBarSize
 
 		if (itemState) {
-			this.itemGUI.Update(position, healthBarSize, itemMenu.Size.value)
+			this.itemGUI.Update(position, healthBarSize, itemMenu.Size.value, scale)
 		}
 
 		if (spellState) {
-			this.spellGUI.Update(position, healthBarSize, spellMenu.Size.value)
+			this.spellGUI.Update(position, healthBarSize, spellMenu.Size.value, scale)
 		}
 
 		if (modifierState) {
-			this.modifierGUI.Update(position, healthBarSize, modifierMenu.Size.value)
+			this.modifierGUI.Update(
+				position,
+				healthBarSize,
+				modifierMenu.Size.value,
+				scale
+			)
 		}
+	}
+
+	public CalculateScale(value: number) {
+		return Math.min(Math.max(0.5, value / 150), 1)
 	}
 }

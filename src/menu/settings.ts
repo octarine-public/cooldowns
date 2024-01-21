@@ -214,7 +214,7 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 			case EMenuType.Spell:
 				return -10
 			case EMenuType.Modifier:
-				return 41
+				return 19
 			default:
 				return 0
 		}
