@@ -106,15 +106,18 @@ export class UnitData {
 	public ModifierCreated(modifier: Modifier) {
 		if (!this.modifiers.includes(modifier)) {
 			this.modifiers.push(modifier)
+			this.modifiers.orderBy(x => x.CreationTime)
 		}
 	}
 
 	public ModifierRemoved(modifier: Modifier) {
 		this.modifiers.remove(modifier)
+		this.modifiers.orderBy(x => x.CreationTime)
 	}
 
 	public ModifierRestart(newModifiers: Modifier[]) {
 		this.modifiers = newModifiers
+		this.modifiers.orderBy(x => x.CreationTime)
 	}
 
 	public EntityDestroyed(entity: Item | Ability) {

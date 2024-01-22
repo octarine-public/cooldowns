@@ -14,7 +14,8 @@ export class ModifierManager {
 		"modifier_bristleback_warpath",
 		"modifier_shredder_reactive_armor",
 		"modifier_huskar_burning_spear_debuff",
-		"modifier_slark_essence_shift_permanent_debuff"
+		"modifier_slark_essence_shift_permanent_debuff",
+		"modifier_skywrath_mage_shard_bonus_counter"
 	])
 	// full ignore modifier name list
 	private readonly ignoreList = new Set<string>([
@@ -23,7 +24,8 @@ export class ModifierManager {
 		"modifier_lion_finger_of_death",
 		"modifier_slark_essence_shift_buff",
 		"modifier_slark_essence_shift_debuff",
-		"modifier_special_bonus_attributes"
+		"modifier_special_bonus_attributes",
+		"modifier_skywrath_mage_shard_bonus"
 	])
 	// ignore ends with modifier name
 	private readonly ignoreByEnds: string[] = ["_stack", "_counter", "_pull", "_push"]
