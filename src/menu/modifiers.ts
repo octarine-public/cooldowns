@@ -1,6 +1,6 @@
 import { Menu } from "github.com/octarine-public/wrapper/index"
 
-import { EMenuType } from "../enum"
+import { EMenuType, EPositionType } from "../enum"
 import { BaseMenu } from "./base"
 import {
 	BearSettingsMenu,
@@ -27,7 +27,11 @@ export class ModifierMenu extends BaseMenu {
 		super({ node, nodeName: "Modifiers" })
 
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
-		this.ModePosition = this.Tree.AddDropdown("Position", this.positionNames)
+		this.ModePosition = this.Tree.AddDropdown(
+			"Position",
+			this.positionNames,
+			EPositionType.Horizontal
+		)
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Modifier)
 		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Modifier)
