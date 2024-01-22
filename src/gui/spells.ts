@@ -30,7 +30,7 @@ export class SpellGUI extends BaseGUI {
 		scale: number
 	) {
 		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
-		const size = SpellGUI.minSize + additionalSize
+		const size = SpellGUI.minSize + additionalSize * 2
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 	}
 
@@ -285,27 +285,50 @@ export class SpellGUI extends BaseGUI {
 		// debug
 		// RendererSDK.FilledRect(imagePosition.pos1, imagePosition.Size, Color.Red)
 
-		const border = GUIInfo.ScaleHeight(1)
+		const borderThickness = Math.max(GUIInfo.ScaleHeight(1), 1)
 		const boxOffset = squarePosition.Height * 0.75
 
 		const size = new Vector2(boxOffset, boxOffset)
 
-		const fieldColor =
+		const fillColor =
 			modeImage === EModeImage.Minimilistic &&
 			(spell.Owner?.Mana ?? 0) < spell.ManaCost
 				? BaseGUI.noManaOutlineColor
 				: levelColor
 
+		const maxLvl = 4
+		const step = (vecSize.x / maxLvl) | 0
+		const borderSize = new Vector2(borderThickness, borderThickness)
+		const squareSize = new Vector2(step, step).Add(borderSize)
+
+		const startPos = position.pos1
+			.Clone()
+			.SubtractScalarX((vecSize.x - step * maxLvl) / 2)
+			.AddScalarY(position.Size.y - squareSize.y)
+
+		for (let i = 0; i < currLvl; i++) {
+			const pos = startPos.Clone().AddScalarX(step * i)
+
+			RendererSDK.FilledRect(pos, squareSize, Color.Black)
+			RendererSDK.FilledRect(
+				pos.Add(borderSize),
+				squareSize.Subtract(borderSize.MultiplyScalar(2)),
+				fillColor
+			)
+		}
+		if (Math.random() !== 2) {
+			return
+		}
 		for (let index = 0; index < currLvl; index++) {
 			const center = new Vector2(
-				squarePosition.x + border + Math.floor(squarePosition.Width / 2),
-				squarePosition.y + border
+				squarePosition.x + borderThickness + Math.floor(squarePosition.Width / 2),
+				squarePosition.y + borderThickness
 			)
-				.SubtractScalarX(((size.x + border) * currLvl) / 2)
-				.AddScalarX(index * (size.x + border))
+				.SubtractScalarX(((size.x + borderThickness) * currLvl) / 2)
+				.AddScalarX(index * (size.x + borderThickness))
 				.FloorForThis()
 
-			RendererSDK.FilledRect(center, size, fieldColor)
+			RendererSDK.FilledRect(center, size, fillColor)
 			RendererSDK.OutlinedRect(center, size, size.y / 2, Color.Black)
 		}
 	}

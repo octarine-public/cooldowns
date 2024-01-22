@@ -31,7 +31,7 @@ export class SpellMenu extends BaseMenu {
 		this.Tree.SortNodes = false
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
-		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Green)
+		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Yellow)
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Spell)
