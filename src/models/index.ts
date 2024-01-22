@@ -52,14 +52,16 @@ export class UnitData {
 			return
 		}
 
-		const cursor = Input.CursorOnScreen
-		const distance = cursor.Distance(position)
+		const cursor = Input.CursorOnScreen,
+			distance = cursor.Distance(position)
 
-		const scale = menu.Scale.value ? this.CalculateScale(distance) : 1
+		const scale = this.CalculateScale(menu.Scale.value ? distance : 1)
 		const alpha =
-			(menu.OpacityByCursor.value
-				? this.CalculateScale(distance)
-				: Math.max(menu.Opacity.value, 40) / 100) * 255
+			this.CalculateScale(
+				menu.OpacityByCursor.value
+					? distance
+					: Math.max(menu.Opacity.value, 40) / 100
+			) * 255
 
 		this.UpdateGUI(scale, position, itemMenu, spellMenu, modifierMenu)
 
@@ -185,7 +187,7 @@ export class UnitData {
 		}
 	}
 
-	public CalculateScale(value: number) {
+	protected CalculateScale(value: number) {
 		return Math.min(Math.max(0.5, value / 150), 1)
 	}
 }
