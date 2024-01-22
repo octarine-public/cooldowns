@@ -53,15 +53,13 @@ export class UnitData {
 		}
 
 		const cursor = Input.CursorOnScreen,
-			distance = cursor.Distance(position)
+			distanceScale = this.CalculateScale(cursor.Distance(position))
 
-		const scale = this.CalculateScale(menu.Scale.value ? distance : 1)
-		const alpha =
-			this.CalculateScale(
-				menu.OpacityByCursor.value
-					? distance
-					: Math.max(menu.Opacity.value, 40) / 100
-			) * 255
+		const scale = menu.Scale.value ? distanceScale : 1
+		let alpha = (menu.Opacity.value / 100) * 255
+		if (menu.OpacityByCursor.value) {
+			alpha *= distanceScale
+		}
 
 		this.UpdateGUI(scale, position, itemMenu, spellMenu, modifierMenu)
 
