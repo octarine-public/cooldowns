@@ -12,8 +12,9 @@ interface IBaseBaseMenu {
 
 export class BaseMenu {
 	public readonly Tree: Menu.Node
-	public readonly Size: Menu.Slider
 	public readonly State: Menu.Toggle
+	public readonly Size: Menu.Slider
+	public readonly Rounding: Menu.Slider
 
 	constructor(options: IBaseBaseMenu) {
 		this.Tree = options.node.AddNode(
@@ -22,6 +23,8 @@ export class BaseMenu {
 			options.tooltip,
 			options.iconRound ?? -1
 		)
+		this.Tree.SortNodes = false
+
 		this.State = this.Tree.AddToggle("State", options.defaultState ?? true)
 		this.Size = this.Tree.AddSlider(
 			"Additional size",
@@ -29,11 +32,13 @@ export class BaseMenu {
 			0,
 			20
 		)
+		this.Rounding = this.Tree.AddSlider("Rounding", 0, 0, 10)
 	}
 
 	public ResetSettings(callback: () => void) {
 		this.Size.value = this.Size.defaultValue
 		this.State.value = this.State.defaultValue
+		this.Rounding.value = this.Rounding.defaultValue
 		this.Tree.Update()
 		callback()
 	}

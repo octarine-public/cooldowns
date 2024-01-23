@@ -43,29 +43,24 @@ export class MenuManager {
 			false,
 			"Scales abilities, items and modifiers\nnear the mouse"
 		)
+		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 0, 100)
 		this.OpacityByCursor = this.baseNode.AddToggle(
 			"Opacity on hover",
 			false,
 			"Opacity abilities, items and modifiers\nnear the mouse"
 		)
-		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 0, 100)
 
-		this.Local = this.baseNode.AddToggle("Your hero", false)
 		this.Team = this.baseNode.AddDropdown("Team", this.teamArray, ETeamState.Enemy)
+		this.Local = this.baseNode.AddToggle("Your hero", false)
 
-		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.SpellMenu = new SpellMenu(this.baseNode)
+		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.ModifierMenu = new ModifierMenu(this.baseNode)
 
 		this.Reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
 
 		this.Team.OnValue(call => {
 			this.Local.IsHidden = call.SelectedID !== 0
-			this.baseNode.Update()
-		})
-
-		this.OpacityByCursor.OnValue(call => {
-			this.Opacity.IsHidden = call.value
 			this.baseNode.Update()
 		})
 	}

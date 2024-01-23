@@ -1,5 +1,6 @@
 import {
 	Ability,
+	GUIInfo,
 	Input,
 	Item,
 	Modifier,
@@ -56,10 +57,8 @@ export class UnitData {
 			distanceScale = this.CalculateScale(cursor.Distance(position))
 
 		const scale = menu.Scale.value ? distanceScale : 1
-		let alpha = (menu.Opacity.value / 100) * 255
-		if (menu.OpacityByCursor.value) {
-			alpha *= distanceScale
-		}
+		const alpha =
+			menu.Opacity.value * (255 / 100) * (menu.OpacityByCursor.value ? -1 : 1)
 
 		this.UpdateGUI(scale, position, itemMenu, spellMenu, modifierMenu)
 
@@ -189,6 +188,7 @@ export class UnitData {
 	}
 
 	protected CalculateScale(value: number) {
-		return Math.min(Math.max(0.5, value / 150), 1)
+		const startDistance = GUIInfo.ScaleHeight(150)
+		return Math.min(Math.max(0.5, value / startDistance), 1)
 	}
 }

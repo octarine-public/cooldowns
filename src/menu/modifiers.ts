@@ -26,6 +26,8 @@ export class ModifierMenu extends BaseMenu {
 	constructor(node: Menu.Node) {
 		super({ node, nodeName: "Modifiers" })
 
+		this.Rounding.IsHidden = true
+
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
 		this.ModePosition = this.Tree.AddDropdown(
 			"Position",
@@ -41,7 +43,7 @@ export class ModifierMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
-		this.ModeImage.OnValue(() => callback())
+		//this.ModeImage.OnValue(() => callback())
 		this.ModePosition.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
@@ -59,6 +61,6 @@ export class ModifierMenu extends BaseMenu {
 		this.Familiar.ResetSettings(callback)
 		this.SpiritBear.ResetSettings(callback)
 		this.Size.value = this.Size.defaultValue
-		this.ModeImage.SelectedID = this.ModeImage.defaultValue
+		//this.ModeImage.SelectedID = this.ModeImage.defaultValue
 	}
 }

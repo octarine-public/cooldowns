@@ -12,7 +12,7 @@ import {
 } from "./settings"
 
 export class SpellMenu extends BaseMenu {
-	public readonly ModeImage: Menu.Dropdown
+	public readonly IsMinimalistic: Menu.Toggle
 	public readonly LevelType: Menu.Dropdown
 	public readonly LevelColor: Menu.ColorPicker
 	public readonly ChargeColor: Menu.ColorPicker
@@ -24,12 +24,11 @@ export class SpellMenu extends BaseMenu {
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
 
-	private readonly modeImageNames = ["Square", "Circle", "Minimalistic"]
-
 	constructor(node: Menu.Node) {
-		super({ node, defaultSize: 6, nodeName: "Spells" })
+		super({ node, defaultSize: 2, nodeName: "Spells" })
 		this.Tree.SortNodes = false
-		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
+		this.Size.max /= 4
+		this.IsMinimalistic = this.Tree.AddToggle("Minimalistic", false)
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
 		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Yellow)
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
@@ -43,7 +42,7 @@ export class SpellMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
-		this.ModeImage.OnValue(() => callback())
+		//this.ModeImage.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
 		this.Creep.MenuChanged(callback)
@@ -64,7 +63,7 @@ export class SpellMenu extends BaseMenu {
 
 		this.Size.value = this.Size.defaultValue
 		this.LevelType.SelectedID = this.LevelType.defaultValue
-		this.ModeImage.SelectedID = this.ModeImage.defaultValue
+		//this.ModeImage.SelectedID = this.ModeImage.defaultValue
 		this.LevelColor.SelectedColor.CopyFrom(this.LevelColor.defaultColor)
 		this.ChargeColor.SelectedColor.CopyFrom(this.ChargeColor.defaultColor)
 	}
