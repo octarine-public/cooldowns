@@ -37,6 +37,7 @@ export class ModifierManager {
 
 	// ignore ends with modifier name
 	private readonly ignoreByEnds: string[] = [
+		"_aura",
 		"_stack",
 		"_counter",
 		"_pull",
