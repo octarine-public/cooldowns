@@ -1,6 +1,7 @@
 import {
 	Ability,
 	Color,
+	GUIInfo,
 	Modifier,
 	Rectangle,
 	RendererSDK,
@@ -34,6 +35,14 @@ export abstract class BaseGUI {
 		additionalPosition: Vector2,
 		isDisable?: boolean
 	): void
+
+	protected Contains() {
+		return (
+			GUIInfo.ContainsShop(this.position.pos1) ||
+			GUIInfo.ContainsMiniMap(this.position.pos1) ||
+			GUIInfo.ContainsScoreboard(this.position.pos1)
+		)
+	}
 
 	protected Text(
 		text: string,
