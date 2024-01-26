@@ -33,6 +33,11 @@ export class ModifierGUI extends BaseGUI {
 		modifiers: Modifier[],
 		additionalPosition: Vector2
 	): void {
+		// hide item if contains dota hud
+		if (this.Contains()) {
+			return
+		}
+
 		const vecSize = this.size,
 			recPosition = this.position,
 			additionalSize = menu.Size.value,

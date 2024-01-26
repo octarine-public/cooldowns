@@ -41,6 +41,10 @@ export class SpellGUI extends BaseGUI {
 		additionalPosition: Vector2,
 		isDisable: boolean
 	): void {
+		// hide item if contains dota hud
+		if (this.Contains()) {
+			return
+		}
 		const vecSize = this.size,
 			recPosition = this.position,
 			modeImage = menu.ModeImage.SelectedID,
@@ -57,10 +61,6 @@ export class SpellGUI extends BaseGUI {
 				false, // vertical
 				spells.length
 			)
-			// hide item if contains dota hud
-			if (GUIInfo.Contains(vecPos)) {
-				continue
-			}
 			// width of outlined
 			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
 			const cooldown = spell.Cooldown,

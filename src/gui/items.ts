@@ -43,6 +43,10 @@ export class ItemGUI extends BaseGUI {
 		additionalPosition: Vector2,
 		isDisable: boolean
 	): void {
+		// hide item if contains dota hud
+		if (this.Contains()) {
+			return
+		}
 		const recPosition = this.position,
 			additionalSize = menu.Size.value,
 			modeImage = menu.ModeImage.SelectedID,
@@ -61,13 +65,9 @@ export class ItemGUI extends BaseGUI {
 				false, // vertical
 				items.length
 			)
-			// hide item if contains dota hud
-			if (GUIInfo.Contains(vecPos)) {
-				continue
-			}
+
 			const cooldown = item.Cooldown,
 				charge = item.CurrentCharges
-
 			const outlineColor = (
 				isDisable || item.IsMuted ? Color.Red : ItemGUI.outlineColor
 			).SetA(alpha)
