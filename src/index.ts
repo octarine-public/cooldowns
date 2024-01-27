@@ -77,13 +77,13 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	public UnitPropertyChanged(entity: Unit) {
-		if (entity.IsIllusion) {
+		if (entity.IsIllusion && !entity.IsClone && !entity.IsStrongIllusion) {
 			return
 		}
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
 			this.units.delete(entity)
 		}
-		if (entity.IsClone) {
+		if (entity.IsClone || entity.IsStrongIllusion) {
 			this.updateAllManagers(entity)
 		}
 	}
