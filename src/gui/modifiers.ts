@@ -28,7 +28,7 @@ export class ModifierGUI extends BaseGUI {
 	}
 
 	public Draw(
-		alpha: number,
+		mainAlpha: number,
 		menu: ModifierMenu,
 		modifiers: Modifier[],
 		additionalPosition: Vector2
@@ -45,8 +45,7 @@ export class ModifierGUI extends BaseGUI {
 			modePos = menu.ModePosition.SelectedID,
 			border = GUIInfo.ScaleHeight(BaseGUI.border)
 
-		const isRound = modeImage === EModeImage.Round,
-			vertical = modePos === EPositionType.Vertical
+		const vertical = modePos === EPositionType.Vertical
 
 		for (let index = modifiers.length - 1; index > -1; index--) {
 			const modifier = modifiers[index],
@@ -57,36 +56,33 @@ export class ModifierGUI extends BaseGUI {
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
-				border,
+				border + 1,
 				index,
 				additionalPosition,
 				vertical
 			)
 
-			// hide item if contains dota hud
-			if (GUIInfo.Contains(vecPos)) {
-				continue
-			}
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
 
 			const duration = modifier.Duration,
 				charge = modifier.StackCount,
 				cooldown = modifier.RemainingTime,
 				ratio = Math.max(100 * (cooldown / duration), 0)
 
-			const position = new Rectangle(vecPos, vecPos.Add(vecSize)),
-				outlinedColor = (modifier.IsEnemy() ? Color.Red : Color.Green).SetA(alpha)
+			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
+			const outlinedColor = (modifier.IsEnemy() ? Color.Red : Color.Green).SetA(
+				alpha
+			)
 
+			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 			// draw image item
 			RendererSDK.Image(
 				ability.TexturePath,
 				vecPos,
-				isRound ? 0 : -1,
+				modeImage === EModeImage.Round ? 0 : -1,
 				vecSize,
 				Color.White.SetA(alpha)
 			)
-
-			// draw outline
-			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 
 			if (charge !== 0) {
 				const charges = charge.toString()
@@ -103,11 +99,11 @@ export class ModifierGUI extends BaseGUI {
 			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
 			const canOffset = !noCharge && additionalSize >= minOffset
-			const textPosition = canOffset ? position.Clone() : position
-			if (canOffset) {
-				textPosition.Add(GUIInfo.ScaleVector(minOffset, minOffset))
-			}
-			this.Text(cdText, textPosition, flags, 2.66)
+			const textPosition = canOffset
+				? position.Clone().Add(GUIInfo.ScaleVector(minOffset, minOffset))
+				: position
+
+			this.Text(cdText, textPosition, flags, 2.75)
 		}
 	}
 
@@ -132,26 +128,19 @@ export class ModifierGUI extends BaseGUI {
 		alpha: number,
 		ratio: number,
 		border: number,
-		position: Rectangle,
+		position_: Rectangle,
 		modeImage: EModeImage,
 		outlinedColor: Color
 	) {
-		const outlineBorder = Math.round(border),
-			isCircle = modeImage === EModeImage.Round
+		const position = position_.Clone()
+		const outlineBorder = border + 1
 
-		if (isCircle) {
-			RendererSDK.Arc(
-				-90,
-				100,
+		if (modeImage === EModeImage.Round) {
+			RendererSDK.OutlinedCircle(
 				position.pos1,
 				position.Size,
-				false,
-				outlineBorder,
 				Color.Black.SetA(alpha),
-				0,
-				undefined,
-				false,
-				true
+				outlineBorder * 2
 			)
 			RendererSDK.Arc(
 				-90,
@@ -159,28 +148,21 @@ export class ModifierGUI extends BaseGUI {
 				position.pos1,
 				position.Size,
 				false,
-				outlineBorder,
+				outlineBorder * 2,
 				outlinedColor,
 				0,
 				undefined,
 				false,
-				true
+				false
 			)
 			return
 		}
-		// inner
-		RendererSDK.Radial(
-			-90,
-			100,
-			position.pos1,
-			position.Size,
-			Color.Black,
-			undefined,
-			undefined,
-			Color.Black.SetA(alpha),
-			false,
+
+		RendererSDK.OutlinedRect(
+			position.pos1.AddScalar(-1),
+			position.Size.AddScalar(outlineBorder - 1),
 			outlineBorder,
-			true
+			Color.Black.SetA(alpha)
 		)
 		RendererSDK.Radial(
 			-90,

@@ -1,7 +1,7 @@
 import {
 	Ability,
 	Color,
-	GUIInfo,
+	Input,
 	Modifier,
 	Rectangle,
 	RendererSDK,
@@ -75,7 +75,20 @@ export abstract class BaseGUI {
 		}
 		return center.AddForThis(additionalPosition).RoundForThis()
 	}
-
+	protected GetRounding(menu: BaseMenu, size: Vector2): number {
+		const rnd = (menu.Rounding.value / 10) * Math.min(size.x, size.y)
+		return rnd === 1 ? -1 : rnd - 1
+	}
+	protected GetAlpha(mainAlpha: number, vecPos: Vector2, vecSize: Vector2): number {
+		if (mainAlpha > 0) {
+			return mainAlpha
+		}
+		const startDistance = (vecSize.x + vecSize.y) * 4
+		const distance = Input.CursorOnScreen.Distance(
+			vecPos.Add(vecSize.DivideScalar(2))
+		)
+		return -1 * mainAlpha * Math.min(Math.max(0.5, distance / startDistance), 1)
+	}
 	protected textChargeOrLevel(
 		value: number,
 		isCharge: boolean,

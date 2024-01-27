@@ -15,12 +15,12 @@ import {
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
-import { ELevelType, EModeImage } from "../enum"
+import { ELevelType } from "../enum"
 import { SpellMenu } from "../menu/spells"
 import { BaseGUI } from "./index"
 
 export class SpellGUI extends BaseGUI {
-	private static readonly minSize = 18
+	private static readonly minSize = 17
 	private readonly size = new Vector2()
 
 	public Update(
@@ -30,12 +30,14 @@ export class SpellGUI extends BaseGUI {
 		scale: number
 	) {
 		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
-		const size = SpellGUI.minSize + additionalSize
+		const size = SpellGUI.minSize + additionalSize * 4
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
+		this.size.x -= (this.size.x + 1) % 2
+		this.size.y -= (this.size.y + 1) % 2
 	}
 
 	public Draw(
-		alpha: number,
+		mainAlpha: number,
 		menu: SpellMenu,
 		spells: Ability[],
 		additionalPosition: Vector2,
@@ -47,7 +49,6 @@ export class SpellGUI extends BaseGUI {
 		}
 		const vecSize = this.size,
 			recPosition = this.position,
-			modeImage = menu.ModeImage.SelectedID,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
 
 		for (let index = spells.length - 1; index > -1; index--) {
@@ -61,50 +62,51 @@ export class SpellGUI extends BaseGUI {
 				false, // vertical
 				spells.length
 			)
+
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
+
 			// width of outlined
-			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
+			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 			const cooldown = spell.Cooldown,
 				texture = spell.TexturePath,
 				currCharges = spell.CurrentCharges,
 				grayScale = spell.Level === 0 || isDisable,
 				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
-				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
-
-			switch (modeImage) {
-				case EModeImage.Minimilistic:
-					this.Minimilistic(
-						alpha,
-						spell,
-						vecPos,
-						vecSize,
-						border,
-						position,
-						cooldown,
-						modeImage,
-						isDisable,
-						noMana
-					)
-					break
-				default:
-					this.Image(
-						alpha,
-						texture,
-						vecPos,
-						vecSize,
-						border,
-						cooldown,
-						modeImage,
-						grayScale,
-						isInPhase,
-						isDisable,
-						noMana
-					)
-					break
+				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
+				rounding = this.GetRounding(menu, vecSize)
+			if (menu.IsMinimalistic.value) {
+				this.Minimilistic(
+					alpha,
+					spell,
+					vecPos,
+					vecSize,
+					rounding,
+					border,
+					position,
+					cooldown,
+					isDisable,
+					noMana
+				)
+			} else {
+				this.Image(
+					alpha,
+					texture,
+					vecPos,
+					vecSize,
+					rounding,
+					border + +(rounding > 0),
+					cooldown,
+					grayScale,
+					isInPhase,
+					isDisable,
+					noMana
+				)
 			}
 
 			const levelType = menu.LevelType.SelectedID,
-				levelColor = menu.LevelColor.SelectedColor,
-				chargeColor = menu.ChargeColor.SelectedColor
+				alphaCorrect = Math.min(alpha * 1.75, 255),
+				levelColor = menu.LevelColor.SelectedColor.Clone().SetA(alphaCorrect),
+				chargeColor = menu.ChargeColor.SelectedColor.Clone().SetA(alphaCorrect)
 
 			// draw charges
 			if (currCharges !== 0) {
@@ -113,17 +115,21 @@ export class SpellGUI extends BaseGUI {
 
 			switch (levelType) {
 				case ELevelType.Square:
-					// draw level by square
-					this.SquareLevel(spell, vecPos, vecSize, modeImage, levelColor)
+					this.SquareLevel(
+						spell,
+						vecPos,
+						vecSize,
+						menu.IsMinimalistic.value,
+						levelColor,
+						Color.Black.SetA(alpha)
+					)
 					break
 				default: {
-					// draw level by text
 					this.textChargeOrLevel(spell.Level, false, position, levelColor)
 					break
 				}
 			}
 
-			// draw cooldown text
 			if (cooldown !== 0) {
 				const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
 				this.Text(cdText, position, TextFlags.Center)
@@ -136,10 +142,10 @@ export class SpellGUI extends BaseGUI {
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
+		rounding: number,
 		width: number,
 		position: Rectangle,
 		cooldown: number,
-		modeImage: EModeImage,
 		isDisable: boolean,
 		noMana: boolean
 	) {
@@ -151,7 +157,10 @@ export class SpellGUI extends BaseGUI {
 
 		if (cooldown === 0) {
 			minimalistic.Height /= 4
-			minimalistic.y += position.Width - minimalistic.Height
+			minimalistic.y +=
+				position.Width -
+				minimalistic.Height * 0.75 -
+				Math.max(GUIInfo.ScaleHeight(1), 1)
 		}
 
 		if (cooldown === 0 || !ignoreMinimalistic) {
@@ -168,9 +177,9 @@ export class SpellGUI extends BaseGUI {
 			texture,
 			vecPos,
 			vecSize,
+			rounding,
 			width,
 			cooldown,
-			modeImage,
 			grayScale,
 			isInPhase,
 			isDisable,
@@ -183,61 +192,41 @@ export class SpellGUI extends BaseGUI {
 		texture: string,
 		vecPos: Vector2,
 		vecSize: Vector2,
+		rounding: number,
 		border: number,
 		cooldown: number,
-		modeImage: EModeImage,
 		grayScale: boolean,
 		isInPhase?: boolean,
 		isDisable?: boolean,
 		noMana?: boolean
 	) {
+		const noManaColor = BaseGUI.noManaOutlineColor.Clone()
+
 		let outlinedColor = Color.Black
 
-		const noManaColor = BaseGUI.noManaOutlineColor
-		const isCircle = modeImage === EModeImage.Round ? 0 : -1
+		if (noMana) {
+			outlinedColor = noManaColor.Clone()
+		} else if (isInPhase) {
+			outlinedColor = Color.Green
+		} else if (cooldown !== 0 || isDisable) {
+			outlinedColor = Color.Red
+		}
 
-		// color for outline
-		switch (true) {
-			case noMana:
-				outlinedColor = noManaColor
-				break
-			case isInPhase:
-				outlinedColor = Color.Green
-				break
-			case cooldown !== 0 || isDisable:
-				outlinedColor = Color.Red
-				break
-			default:
-				outlinedColor = Color.Black
-				break
-		}
-		// draw outline
-		switch (modeImage) {
-			case EModeImage.Round:
-				RendererSDK.OutlinedCircle(
-					vecPos,
-					vecSize,
-					outlinedColor.SetA(alpha),
-					Math.round(border)
-				)
-				break
-			default:
-				RendererSDK.OutlinedRect(
-					vecPos,
-					vecSize,
-					Math.round(border),
-					outlinedColor.SetA(alpha)
-				)
-				break
-		}
-		// draw texture spell / item
-		const imageColor = (noMana ? noManaColor : Color.White).SetA(alpha)
+		RendererSDK.RectRounded(
+			vecPos,
+			vecSize,
+			rounding,
+			Color.fromUint32(0),
+			outlinedColor.SetA(alpha),
+			Math.round(border)
+		)
+
 		RendererSDK.Image(
 			texture,
 			vecPos,
-			isCircle,
+			rounding,
 			vecSize,
-			imageColor,
+			(noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
 			undefined,
 			undefined,
 			grayScale
@@ -245,29 +234,30 @@ export class SpellGUI extends BaseGUI {
 		if (cooldown === 0) {
 			return
 		}
-		switch (modeImage) {
-			case EModeImage.Round:
-				RendererSDK.FilledCircle(vecPos, vecSize, Color.Black.SetA(100))
-				break
-			default:
-				RendererSDK.FilledRect(vecPos, vecSize, Color.Black.SetA(100))
-				break
-		}
+		RendererSDK.RectRounded(
+			vecPos,
+			vecSize,
+			rounding,
+			Color.Black.SetA(alpha * (100 / 255)),
+			Color.fromUint32(0),
+			1
+		)
 	}
 
 	private SquareLevel(
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
-		modeImage: EModeImage,
-		levelColor: Color
+		minimalistic: boolean,
+		levelColor: Color,
+		outlineColor: Color
 	) {
 		const currLvl = spell.Level
 		if (spell.MaxLevel === 0 || spell.Level === 0) {
 			return
 		}
 
-		const position = new Rectangle(vecPos, vecPos.Add(vecSize))
+		const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 		// if invoker abilities draw level by text
 		if (
 			spell instanceof invoker_wex ||
@@ -278,35 +268,30 @@ export class SpellGUI extends BaseGUI {
 			return
 		}
 
-		const squarePosition = position.Clone()
-		squarePosition.Height /= 4
-		squarePosition.y += squarePosition.Width - squarePosition.Height
+		const fillColor = !(minimalistic && (spell.Owner?.Mana ?? 0) < spell.ManaCost)
+			? levelColor
+			: BaseGUI.noManaOutlineColor
 
-		// debug
-		// RendererSDK.FilledRect(imagePosition.pos1, imagePosition.Size, Color.Red)
+		const borderThickness = Math.max(GUIInfo.ScaleHeight(1), 1)
+		const maxLvl = 4
+		const step = ((vecSize.x + borderThickness * 2) / maxLvl) | 0
+		const borderSize = new Vector2(borderThickness, borderThickness)
+		const squareSize = new Vector2(step, Math.round(step * (1 / 2))).Add(borderSize)
 
-		const border = GUIInfo.ScaleHeight(1)
-		const boxOffset = squarePosition.Height * 0.75
+		const pos = position.pos1
+			.Clone()
+			.AddScalarX((vecSize.x - (step * maxLvl + borderThickness)) / 2) // 1px fix
+			.AddScalarX(step * (maxLvl - currLvl) * 0.5) // center
+			.AddScalarY(position.Size.y - squareSize.y)
 
-		const size = new Vector2(boxOffset, boxOffset)
-
-		const fieldColor =
-			modeImage === EModeImage.Minimilistic &&
-			(spell.Owner?.Mana ?? 0) < spell.ManaCost
-				? BaseGUI.noManaOutlineColor
-				: levelColor
-
-		for (let index = 0; index < currLvl; index++) {
-			const center = new Vector2(
-				squarePosition.x + border + Math.floor(squarePosition.Width / 2),
-				squarePosition.y + border
+		for (let i = 0; i < currLvl; i++) {
+			RendererSDK.FilledRect(pos, squareSize, outlineColor)
+			RendererSDK.FilledRect(
+				pos.Add(borderSize),
+				squareSize.Subtract(borderSize.MultiplyScalar(2)),
+				fillColor
 			)
-				.SubtractScalarX(((size.x + border) * currLvl) / 2)
-				.AddScalarX(index * (size.x + border))
-				.FloorForThis()
-
-			RendererSDK.FilledRect(center, size, fieldColor)
-			RendererSDK.OutlinedRect(center, size, size.y / 2, Color.Black)
+			pos.AddScalarX(step)
 		}
 	}
 

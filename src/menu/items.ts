@@ -15,13 +15,13 @@ export class ItemMenu extends BaseMenu {
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 
-	public readonly ModeImage: Menu.Dropdown
-	private readonly modeImageNames = ["Square", "Circle"]
+	public readonly SquareMode: Menu.Dropdown
 
 	constructor(node: Menu.Node) {
 		super({ node, nodeName: "Items" })
 		this.Tree.SortNodes = false
-		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
+		this.SquareMode = this.Tree.AddDropdown("Shape", ["Rectangle", "Square"])
+
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Item)
 		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Item)
 		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Item)

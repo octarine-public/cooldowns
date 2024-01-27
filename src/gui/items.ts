@@ -8,17 +8,14 @@ import {
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
-import { EModeImage } from "../enum"
 import { ItemMenu } from "../menu/items"
 import { BaseGUI } from "./index"
 
 export class ItemGUI extends BaseGUI {
 	private static readonly minSize = 16
-	private static readonly minRoundSize = 18
-	private static readonly outlineColor = new Color(35, 38, 40)
+	private static readonly outlineColor = Color.Black
 
 	private readonly size = new Vector2()
-	private readonly roundSize = new Vector2()
 
 	public Update(
 		healthBarPosition: Vector2,
@@ -28,16 +25,14 @@ export class ItemGUI extends BaseGUI {
 	) {
 		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
 		const square = ItemGUI.minSize + additionalSize
-		const rounded = ItemGUI.minRoundSize + additionalSize
 
 		this.size.CopyFrom(
 			GUIInfo.ScaleVector(square * (88 / 64) * scale, square * scale)
 		)
-		this.roundSize.CopyFrom(GUIInfo.ScaleVector(rounded * scale, rounded * scale))
 	}
 
 	public Draw(
-		alpha: number,
+		mainAlpha: number,
 		menu: ItemMenu,
 		items: Item[],
 		additionalPosition: Vector2,
@@ -49,10 +44,11 @@ export class ItemGUI extends BaseGUI {
 		}
 		const recPosition = this.position,
 			additionalSize = menu.Size.value,
-			modeImage = menu.ModeImage.SelectedID,
-			isRound = modeImage === EModeImage.Round,
-			vecSize = isRound ? this.roundSize : this.size,
-			border = GUIInfo.ScaleHeight(BaseGUI.border / 2)
+			vecSize = new Vector2(
+				!!menu.SquareMode.SelectedID ? this.size.y : this.size.x,
+				this.size.y
+			),
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
 
 		for (let index = items.length - 1; index > -1; index--) {
 			const item = items[index]
@@ -66,37 +62,33 @@ export class ItemGUI extends BaseGUI {
 				items.length
 			)
 
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
+
 			const cooldown = item.Cooldown,
 				charge = item.CurrentCharges
 			const outlineColor = (
-				isDisable || item.IsMuted ? Color.Red : ItemGUI.outlineColor
+				isDisable || item.IsMuted ? Color.Red : ItemGUI.outlineColor.Clone()
 			).SetA(alpha)
+
+			const rounding = this.GetRounding(menu, vecSize)
+
+			RendererSDK.RectRounded(
+				vecPos,
+				vecSize,
+				rounding,
+				Color.fromUint32(0),
+				outlineColor,
+				border + +(rounding > 0)
+			)
 
 			// draw image item
 			RendererSDK.Image(
 				item.TexturePath,
 				vecPos,
-				isRound ? 0 : -1,
+				rounding,
 				vecSize,
 				Color.White.SetA(alpha)
 			)
-
-			// draw outline
-			if (!isRound) {
-				RendererSDK.OutlinedRect(
-					vecPos,
-					vecSize,
-					Math.round(border),
-					outlineColor
-				)
-			} else {
-				RendererSDK.OutlinedCircle(
-					vecPos,
-					vecSize,
-					outlineColor,
-					Math.round(border)
-				)
-			}
 
 			if (!charge && !cooldown) {
 				continue

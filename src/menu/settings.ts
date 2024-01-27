@@ -34,8 +34,12 @@ export abstract class BaseSettingsMenu {
 		this.Tree.SortNodes = false
 		this.State = this.Tree.AddToggle("State", this.defaultState ?? true)
 
-		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -250, 250)
-		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -250, 250)
+		//const bnd = GUIInfo.ScaleHeight(100) | 0 // bound
+		//this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -bnd, bnd)
+		//this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -bnd, bnd)
+
+		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -100, 100)
+		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -100, 100)
 	}
 
 	public get Position() {
@@ -56,9 +60,9 @@ export abstract class BaseSettingsMenu {
 	protected get defaultY(): number {
 		switch (this.options.menuType) {
 			case EMenuType.Item:
-				return -41
+				return -39
 			case EMenuType.Spell:
-				return -10
+				return -8
 			case EMenuType.Modifier:
 				return 41
 			default:
@@ -118,10 +122,11 @@ export class BearSettingsMenu extends BaseSettingsMenu {
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -32
+				return -34
 			case EMenuType.Spell:
+				return -6
 			case EMenuType.Modifier:
-				return -3
+				return 19
 			default:
 				return 0
 		}
@@ -162,22 +167,17 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 	}
 
 	protected get defaultX() {
-		switch (this.menuType) {
-			case EMenuType.Modifier:
-				return 25
-			default:
-				return 0
-		}
+		return 0
 	}
 
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -26
+				return 32
 			case EMenuType.Spell:
 				return 4
 			case EMenuType.Modifier:
-				return 38
+				return 32
 			default:
 				return 0
 		}
@@ -210,9 +210,9 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -41
+				return -34
 			case EMenuType.Spell:
-				return -10
+				return -6
 			case EMenuType.Modifier:
 				return 19
 			default:
@@ -244,12 +244,22 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 		})
 	}
 
+	protected get defaultX() {
+		switch (this.menuType) {
+			case EMenuType.Modifier:
+				return 58
+			default:
+				return 0
+		}
+	}
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -35
+				return -25
 			case EMenuType.Spell:
-				return -6
+				return 3
+			case EMenuType.Modifier:
+				return 10
 			default:
 				return 0
 		}
@@ -267,7 +277,10 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Familiars
  */
 export class FamiliarSettingsMenu extends BaseSettingsMenu {
-	constructor(node: Menu.Node, menuType = EMenuType.Spell) {
+	constructor(
+		node: Menu.Node,
+		private readonly menuType = EMenuType.Spell
+	) {
 		super({
 			node,
 			menuType,
@@ -278,7 +291,14 @@ export class FamiliarSettingsMenu extends BaseSettingsMenu {
 	}
 
 	protected get defaultY() {
-		return -3
+		switch (this.menuType) {
+			case EMenuType.Spell:
+				return 1
+			case EMenuType.Modifier:
+				return 15
+			default:
+				return 0
+		}
 	}
 
 	public ResetSettings(callback: () => void): void {
