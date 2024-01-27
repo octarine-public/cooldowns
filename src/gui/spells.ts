@@ -43,6 +43,10 @@ export class SpellGUI extends BaseGUI {
 		additionalPosition: Vector2,
 		isDisable: boolean
 	): void {
+		// hide item if contains dota hud
+		if (this.Contains()) {
+			return
+		}
 		const vecSize = this.size,
 			recPosition = this.position,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1

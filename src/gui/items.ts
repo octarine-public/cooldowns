@@ -38,6 +38,10 @@ export class ItemGUI extends BaseGUI {
 		additionalPosition: Vector2,
 		isDisable: boolean
 	): void {
+		// hide item if contains dota hud
+		if (this.Contains()) {
+			return
+		}
 		const recPosition = this.position,
 			additionalSize = menu.Size.value,
 			vecSize = new Vector2(
