@@ -15,7 +15,7 @@ export class SpellManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(unit: Nullable<Unit>) {
-		if (unit === undefined || !this.stateByMenu(unit)) {
+		if (unit === undefined || !this.stateByMenu(unit) || !unit.CanUseAbilities) {
 			return []
 		}
 		return unit.Spells.filter(

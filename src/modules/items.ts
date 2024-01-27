@@ -6,7 +6,7 @@ export class ItemManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(unit: Nullable<Unit>) {
-		if (unit === undefined || !this.stateByMenu(unit)) {
+		if (unit === undefined || !this.stateByMenu(unit) || !unit.CanUseItems) {
 			return []
 		}
 		const inventory = unit.Inventory
