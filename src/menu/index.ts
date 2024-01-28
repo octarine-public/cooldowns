@@ -43,7 +43,7 @@ export class MenuManager {
 			false,
 			"Scales abilities, items and modifiers\nnear the mouse"
 		)
-		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 0, 100)
+		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 40, 100)
 		this.OpacityByCursor = this.baseNode.AddToggle(
 			"Opacity on hover",
 			false,

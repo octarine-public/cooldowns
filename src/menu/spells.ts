@@ -25,7 +25,7 @@ export class SpellMenu extends BaseMenu {
 	public readonly Familiar: FamiliarSettingsMenu
 
 	constructor(node: Menu.Node) {
-		super({ node, defaultSize: 2, nodeName: "Spells" })
+		super({ node, defaultSize: 1, nodeName: "Spells" })
 		this.Tree.SortNodes = false
 		this.Size.max /= 4
 		this.IsMinimalistic = this.Tree.AddToggle("Minimalistic", false)

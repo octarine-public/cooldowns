@@ -122,7 +122,7 @@ export class BearSettingsMenu extends BaseSettingsMenu {
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -34
+				return -32
 			case EMenuType.Spell:
 				return -6
 			case EMenuType.Modifier:
@@ -210,7 +210,7 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 	protected get defaultY() {
 		switch (this.menuType) {
 			case EMenuType.Item:
-				return -34
+				return -32
 			case EMenuType.Spell:
 				return -6
 			case EMenuType.Modifier:
