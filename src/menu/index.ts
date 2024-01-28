@@ -25,6 +25,8 @@ export class MenuManager {
 	public readonly ModifierMenu: ModifierMenu
 
 	public readonly Reset: Menu.Button
+	public readonly TestDefaultConfig: Menu.Toggle
+
 	private readonly baseNode: Menu.Node
 	private readonly visual = Menu.AddEntry("Visual")
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
@@ -59,6 +61,15 @@ export class MenuManager {
 
 		this.Reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
 
+		this.TestDefaultConfig = this.baseNode.AddToggle("is_new", true)
+		this.TestDefaultConfig.IsHidden = true
+		this.TestDefaultConfig.OnValue(_ => {
+			if (this.TestDefaultConfig.value) {
+				this.TestDefaultConfig.value = false
+				// eslint-disable-next-line @typescript-eslint/no-empty-function
+				this.ResetSettings(() => { })
+			}
+		})
 		this.Team.OnValue(call => {
 			this.Local.IsHidden = call.SelectedID !== 0
 			this.baseNode.Update()
