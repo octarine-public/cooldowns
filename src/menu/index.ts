@@ -31,7 +31,7 @@ export class MenuManager {
 
 	constructor(private readonly sleeper: Sleeper) {
 		this.baseNode = this.visual.AddNode(
-			"Cooldowns ",
+			"Cooldowns_v1",
 			ImageData.Paths.Icons.icon_svg_time_fast,
 			"Displays cooldowns for spells and items"
 		)

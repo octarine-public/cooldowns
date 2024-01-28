@@ -10,10 +10,25 @@ import { EMenuType } from "../enum"
 interface IBaseSettingsMenu {
 	node: Menu.Node
 	nodeName: string
-	menuType: EMenuType
+	mType: EMenuType
 	texture?: string
 	round?: number
 	tooltip?: string
+	defaultState?: {
+		[EMenuType.Item]: boolean
+		[EMenuType.Spell]: boolean
+		[EMenuType.Modifier]: boolean
+	}
+	defaultY?: {
+		[EMenuType.Item]: number
+		[EMenuType.Spell]: number
+		[EMenuType.Modifier]: number
+	}
+	defaultX?: {
+		[EMenuType.Item]: number
+		[EMenuType.Spell]: number
+		[EMenuType.Modifier]: number
+	}
 }
 
 export abstract class BaseSettingsMenu {
@@ -32,7 +47,7 @@ export abstract class BaseSettingsMenu {
 		)
 
 		this.Tree.SortNodes = false
-		this.State = this.Tree.AddToggle("State", this.defaultState ?? true)
+		this.State = this.Tree.AddToggle("State", this.defaultState)
 
 		//const bnd = GUIInfo.ScaleHeight(100) | 0 // bound
 		//this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -bnd, bnd)
@@ -49,25 +64,19 @@ export abstract class BaseSettingsMenu {
 		)
 	}
 
-	protected get defaultState(): boolean {
-		return true
+	protected get defaultState() {
+		const options = this.options
+		return options.defaultState?.[options.mType] ?? true
 	}
 
-	protected get defaultX(): number {
-		return 0
+	protected get defaultX() {
+		const options = this.options
+		return options.defaultX?.[options.mType] ?? 0
 	}
 
-	protected get defaultY(): number {
-		switch (this.options.menuType) {
-			case EMenuType.Item:
-				return -39
-			case EMenuType.Spell:
-				return -8
-			case EMenuType.Modifier:
-				return 41
-			default:
-				return 0
-		}
+	protected get defaultY() {
+		const options = this.options
+		return options.defaultY?.[options.mType] ?? 0
 	}
 
 	public abstract ResetSettings(callback: () => void): void
@@ -81,10 +90,10 @@ export abstract class BaseSettingsMenu {
  * @description Offset & State from Creeps
  */
 export class CreepSettingsMenu extends BaseSettingsMenu {
-	constructor(node: Menu.Node, menuType = EMenuType.Spell) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			nodeName: "Creeps",
 			texture: ImageData.Paths.Icons.icon_svg_creep
 		})
@@ -106,30 +115,19 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Bears
  */
 export class BearSettingsMenu extends BaseSettingsMenu {
-	constructor(
-		node: Menu.Node,
-		private readonly menuType = EMenuType.Spell
-	) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			round: 0,
 			nodeName: "Bear",
-			texture: ImageData.GetBearTexture()
+			texture: ImageData.GetBearTexture(),
+			defaultY: {
+				[EMenuType.Item]: -32,
+				[EMenuType.Spell]: -6,
+				[EMenuType.Modifier]: 19
+			}
 		})
-	}
-
-	protected get defaultY() {
-		switch (this.menuType) {
-			case EMenuType.Item:
-				return -32
-			case EMenuType.Spell:
-				return -6
-			case EMenuType.Modifier:
-				return 19
-			default:
-				return 0
-		}
 	}
 
 	public ResetSettings(callback: () => void): void {
@@ -144,43 +142,23 @@ export class BearSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Couriers
  */
 export class CourierSettingsMenu extends BaseSettingsMenu {
-	constructor(
-		node: Menu.Node,
-		private readonly menuType = EMenuType.Spell
-	) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			nodeName: "npc_dota_courier",
-			texture: ImageData.Paths.Icons.icon_svg_courier
+			texture: ImageData.Paths.Icons.icon_svg_courier,
+			defaultState: {
+				[EMenuType.Item]: true,
+				[EMenuType.Spell]: false,
+				[EMenuType.Modifier]: true
+			},
+			defaultY: {
+				[EMenuType.Item]: 32,
+				[EMenuType.Spell]: 4,
+				[EMenuType.Modifier]: 32
+			}
 		})
-	}
-
-	protected get defaultState() {
-		switch (this.menuType) {
-			case EMenuType.Item:
-			case EMenuType.Modifier:
-				return true
-			default:
-				return false
-		}
-	}
-
-	protected get defaultX() {
-		return 0
-	}
-
-	protected get defaultY() {
-		switch (this.menuType) {
-			case EMenuType.Item:
-				return 32
-			case EMenuType.Spell:
-				return 4
-			case EMenuType.Modifier:
-				return 32
-			default:
-				return 0
-		}
 	}
 
 	public ResetSettings(callback: () => void): void {
@@ -195,29 +173,18 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Heroes
  */
 export class HeroSettingsMenu extends BaseSettingsMenu {
-	constructor(
-		node: Menu.Node,
-		private readonly menuType = EMenuType.Spell
-	) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			nodeName: "Heroes",
-			texture: "menu/icons/juggernaut.svg"
+			texture: "menu/icons/juggernaut.svg",
+			defaultY: {
+				[EMenuType.Item]: -32,
+				[EMenuType.Spell]: -6,
+				[EMenuType.Modifier]: 19
+			}
 		})
-	}
-
-	protected get defaultY() {
-		switch (this.menuType) {
-			case EMenuType.Item:
-				return -32
-			case EMenuType.Spell:
-				return -6
-			case EMenuType.Modifier:
-				return 19
-			default:
-				return 0
-		}
 	}
 
 	public ResetSettings(callback: () => void): void {
@@ -232,37 +199,23 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Roshans
  */
 export class RoshanSettingsMenu extends BaseSettingsMenu {
-	constructor(
-		node: Menu.Node,
-		private readonly menuType = EMenuType.Spell
-	) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			nodeName: "npc_dota_roshan",
-			texture: ImageData.Paths.Icons.icon_roshan
+			texture: ImageData.Paths.Icons.icon_roshan,
+			defaultY: {
+				[EMenuType.Item]: -25,
+				[EMenuType.Spell]: 3,
+				[EMenuType.Modifier]: 10
+			},
+			defaultX: {
+				[EMenuType.Item]: 0,
+				[EMenuType.Spell]: 0,
+				[EMenuType.Modifier]: 58
+			}
 		})
-	}
-
-	protected get defaultX() {
-		switch (this.menuType) {
-			case EMenuType.Modifier:
-				return 58
-			default:
-				return 0
-		}
-	}
-	protected get defaultY() {
-		switch (this.menuType) {
-			case EMenuType.Item:
-				return -25
-			case EMenuType.Spell:
-				return 3
-			case EMenuType.Modifier:
-				return 10
-			default:
-				return 0
-		}
 	}
 
 	public ResetSettings(callback: () => void): void {
@@ -277,28 +230,19 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
  * @description Offset & State from Familiars
  */
 export class FamiliarSettingsMenu extends BaseSettingsMenu {
-	constructor(
-		node: Menu.Node,
-		private readonly menuType = EMenuType.Spell
-	) {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
 		super({
 			node,
-			menuType,
+			mType,
 			round: 0,
 			nodeName: "Familiars",
-			texture: ImageData.GetHeroTexture("npc_dota_visage_familiar")
+			texture: ImageData.GetHeroTexture("npc_dota_visage_familiar"),
+			defaultY: {
+				[EMenuType.Item]: 0,
+				[EMenuType.Spell]: 1,
+				[EMenuType.Modifier]: 15
+			}
 		})
-	}
-
-	protected get defaultY() {
-		switch (this.menuType) {
-			case EMenuType.Spell:
-				return 1
-			case EMenuType.Modifier:
-				return 15
-			default:
-				return 0
-		}
 	}
 
 	public ResetSettings(callback: () => void): void {
