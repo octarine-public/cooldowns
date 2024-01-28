@@ -39,6 +39,11 @@ export class SpellMenu extends BaseMenu {
 		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Spell)
 		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Spell)
 		this.Familiar = new FamiliarSettingsMenu(this.Tree, EMenuType.Spell)
+
+		this.IsMinimalistic.OnValue(call => {
+			this.Rounding.IsHidden = call.value
+			node.Update()
+		})
 	}
 
 	public MenuChanged(callback: () => void) {
