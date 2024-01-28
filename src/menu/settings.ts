@@ -38,8 +38,8 @@ export abstract class BaseSettingsMenu {
 		//this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -bnd, bnd)
 		//this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -bnd, bnd)
 
-		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -100, 100)
-		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -100, 100)
+		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -50, 250)
+		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -50, 250)
 	}
 
 	public get Position() {
