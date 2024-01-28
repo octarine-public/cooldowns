@@ -117,11 +117,6 @@ const bootstrap = new (class CCooldowns {
 		if (unitData === undefined) {
 			return
 		}
-		// console.log(
-		// 	modifier.Name,
-		// 	modifier.StackCount,
-		// 	this.modifierManager.ShouldBeValid(owner, modifier) ? "add" : "remove"
-		// )
 		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
 			unitData.ModifierCreated(modifier)
 		} else {

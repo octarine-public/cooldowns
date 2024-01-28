@@ -62,6 +62,9 @@ export class ModifierManager {
 		if (modifier.IsAura || this.ignoreList.has(modifier.Name)) {
 			return false
 		}
+		if (!modifier.GetTexturePath().length) {
+			return false
+		}
 		if (this.checkStateList.has(modifier.Name)) {
 			return modifier.StackCount !== 0
 		}

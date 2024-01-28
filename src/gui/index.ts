@@ -1,6 +1,7 @@
 import {
 	Ability,
 	Color,
+	GUIInfo,
 	Input,
 	Modifier,
 	Rectangle,

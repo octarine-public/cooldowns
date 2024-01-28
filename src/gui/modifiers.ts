@@ -48,11 +48,7 @@ export class ModifierGUI extends BaseGUI {
 		const vertical = modePos === EPositionType.Vertical
 
 		for (let index = modifiers.length - 1; index > -1; index--) {
-			const modifier = modifiers[index],
-				ability = modifier.Ability
-			if (ability === undefined) {
-				continue
-			}
+			const modifier = modifiers[index]
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
@@ -77,7 +73,7 @@ export class ModifierGUI extends BaseGUI {
 			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 			// draw image item
 			RendererSDK.Image(
-				ability.TexturePath,
+				modifier.GetTexturePath(),
 				vecPos,
 				modeImage === EModeImage.Round ? 0 : -1,
 				vecSize,
