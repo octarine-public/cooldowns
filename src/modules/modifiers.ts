@@ -17,7 +17,9 @@ export class ModifierManager {
 		"modifier_slark_essence_shift_permanent_debuff",
 		"modifier_skywrath_mage_shard_bonus_counter",
 		"modifier_dazzle_bad_juju_armor_counter",
-		"modifier_dazzle_bad_juju_manacost"
+		"modifier_dazzle_bad_juju_manacost",
+		"modifier_silencer_glaives_of_wisdom_buff_counter",
+		"modifier_silencer_glaives_of_wisdom_debuff_counter"
 	])
 	// full ignore modifier name list
 	private readonly ignoreList = new Set<string>([
@@ -32,7 +34,10 @@ export class ModifierManager {
 		"modifier_dazzle_bad_juju_armor",
 		"modifier_dragon_knight_frost_breath",
 		"modifier_dragon_knight_splash_attack",
-		"modifier_dragon_knight_corrosive_breath"
+		"modifier_dragon_knight_corrosive_breath",
+		"modifier_silencer_glaives_of_wisdom",
+		"modifier_silencer_glaives_of_wisdom_buff",
+		"modifier_silencer_glaives_of_wisdom_debuff"
 	])
 
 	// ignore ends with modifier name
