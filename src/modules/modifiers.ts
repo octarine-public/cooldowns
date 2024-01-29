@@ -12,6 +12,7 @@ export class ModifierManager {
 		"modifier_slardar_bash_active",
 		"modifier_slark_essence_shift",
 		"modifier_bristleback_warpath",
+		"modifier_item_eternal_shroud",
 		"modifier_shredder_reactive_armor",
 		"modifier_huskar_burning_spear_debuff",
 		"modifier_slark_essence_shift_permanent_debuff",
@@ -37,7 +38,8 @@ export class ModifierManager {
 		"modifier_dragon_knight_corrosive_breath",
 		"modifier_silencer_glaives_of_wisdom",
 		"modifier_silencer_glaives_of_wisdom_buff",
-		"modifier_silencer_glaives_of_wisdom_debuff"
+		"modifier_silencer_glaives_of_wisdom_debuff",
+		"modifier_item_eternal_shroud_bonus_magic_resist"
 	])
 
 	// ignore ends with modifier name
