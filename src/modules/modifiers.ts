@@ -19,6 +19,7 @@ export class ModifierManager {
 		"modifier_skywrath_mage_shard_bonus_counter",
 		"modifier_dazzle_bad_juju_armor_counter",
 		"modifier_dazzle_bad_juju_manacost",
+		"modifier_undying_decay_debuff_counter",
 		"modifier_silencer_glaives_of_wisdom_buff_counter",
 		"modifier_silencer_glaives_of_wisdom_debuff_counter"
 	])
@@ -33,6 +34,8 @@ export class ModifierManager {
 		"modifier_skywrath_mage_shard_bonus",
 		"modifier_teleporting_root_logic",
 		"modifier_dazzle_bad_juju_armor",
+		"modifier_undying_decay_debuff",
+		"modifier_undying_decay_buff",
 		"modifier_dragon_knight_frost_breath",
 		"modifier_dragon_knight_splash_attack",
 		"modifier_dragon_knight_corrosive_breath",
