@@ -154,9 +154,9 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 				[EMenuType.Modifier]: true
 			},
 			defaultY: {
-				[EMenuType.Item]: 32,
+				[EMenuType.Item]: 0,
 				[EMenuType.Spell]: 4,
-				[EMenuType.Modifier]: 32
+				[EMenuType.Modifier]: 13
 			}
 		})
 	}
@@ -205,15 +205,15 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 			mType,
 			nodeName: "npc_dota_roshan",
 			texture: ImageData.Paths.Icons.icon_roshan,
-			defaultY: {
-				[EMenuType.Item]: -25,
-				[EMenuType.Spell]: 3,
-				[EMenuType.Modifier]: 10
-			},
 			defaultX: {
 				[EMenuType.Item]: 0,
 				[EMenuType.Spell]: 0,
-				[EMenuType.Modifier]: 58
+				[EMenuType.Modifier]: 4
+			},
+			defaultY: {
+				[EMenuType.Item]: -33,
+				[EMenuType.Spell]: -6,
+				[EMenuType.Modifier]: 15
 			}
 		})
 	}
