@@ -21,7 +21,8 @@ export class ModifierManager {
 		"modifier_dazzle_bad_juju_manacost",
 		"modifier_undying_decay_debuff_counter",
 		"modifier_silencer_glaives_of_wisdom_buff_counter",
-		"modifier_silencer_glaives_of_wisdom_debuff_counter"
+		"modifier_silencer_glaives_of_wisdom_debuff_counter",
+		"modifier_abyssal_underlord_atrophy_aura_dmg_buff_counter"
 	])
 	// full ignore modifier name list
 	private readonly ignoreList = new Set<string>([
@@ -42,7 +43,8 @@ export class ModifierManager {
 		"modifier_silencer_glaives_of_wisdom",
 		"modifier_silencer_glaives_of_wisdom_buff",
 		"modifier_silencer_glaives_of_wisdom_debuff",
-		"modifier_item_eternal_shroud_bonus_magic_resist"
+		"modifier_item_eternal_shroud_bonus_magic_resist",
+		"modifier_abyssal_underlord_atrophy_aura_creep_buff"
 	])
 
 	// ignore ends with modifier name
