@@ -38,8 +38,6 @@ const bootstrap = new (class CCooldowns {
 
 	constructor() {
 		this.menu.MenuChnaged(() => this.menuChanged())
-		const as = globalThis as any
-		as.CCooldowns = this
 	}
 
 	protected get State() {
