@@ -9,6 +9,7 @@ import { MenuManager } from "../menu/index"
 export class ModifierManager {
 	// check by stack count changed
 	private readonly checkStateList = new Set<string>([
+		"modifier_lina_fiery_soul",
 		"modifier_slardar_bash_active",
 		"modifier_slark_essence_shift",
 		"modifier_bristleback_warpath",
@@ -71,7 +72,7 @@ export class ModifierManager {
 	}
 
 	private shouldBeValid(modifier: Modifier) {
-		if (modifier.IsAura || this.ignoreList.has(modifier.Name)) {
+		if (!modifier.IsValid || modifier.IsAura || this.ignoreList.has(modifier.Name)) {
 			return false
 		}
 		if (!modifier.GetTexturePath().length) {
