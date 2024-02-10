@@ -47,8 +47,6 @@ export class SpellMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
-		//this.ModeImage.OnValue(() => callback())
-
 		this.Hero.MenuChanged(callback)
 		this.Creep.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
@@ -67,8 +65,9 @@ export class SpellMenu extends BaseMenu {
 		this.SpiritBear.ResetSettings(callback)
 
 		this.Size.value = this.Size.defaultValue
+		this.Rounding.value = this.Rounding.defaultValue
 		this.LevelType.SelectedID = this.LevelType.defaultValue
-		//this.ModeImage.SelectedID = this.ModeImage.defaultValue
+		this.IsMinimalistic.value = this.IsMinimalistic.defaultValue
 		this.LevelColor.SelectedColor.CopyFrom(this.LevelColor.defaultColor)
 		this.ChargeColor.SelectedColor.CopyFrom(this.ChargeColor.defaultColor)
 	}

@@ -29,6 +29,8 @@ export class ItemMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
+		this.SquareMode.OnValue(() => callback())
+
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
@@ -41,5 +43,6 @@ export class ItemMenu extends BaseMenu {
 		this.Roshan.ResetSettings(callback)
 		this.Courier.ResetSettings(callback)
 		this.SpiritBear.ResetSettings(callback)
+		this.SquareMode.SelectedID = this.SquareMode.defaultValue
 	}
 }

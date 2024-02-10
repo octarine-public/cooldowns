@@ -71,6 +71,7 @@ export class ModifierGUI extends BaseGUI {
 			)
 
 			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
+
 			// draw image item
 			RendererSDK.Image(
 				modifier.GetTexturePath(),
@@ -80,12 +81,12 @@ export class ModifierGUI extends BaseGUI {
 				Color.White.SetA(alpha)
 			)
 
-			if (charge !== 0) {
+			if (charge !== 0 && menu.Charges.value) {
 				const charges = charge.toString()
 				this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
 			}
 
-			if (cooldown <= 0) {
+			if (!menu.Remaining.value || cooldown <= 0) {
 				continue
 			}
 

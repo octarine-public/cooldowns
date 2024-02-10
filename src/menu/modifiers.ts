@@ -11,11 +11,10 @@ import {
 } from "./settings"
 
 export class ModifierMenu extends BaseMenu {
+	public readonly Charges: Menu.Toggle
+	public readonly Remaining: Menu.Toggle
 	public readonly ModeImage: Menu.Dropdown
 	public readonly ModePosition: Menu.Dropdown
-
-	private readonly modeImageNames = ["Square", "Circle"]
-	private readonly positionNames = ["Vertical", "Horizontal"]
 
 	public readonly Hero: HeroSettingsMenu
 	public readonly Roshan: RoshanSettingsMenu
@@ -23,11 +22,20 @@ export class ModifierMenu extends BaseMenu {
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
 
+	private readonly modeImageNames = ["Square", "Circle"]
+	private readonly positionNames = ["Vertical", "Horizontal"]
+
 	constructor(node: Menu.Node) {
 		super({ node, nodeName: "Modifiers" })
 
 		this.Rounding.IsHidden = true
 
+		this.Charges = this.Tree.AddToggle("Charges", true, "Show charges")
+		this.Remaining = this.Tree.AddToggle(
+			"Remaining time",
+			false,
+			"Show remaining time"
+		)
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames)
 		this.ModePosition = this.Tree.AddDropdown(
 			"Position",
@@ -43,13 +51,15 @@ export class ModifierMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
-		//this.ModeImage.OnValue(() => callback())
+		this.ModeImage.OnValue(() => callback())
+		this.Remaining.OnValue(() => callback())
 		this.ModePosition.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
 		this.Familiar.MenuChanged(callback)
+		this.SpiritBear.MenuChanged(callback)
 		this.SpiritBear.MenuChanged(callback)
 	}
 
@@ -61,6 +71,9 @@ export class ModifierMenu extends BaseMenu {
 		this.Familiar.ResetSettings(callback)
 		this.SpiritBear.ResetSettings(callback)
 		this.Size.value = this.Size.defaultValue
-		//this.ModeImage.SelectedID = this.ModeImage.defaultValue
+		this.Charges.value = this.Charges.defaultValue
+		this.Remaining.value = this.Remaining.defaultValue
+		this.ModeImage.SelectedID = this.ModeImage.defaultValue
+		this.ModePosition.SelectedID = this.ModePosition.defaultValue
 	}
 }
