@@ -23,8 +23,10 @@ export class ModifierManager {
 		"modifier_undying_decay_debuff_counter",
 		"modifier_silencer_glaives_of_wisdom_buff_counter",
 		"modifier_silencer_glaives_of_wisdom_debuff_counter",
-		"modifier_abyssal_underlord_atrophy_aura_dmg_buff_counter"
+		"modifier_abyssal_underlord_atrophy_aura_dmg_buff_counter",
+		"modifier_undying_tombstone_zombie_deathstrike_slow_counter"
 	])
+
 	// full ignore modifier name list
 	private readonly ignoreList = new Set<string>([
 		"modifier_razor_static_link",
@@ -45,7 +47,8 @@ export class ModifierManager {
 		"modifier_silencer_glaives_of_wisdom_buff",
 		"modifier_silencer_glaives_of_wisdom_debuff",
 		"modifier_item_eternal_shroud_bonus_magic_resist",
-		"modifier_abyssal_underlord_atrophy_aura_creep_buff"
+		"modifier_abyssal_underlord_atrophy_aura_creep_buff",
+		"modifier_undying_tombstone_zombie_deathstrike_slow"
 	])
 
 	// ignore ends with modifier name
@@ -72,10 +75,10 @@ export class ModifierManager {
 	}
 
 	private shouldBeValid(modifier: Modifier) {
-		if (!modifier.IsValid || modifier.IsAura || this.ignoreList.has(modifier.Name)) {
+		if (!modifier.IsValid || modifier.IsAura) {
 			return false
 		}
-		if (!modifier.GetTexturePath().length) {
+		if (this.ignoreList.has(modifier.Name)) {
 			return false
 		}
 		if (this.checkStateList.has(modifier.Name)) {
