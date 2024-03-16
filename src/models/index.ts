@@ -119,6 +119,10 @@ export class UnitData {
 		this.modifiers.orderBy(x => x.CreationTime)
 	}
 
+	public HasModifier(modifier: Modifier) {
+		return this.modifiers.includes(modifier)
+	}
+
 	public EntityDestroyed(entity: Item | Ability) {
 		switch (true) {
 			case entity instanceof Item:

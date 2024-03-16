@@ -136,11 +136,15 @@ const bootstrap = new (class CCooldowns {
 
 	public ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldBeUnit(owner)) {
+		if (!this.ShouldBeUnit(owner) || !this.modifierManager.StateByMenu(owner)) {
 			return
 		}
-		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
-			this.GetOrAddUnitData(owner)?.ModifierRemoved(modifier)
+		const unitData = this.GetOrAddUnitData(owner)
+		if (unitData === undefined) {
+			return
+		}
+		if (unitData.HasModifier(modifier)) {
+			unitData.ModifierRemoved(modifier)
 		}
 	}
 

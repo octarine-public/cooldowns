@@ -63,12 +63,33 @@ export class ModifierManager {
 
 	constructor(private readonly menu: MenuManager) {}
 
+	public StateByMenu(entity: Nullable<Unit>) {
+		if (entity === undefined) {
+			return false
+		}
+		const menu = this.menu.ModifierMenu
+		switch (true) {
+			case entity.IsHero:
+				return menu.Hero.State.value
+			case entity.IsRoshan:
+				return menu.Roshan.State.value
+			case entity.IsCourier:
+				return menu.Courier.State.value
+			case entity.IsSpiritBear:
+				return menu.SpiritBear.State.value
+			case entity instanceof npc_dota_visage_familiar:
+				return menu.Familiar.State.value
+			default:
+				return false
+		}
+	}
+
 	public ShouldBeValid(owner: Nullable<Unit>, modifier: Modifier) {
-		return this.stateByMenu(owner) && this.shouldBeValid(modifier)
+		return this.StateByMenu(owner) && this.shouldBeValid(modifier)
 	}
 
 	public Get(owner: Nullable<Unit>) {
-		if (owner === undefined || !this.stateByMenu(owner)) {
+		if (owner === undefined || !this.StateByMenu(owner)) {
 			return []
 		}
 		return owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
@@ -88,27 +109,6 @@ export class ModifierManager {
 			return false
 		}
 		return modifier.Duration !== -1
-	}
-
-	private stateByMenu(entity: Nullable<Unit>) {
-		if (entity === undefined) {
-			return false
-		}
-		const menu = this.menu.ModifierMenu
-		switch (true) {
-			case entity.IsHero:
-				return menu.Hero.State.value
-			case entity.IsRoshan:
-				return menu.Roshan.State.value
-			case entity.IsCourier:
-				return menu.Courier.State.value
-			case entity.IsSpiritBear:
-				return menu.SpiritBear.State.value
-			case entity instanceof npc_dota_visage_familiar:
-				return menu.Familiar.State.value
-			default:
-				return false
-		}
 	}
 
 	private isPostfix(modifierName: string) {
