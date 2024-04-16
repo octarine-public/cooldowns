@@ -24,7 +24,8 @@ export class ModifierManager {
 		"modifier_silencer_glaives_of_wisdom_buff_counter",
 		"modifier_silencer_glaives_of_wisdom_debuff_counter",
 		"modifier_abyssal_underlord_atrophy_aura_dmg_buff_counter",
-		"modifier_undying_tombstone_zombie_deathstrike_slow_counter"
+		"modifier_undying_tombstone_zombie_deathstrike_slow_counter",
+		"modifier_obsidian_destroyer_equilibrium_debuff_counter"
 	])
 
 	// full ignore modifier name list
@@ -48,7 +49,8 @@ export class ModifierManager {
 		"modifier_silencer_glaives_of_wisdom_debuff",
 		"modifier_item_eternal_shroud_bonus_magic_resist",
 		"modifier_abyssal_underlord_atrophy_aura_creep_buff",
-		"modifier_undying_tombstone_zombie_deathstrike_slow"
+		"modifier_undying_tombstone_zombie_deathstrike_slow",
+		"modifier_obsidian_destroyer_equilibrium_debuff"
 	])
 
 	// ignore ends with modifier name
