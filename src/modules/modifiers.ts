@@ -32,6 +32,7 @@ export class ModifierManager {
 	private readonly ignoreList = new Set<string>([
 		"modifier_razor_static_link",
 		"modifier_razor_link_vision",
+		"modifier_earthshaker_enchant_totem_anim",
 		"modifier_lion_finger_of_death",
 		"modifier_slark_essence_shift_buff",
 		"modifier_slark_essence_shift_debuff",
