@@ -51,7 +51,8 @@ export class ModifierManager {
 		"modifier_item_eternal_shroud_bonus_magic_resist",
 		"modifier_abyssal_underlord_atrophy_aura_creep_buff",
 		"modifier_undying_tombstone_zombie_deathstrike_slow",
-		"modifier_obsidian_destroyer_equilibrium_debuff"
+		"modifier_obsidian_destroyer_equilibrium_debuff",
+		"modifier_meepo_earthbind_chain_duration"
 	])
 
 	// ignore ends with modifier name
