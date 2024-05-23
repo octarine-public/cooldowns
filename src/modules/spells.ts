@@ -24,7 +24,7 @@ export class SpellManager {
 	}
 
 	private shouldExclude(unit: Unit, abil: Ability) {
-		if (abil.MaxLevel === 0 || abil.IsHidden || abil.IsAttributes) {
+		if (abil.MaxLevel === 0 || abil.IsHidden || abil.IsAttributes || abil.IsInnateHidden) {
 			return true
 		}
 		if (abil.Name.includes("seasonal_")) {
