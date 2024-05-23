@@ -2,10 +2,7 @@ import {
 	Ability,
 	courier_burst,
 	courier_shield,
-	high_five,
 	npc_dota_visage_familiar,
-	plus_guild_banner,
-	plus_high_five,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
 
@@ -18,29 +15,20 @@ export class SpellManager {
 		if (unit === undefined || !this.stateByMenu(unit) || !unit.CanUseAbilities) {
 			return []
 		}
-		return unit.Spells.filter(
-			abil => abil !== undefined && !this.shouldExclude(unit, abil)
-		) as Ability[]
+		return unit.Spells.filter(abil => this.shouldDrawable(unit, abil)) as Ability[]
 	}
 
-	private shouldExclude(unit: Unit, abil: Ability) {
-		if (abil.MaxLevel === 0 || abil.IsHidden || abil.IsAttributes || abil.IsInnateHidden) {
-			return true
-		}
-		if (abil.Name.includes("seasonal_")) {
-			return true
+	private shouldDrawable(unit: Unit, abil: Nullable<Ability>) {
+		if (abil === undefined || !abil.ShouldBeDrawable || abil.IsHidden) {
+			return false
 		}
 		if (unit.IsCreep && unit.IsNeutral) {
-			return abil.IsPassive // exclude passive abilities on creeps
+			return !abil.IsPassive // exclude passive abilities on creeps
 		}
 		if (unit.IsCourier) {
-			return !(abil instanceof courier_burst || abil instanceof courier_shield)
+			return abil instanceof courier_burst || abil instanceof courier_shield
 		}
-		return (
-			abil instanceof high_five ||
-			abil instanceof plus_high_five ||
-			abil instanceof plus_guild_banner
-		)
+		return true
 	}
 
 	private stateByMenu(entity: Unit) {
