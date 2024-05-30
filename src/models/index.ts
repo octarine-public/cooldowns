@@ -103,20 +103,18 @@ export class UnitData {
 	}
 
 	public ModifierCreated(modifier: Modifier) {
-		if (!this.modifiers.includes(modifier)) {
-			this.modifiers.push(modifier)
-			this.modifiers.orderBy(x => x.CreationTime)
-		}
+		this.modifiers.push(modifier)
+		this.modifiers = this.SortModifiers()
 	}
 
 	public ModifierRemoved(modifier: Modifier) {
 		this.modifiers.remove(modifier)
-		this.modifiers.orderBy(x => x.CreationTime)
+		this.modifiers = this.SortModifiers()
 	}
 
 	public ModifierRestart(newModifiers: Modifier[]) {
 		this.modifiers = newModifiers
-		this.modifiers.orderBy(x => x.CreationTime)
+		this.modifiers = this.SortModifiers()
 	}
 
 	public HasModifier(modifier: Modifier) {
@@ -194,5 +192,36 @@ export class UnitData {
 	protected CalculateScale(value: number) {
 		const startDistance = GUIInfo.ScaleHeight(150)
 		return Math.min(Math.max(0.5, value / startDistance), 1)
+	}
+
+	protected SortModifiers(modifiers: Modifier[] = this.modifiers) {
+		const modifiersMap = new Map<string, Modifier>()
+		for (let i = 0, end = modifiers.length; i < end; i++) {
+			const modifier = modifiers[i],
+				keyName = this.getUniqueBuffKeyName(modifier)
+			if (!modifier.IsValid) {
+				modifiersMap.delete(keyName)
+				this.modifiers.remove(modifier)
+				continue
+			}
+			const modifierInMap = modifiersMap.get(keyName)
+			if (
+				modifierInMap === undefined ||
+				modifierInMap.RemainingTime < modifier.RemainingTime
+			) {
+				modifiersMap.set(keyName, modifier)
+			}
+		}
+		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
+	}
+
+	private getUniqueBuffKeyName(modifier: Modifier) {
+		const texture = modifier.GetTexturePath(),
+			stackCount = modifier.StackCount
+		if (stackCount === 0) {
+			return texture
+		}
+		const isEnemy = modifier.IsEnemy()
+		return `${modifier.Name}_${isEnemy}`
 	}
 }

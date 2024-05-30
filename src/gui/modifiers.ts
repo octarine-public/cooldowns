@@ -62,8 +62,12 @@ export class ModifierGUI extends BaseGUI {
 
 			const duration = modifier.Duration,
 				charge = modifier.StackCount,
-				cooldown = modifier.RemainingTime,
-				ratio = Math.max(100 * (cooldown / duration), 0)
+				cooldown = modifier.RemainingTime
+
+			const ratio = Math.max(
+				(cooldown / duration) * 100,
+				charge !== 0 && cooldown <= 0 ? 100 : 0
+			)
 
 			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 			const outlinedColor = (modifier.IsEnemy() ? Color.Red : Color.Green).SetA(
