@@ -55,6 +55,10 @@ const bootstrap = new (class CCooldowns {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
 
+	protected IsIllusion(unit: Unit) {
+		return unit.IsIllusion && !unit.IsStrongIllusion
+	}
+
 	public Draw() {
 		if (!this.State || this.IsPostGame) {
 			return
@@ -77,10 +81,12 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	public UnitPropertyChanged(entity: Unit) {
-		if (entity.IsIllusion && !entity.IsClone && !entity.IsStrongIllusion) {
+		if (this.IsIllusion(entity)) {
 			return
 		}
+		const getUnitData = this.units.get(entity)
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
+			getUnitData?.DisposeAll()
 			this.units.delete(entity)
 		}
 		if (entity.IsClone || entity.IsStrongIllusion) {
@@ -90,10 +96,11 @@ const bootstrap = new (class CCooldowns {
 
 	public AbilityHiddenChanged(abil: Ability) {
 		const owner = abil.Owner
-		if (!this.ShouldBeUnit(owner)) {
-			return
+		if (this.ShouldBeUnit(owner)) {
+			this.GetOrAddUnitData(owner)?.UnitAbilitiesChanged(
+				this.spellManager.Get(owner)
+			)
 		}
-		this.GetOrAddUnitData(owner)?.UnitAbilitiesChanged(this.spellManager.Get(owner))
 	}
 
 	public UnitItemsChanged(unit: Unit) {
@@ -152,7 +159,10 @@ const bootstrap = new (class CCooldowns {
 		this.menu.GameChanged()
 	}
 
-	protected GetStateByTeam(unit: Unit, teamState: ETeamState) {
+	protected GetStateByTeam(
+		unit: Unit,
+		teamState: ETeamState = this.menu.Team.SelectedID
+	) {
 		if (unit.IsMyHero && !this.menu.Local.value) {
 			return false
 		}
@@ -166,7 +176,8 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	protected GetOrAddUnitData(entity: Unit) {
-		if (!entity.IsValid || !this.GetStateByTeam(entity, this.menu.Team.SelectedID)) {
+		if (!entity.IsValid || this.IsIllusion(entity) || !this.GetStateByTeam(entity)) {
+			this.units.get(entity)?.DisposeAll()
 			this.units.delete(entity)
 			return
 		}

@@ -134,6 +134,12 @@ export class UnitData {
 		}
 	}
 
+	public DisposeAll() {
+		this.items.clear()
+		this.spells.clear()
+		this.modifiers.clear()
+	}
+
 	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
 		const owner = this.Owner
 		if (
