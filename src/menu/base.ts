@@ -34,12 +34,4 @@ export class BaseMenu {
 		)
 		this.Rounding = this.Tree.AddSlider("Rounding", 0, 0, 10)
 	}
-
-	public ResetSettings(callback: () => void) {
-		this.Size.value = this.Size.defaultValue
-		this.State.value = this.State.defaultValue
-		this.Rounding.value = this.Rounding.defaultValue
-		this.Tree.Update()
-		callback()
-	}
 }

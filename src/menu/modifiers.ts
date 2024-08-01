@@ -7,6 +7,7 @@ import {
 	CourierSettingsMenu,
 	FamiliarSettingsMenu,
 	HeroSettingsMenu,
+	PandasSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
 
@@ -21,6 +22,7 @@ export class ModifierMenu extends BaseMenu {
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
+	public readonly Pandas: PandasSettingsMenu
 
 	private readonly modeImageNames = ["Square", "Circle"]
 	private readonly positionNames = ["Vertical", "Horizontal"]
@@ -48,6 +50,7 @@ export class ModifierMenu extends BaseMenu {
 		this.Familiar = new FamiliarSettingsMenu(this.Tree, EMenuType.Modifier)
 		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Modifier)
 		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Modifier)
+		this.Pandas = new PandasSettingsMenu(this.Tree, EMenuType.Modifier)
 	}
 
 	public MenuChanged(callback: () => void) {
@@ -58,22 +61,8 @@ export class ModifierMenu extends BaseMenu {
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
+		this.Pandas.MenuChanged(callback)
 		this.Familiar.MenuChanged(callback)
 		this.SpiritBear.MenuChanged(callback)
-		this.SpiritBear.MenuChanged(callback)
-	}
-
-	public ResetSettings(callback: () => void) {
-		super.ResetSettings(callback)
-		this.Hero.ResetSettings(callback)
-		this.Roshan.ResetSettings(callback)
-		this.Courier.ResetSettings(callback)
-		this.Familiar.ResetSettings(callback)
-		this.SpiritBear.ResetSettings(callback)
-		this.Size.value = this.Size.defaultValue
-		this.Charges.value = this.Charges.defaultValue
-		this.Remaining.value = this.Remaining.defaultValue
-		this.ModeImage.SelectedID = this.ModeImage.defaultValue
-		this.ModePosition.SelectedID = this.ModePosition.defaultValue
 	}
 }

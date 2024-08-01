@@ -4,6 +4,9 @@ import {
 	Input,
 	Item,
 	Modifier,
+	npc_dota_brewmaster_earth,
+	npc_dota_brewmaster_storm,
+	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
 	Unit,
 	Vector2
@@ -147,6 +150,14 @@ export class UnitData {
 			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
 		) {
 			return menu.Familiar.Position
+		}
+		if (
+			(owner instanceof npc_dota_brewmaster_void ||
+				owner instanceof npc_dota_brewmaster_storm ||
+				owner instanceof npc_dota_brewmaster_earth) &&
+			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
+		) {
+			return menu.Pandas.Position
 		}
 		if (owner.IsCreep && menu instanceof SpellMenu) {
 			return menu.Creep.Position

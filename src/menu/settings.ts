@@ -20,7 +20,7 @@ interface IBaseSettingsMenu {
 		[EMenuType.Modifier]: boolean
 	}
 	defaultY?: {
-		[EMenuType.Item]: number
+		[EMenuType.Item]?: number
 		[EMenuType.Spell]: number
 		[EMenuType.Modifier]: number
 	}
@@ -79,8 +79,6 @@ export abstract class BaseSettingsMenu {
 		return options.defaultY?.[options.mType] ?? 0
 	}
 
-	public abstract ResetSettings(callback: () => void): void
-
 	public MenuChanged(callback: () => void) {
 		this.State.OnValue(() => callback())
 	}
@@ -101,13 +99,6 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 
 	protected get defaultState() {
 		return false
-	}
-
-	public ResetSettings(callback: () => void): void {
-		this.State.value = this.defaultState
-		this.PositionX.value = this.defaultX
-		this.PositionY.value = this.defaultY
-		callback()
 	}
 }
 
@@ -186,13 +177,6 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 			}
 		})
 	}
-
-	public ResetSettings(callback: () => void): void {
-		this.State.value = this.defaultState
-		this.PositionX.value = this.defaultX
-		this.PositionY.value = this.defaultY
-		callback()
-	}
 }
 
 /**
@@ -217,13 +201,6 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 			}
 		})
 	}
-
-	public ResetSettings(callback: () => void): void {
-		this.State.value = this.defaultState
-		this.PositionX.value = this.defaultX
-		this.PositionY.value = this.defaultY
-		callback()
-	}
 }
 
 /**
@@ -238,17 +215,28 @@ export class FamiliarSettingsMenu extends BaseSettingsMenu {
 			nodeName: "Familiars",
 			texture: ImageData.GetHeroTexture("npc_dota_visage_familiar"),
 			defaultY: {
-				[EMenuType.Item]: 0,
 				[EMenuType.Spell]: 1,
 				[EMenuType.Modifier]: 15
 			}
 		})
 	}
+}
 
-	public ResetSettings(callback: () => void): void {
-		this.State.value = this.defaultState
-		this.PositionX.value = this.defaultX
-		this.PositionY.value = this.defaultY
-		callback()
+/**
+ * @description Offset & State from Familiars
+ */
+export class PandasSettingsMenu extends BaseSettingsMenu {
+	constructor(node: Menu.Node, mType = EMenuType.Spell) {
+		super({
+			node,
+			mType,
+			round: 0,
+			nodeName: "Pandas",
+			texture: ImageData.GetHeroTexture("npc_dota_brewmaster_void"),
+			defaultY: {
+				[EMenuType.Spell]: 1,
+				[EMenuType.Modifier]: 15
+			}
+		})
 	}
 }

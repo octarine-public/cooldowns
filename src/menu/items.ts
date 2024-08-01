@@ -14,7 +14,6 @@ export class ItemMenu extends BaseMenu {
 	public readonly Roshan: RoshanSettingsMenu
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
-
 	public readonly SquareMode: Menu.Dropdown
 
 	constructor(node: Menu.Node) {
@@ -30,19 +29,9 @@ export class ItemMenu extends BaseMenu {
 
 	public MenuChanged(callback: () => void) {
 		this.SquareMode.OnValue(() => callback())
-
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
 		this.SpiritBear.MenuChanged(callback)
-	}
-
-	public ResetSettings(callback: () => void) {
-		super.ResetSettings(callback)
-		this.Hero.ResetSettings(callback)
-		this.Roshan.ResetSettings(callback)
-		this.Courier.ResetSettings(callback)
-		this.SpiritBear.ResetSettings(callback)
-		this.SquareMode.SelectedID = this.SquareMode.defaultValue
 	}
 }

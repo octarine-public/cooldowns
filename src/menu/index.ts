@@ -1,10 +1,4 @@
-import {
-	ImageData,
-	Menu,
-	NotificationsSDK,
-	ResetSettingsUpdated,
-	Sleeper
-} from "github.com/octarine-public/wrapper/index"
+import { ImageData, Menu } from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
 import { ItemMenu } from "./items"
@@ -24,12 +18,11 @@ export class MenuManager {
 	public readonly SpellMenu: SpellMenu
 	public readonly ModifierMenu: ModifierMenu
 
-	public readonly Reset: Menu.Button
 	private readonly baseNode: Menu.Node
 	private readonly visual = Menu.AddEntry("Visual")
 	private readonly teamArray = ["Allies and enemy", "Only enemy"]
 
-	constructor(private readonly sleeper: Sleeper) {
+	constructor() {
 		this.baseNode = this.visual.AddNode(
 			"Cooldowns_v1",
 			ImageData.Paths.Icons.icon_svg_time_fast,
@@ -57,8 +50,6 @@ export class MenuManager {
 		this.ItemMenu = new ItemMenu(this.baseNode)
 		this.ModifierMenu = new ModifierMenu(this.baseNode)
 
-		this.Reset = this.baseNode.AddButton("Reset", "Reset settings to default values")
-
 		this.Team.OnValue(call => {
 			this.Local.IsHidden = call.SelectedID !== 0
 			this.baseNode.Update()
@@ -72,27 +63,5 @@ export class MenuManager {
 		this.ItemMenu.MenuChanged(callback)
 		this.SpellMenu.MenuChanged(callback)
 		this.ModifierMenu.MenuChanged(callback)
-		this.Reset.OnValue(() => this.ResetSettings(callback))
-	}
-
-	public ResetSettings(callback: () => void) {
-		if (this.sleeper.Sleeping("ResetSettings")) {
-			return
-		}
-		this.ItemMenu.ResetSettings(callback)
-		this.SpellMenu.ResetSettings(callback)
-		this.ModifierMenu.ResetSettings(callback)
-		this.State.value = this.State.defaultValue
-		this.Local.value = this.Local.defaultValue
-		this.Scale.value = this.Scale.defaultValue
-		this.Team.SelectedID = this.Team.defaultValue
-		this.Opacity.value = this.Opacity.defaultValue
-		this.OpacityByCursor.value = this.OpacityByCursor.defaultValue
-		NotificationsSDK.Push(new ResetSettingsUpdated())
-		this.sleeper.Sleep(2 * 1000, "ResetSettings")
-	}
-
-	public GameChanged() {
-		this.sleeper.FullReset()
 	}
 }

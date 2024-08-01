@@ -8,6 +8,7 @@ import {
 	CreepSettingsMenu,
 	FamiliarSettingsMenu,
 	HeroSettingsMenu,
+	PandasSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
 
@@ -23,6 +24,7 @@ export class SpellMenu extends BaseMenu {
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 	public readonly Familiar: FamiliarSettingsMenu
+	public readonly Pandas: PandasSettingsMenu
 
 	constructor(node: Menu.Node) {
 		super({ node, defaultSize: 1, nodeName: "Spells" })
@@ -39,6 +41,7 @@ export class SpellMenu extends BaseMenu {
 		this.Courier = new CourierSettingsMenu(this.Tree, EMenuType.Spell)
 		this.SpiritBear = new BearSettingsMenu(this.Tree, EMenuType.Spell)
 		this.Familiar = new FamiliarSettingsMenu(this.Tree, EMenuType.Spell)
+		this.Pandas = new PandasSettingsMenu(this.Tree, EMenuType.Spell)
 
 		this.IsMinimalistic.OnValue(call => {
 			this.Rounding.IsHidden = call.value
@@ -53,22 +56,6 @@ export class SpellMenu extends BaseMenu {
 		this.Courier.MenuChanged(callback)
 		this.Familiar.MenuChanged(callback)
 		this.SpiritBear.MenuChanged(callback)
-	}
-
-	public ResetSettings(callback: () => void) {
-		super.ResetSettings(callback)
-		this.Hero.ResetSettings(callback)
-		this.Creep.ResetSettings(callback)
-		this.Roshan.ResetSettings(callback)
-		this.Courier.ResetSettings(callback)
-		this.Familiar.ResetSettings(callback)
-		this.SpiritBear.ResetSettings(callback)
-
-		this.Size.value = this.Size.defaultValue
-		this.Rounding.value = this.Rounding.defaultValue
-		this.LevelType.SelectedID = this.LevelType.defaultValue
-		this.IsMinimalistic.value = this.IsMinimalistic.defaultValue
-		this.LevelColor.SelectedColor.CopyFrom(this.LevelColor.defaultColor)
-		this.ChargeColor.SelectedColor.CopyFrom(this.ChargeColor.defaultColor)
+		this.Pandas.MenuChanged(callback)
 	}
 }

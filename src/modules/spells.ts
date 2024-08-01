@@ -2,6 +2,9 @@ import {
 	Ability,
 	courier_burst,
 	courier_shield,
+	npc_dota_brewmaster_earth,
+	npc_dota_brewmaster_storm,
+	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
@@ -44,6 +47,10 @@ export class SpellManager {
 				return menu.SpiritBear.State.value
 			case entity instanceof npc_dota_visage_familiar:
 				return menu.Familiar.State.value
+			case entity instanceof npc_dota_brewmaster_void ||
+				entity instanceof npc_dota_brewmaster_storm ||
+				entity instanceof npc_dota_brewmaster_earth:
+				return menu.Pandas.State.value
 			case entity.IsCreep && entity.IsNeutral:
 				return menu.Creep.State.value
 			default:

@@ -14,7 +14,6 @@ import {
 	npc_dota_brewmaster_storm,
 	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
-	Sleeper,
 	SpiritBear,
 	Team,
 	Unit
@@ -27,61 +26,67 @@ import { ItemManager } from "./modules/items"
 import { ModifierManager } from "./modules/modifiers"
 import { SpellManager } from "./modules/spells"
 
-const bootstrap = new (class CCooldowns {
-	private readonly sleeper = new Sleeper()
-	private readonly units = new Map<Unit, UnitData>()
-
-	private readonly menu = new MenuManager(this.sleeper)
+new (class CCooldowns {
+	private readonly menu = new MenuManager()
 	private readonly itemManager = new ItemManager(this.menu)
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
 
+	private readonly units = new Map<Unit, UnitData>()
+
 	constructor() {
+		EventsSDK.on("Draw", this.Draw.bind(this))
+		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
+		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
+		EventsSDK.on("UnitItemsChanged", this.UnitItemsChanged.bind(this))
+		EventsSDK.on("ModifierCreated", this.ModifierCreated.bind(this))
+		EventsSDK.on("ModifierChanged", this.ModifierChanged.bind(this))
+		EventsSDK.on("ModifierRemoved", this.ModifierRemoved.bind(this))
+		EventsSDK.on("UnitAbilitiesChanged", this.UnitAbilitiesChanged.bind(this))
+		EventsSDK.on("UnitPropertyChanged", this.UnitPropertyChanged.bind(this))
+		EventsSDK.on("AbilityHiddenChanged", this.AbilityHiddenChanged.bind(this))
+
 		this.menu.MenuChnaged(() => this.menuChanged())
 	}
 
-	protected get State() {
+	private get state() {
 		return this.menu.State.value
 	}
 
-	protected get IsPostGame() {
+	private get isPostGame() {
 		return (
 			GameRules === undefined ||
 			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
 
-	protected get IsUIGame() {
+	private get isUIGame() {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
 
-	protected IsIllusion(unit: Unit) {
-		return unit.IsIllusion && !unit.IsStrongIllusion
-	}
-
-	public Draw() {
-		if (!this.State || this.IsPostGame) {
+	protected Draw() {
+		if (!this.state || this.isPostGame) {
 			return
 		}
-		if (this.IsUIGame) {
+		if (this.isUIGame) {
 			this.units.forEach(unit => unit.Draw(this.menu))
 		}
 	}
 
-	public EntityCreated(entity: Entity) {
-		if (this.ShouldBeUnit(entity)) {
+	protected EntityCreated(entity: Entity) {
+		if (this.shouldBeUnit(entity)) {
 			this.updateAllManagers(entity)
 		}
 	}
 
-	public EntityDestroyed(entity: Entity) {
-		if (this.ShouldBeUnit(entity)) {
+	protected EntityDestroyed(entity: Entity) {
+		if (this.shouldBeUnit(entity)) {
 			this.units.delete(entity)
 		}
 	}
 
-	public UnitPropertyChanged(entity: Unit) {
-		if (this.IsIllusion(entity)) {
+	protected UnitPropertyChanged(entity: Unit) {
+		if (this.isIllusion(entity)) {
 			return
 		}
 		const getUnitData = this.units.get(entity)
@@ -94,33 +99,33 @@ const bootstrap = new (class CCooldowns {
 		}
 	}
 
-	public AbilityHiddenChanged(abil: Ability) {
+	protected AbilityHiddenChanged(abil: Ability) {
 		const owner = abil.Owner
-		if (this.ShouldBeUnit(owner)) {
-			this.GetOrAddUnitData(owner)?.UnitAbilitiesChanged(
+		if (this.shouldBeUnit(owner)) {
+			this.getOrAddUnitData(owner)?.UnitAbilitiesChanged(
 				this.spellManager.Get(owner)
 			)
 		}
 	}
 
-	public UnitItemsChanged(unit: Unit) {
-		if (this.ShouldBeUnit(unit)) {
-			this.GetOrAddUnitData(unit)?.UnitItemsChanged(this.itemManager.Get(unit))
+	protected UnitItemsChanged(unit: Unit) {
+		if (this.shouldBeUnit(unit)) {
+			this.getOrAddUnitData(unit)?.UnitItemsChanged(this.itemManager.Get(unit))
 		}
 	}
 
-	public UnitAbilitiesChanged(unit: Unit) {
-		if (this.ShouldBeUnit(unit)) {
-			this.GetOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
+	protected UnitAbilitiesChanged(unit: Unit) {
+		if (this.shouldBeUnit(unit)) {
+			this.getOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
 		}
 	}
 
-	public ModifierChanged(modifier: Modifier) {
+	protected ModifierChanged(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldBeUnit(owner)) {
+		if (!this.shouldBeUnit(owner)) {
 			return
 		}
-		const unitData = this.GetOrAddUnitData(owner)
+		const unitData = this.getOrAddUnitData(owner)
 		if (unitData === undefined) {
 			return
 		}
@@ -131,22 +136,22 @@ const bootstrap = new (class CCooldowns {
 		}
 	}
 
-	public ModifierCreated(modifier: Modifier) {
+	protected ModifierCreated(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldBeUnit(owner)) {
+		if (!this.shouldBeUnit(owner)) {
 			return
 		}
 		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
-			this.GetOrAddUnitData(owner)?.ModifierCreated(modifier)
+			this.getOrAddUnitData(owner)?.ModifierCreated(modifier)
 		}
 	}
 
-	public ModifierRemoved(modifier: Modifier) {
+	protected ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.ShouldBeUnit(owner) || !this.modifierManager.StateByMenu(owner)) {
+		if (!this.shouldBeUnit(owner) || !this.modifierManager.StateByMenu(owner)) {
 			return
 		}
-		const unitData = this.GetOrAddUnitData(owner)
+		const unitData = this.getOrAddUnitData(owner)
 		if (unitData === undefined) {
 			return
 		}
@@ -155,11 +160,7 @@ const bootstrap = new (class CCooldowns {
 		}
 	}
 
-	public GameChanged() {
-		this.menu.GameChanged()
-	}
-
-	protected GetStateByTeam(
+	private getStateByTeam(
 		unit: Unit,
 		teamState: ETeamState = this.menu.Team.SelectedID
 	) {
@@ -175,8 +176,12 @@ const bootstrap = new (class CCooldowns {
 		)
 	}
 
-	protected GetOrAddUnitData(entity: Unit) {
-		if (!entity.IsValid || this.IsIllusion(entity) || !this.GetStateByTeam(entity)) {
+	private isIllusion(unit: Unit) {
+		return unit.IsIllusion && !unit.IsStrongIllusion
+	}
+
+	private getOrAddUnitData(entity: Unit) {
+		if (!entity.IsValid || this.isIllusion(entity) || !this.getStateByTeam(entity)) {
 			this.units.get(entity)?.DisposeAll()
 			this.units.delete(entity)
 			return
@@ -190,7 +195,7 @@ const bootstrap = new (class CCooldowns {
 		return getUnitData
 	}
 
-	protected ShouldBeUnit(entity: Nullable<Entity>): entity is Unit {
+	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
 		// todo Entity#IsUnit() ?
 		if (!(entity instanceof Unit)) {
 			return false
@@ -219,7 +224,7 @@ const bootstrap = new (class CCooldowns {
 	}
 
 	private updateAllManagers(entity: Unit) {
-		const unitData = this.GetOrAddUnitData(entity)
+		const unitData = this.getOrAddUnitData(entity)
 		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
 		unitData?.ModifierRestart(this.modifierManager.Get(entity))
 		unitData?.UnitAbilitiesChanged(this.spellManager.Get(entity))
@@ -229,33 +234,9 @@ const bootstrap = new (class CCooldowns {
 		const units = EntityManager.GetEntitiesByClass(Unit)
 		for (let index = units.length - 1; index > -1; index--) {
 			const unit = units[index]
-			if (this.ShouldBeUnit(unit)) {
+			if (this.shouldBeUnit(unit)) {
 				this.updateAllManagers(unit)
 			}
 		}
 	}
 })()
-
-EventsSDK.on("Draw", () => bootstrap.Draw())
-
-EventsSDK.on("GameEnded", () => bootstrap.GameChanged())
-
-EventsSDK.on("GameStarted", () => bootstrap.GameChanged())
-
-EventsSDK.on("EntityCreated", entity => bootstrap.EntityCreated(entity))
-
-EventsSDK.on("EntityDestroyed", entity => bootstrap.EntityDestroyed(entity))
-
-EventsSDK.on("UnitItemsChanged", unit => bootstrap.UnitItemsChanged(unit))
-
-EventsSDK.on("ModifierCreated", modifier => bootstrap.ModifierCreated(modifier))
-
-EventsSDK.on("ModifierChanged", modifier => bootstrap.ModifierChanged(modifier))
-
-EventsSDK.on("ModifierRemoved", modifier => bootstrap.ModifierRemoved(modifier))
-
-EventsSDK.on("UnitAbilitiesChanged", unit => bootstrap.UnitAbilitiesChanged(unit))
-
-EventsSDK.on("UnitPropertyChanged", unit => bootstrap.UnitPropertyChanged(unit))
-
-EventsSDK.on("AbilityHiddenChanged", abil => bootstrap.AbilityHiddenChanged(abil))

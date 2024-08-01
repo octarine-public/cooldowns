@@ -1,5 +1,8 @@
 import {
 	Modifier,
+	npc_dota_brewmaster_earth,
+	npc_dota_brewmaster_storm,
+	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
 	Unit,
 	Utils
@@ -48,6 +51,10 @@ export class ModifierManager {
 				return menu.SpiritBear.State.value
 			case entity instanceof npc_dota_visage_familiar:
 				return menu.Familiar.State.value
+			case entity instanceof npc_dota_brewmaster_void ||
+				entity instanceof npc_dota_brewmaster_storm ||
+				entity instanceof npc_dota_brewmaster_earth:
+				return menu.Pandas.State.value
 			default:
 				return false
 		}
@@ -88,18 +95,18 @@ export class ModifierManager {
 	}
 
 	private InitData() {
-		const data = this.getData()
-
-		for (const name of data.ignoreList) {
-			this.ignoreList.add(name)
-		}
-
-		for (const name of data.checkStateList) {
-			this.checkStateList.add(name)
-		}
+		const { ignoreList, checkStateList } = this.getData()
+		this.addToList(ignoreList, this.ignoreList)
+		this.addToList(checkStateList, this.checkStateList)
 	}
 
 	private getData(): IModifierData {
 		return Utils.readJSON("modifier_data.json")
+	}
+
+	private addToList(list: string[], hashSet: Set<string>) {
+		for (let i = list.length - 1; i > -1; i--) {
+			hashSet.add(list[i])
+		}
 	}
 }
