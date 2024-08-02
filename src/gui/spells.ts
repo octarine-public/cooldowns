@@ -3,9 +3,6 @@ import {
 	Color,
 	EAbilitySlot,
 	GUIInfo,
-	invoker_exort,
-	invoker_quas,
-	invoker_wex,
 	npc_dota_hero_doom_bringer,
 	npc_dota_hero_invoker,
 	npc_dota_hero_rubick,
@@ -253,18 +250,19 @@ export class SpellGUI extends BaseGUI {
 		outlineColor: Color
 	) {
 		const currLvl = spell.Level
-		if (spell.MaxLevel === 0 || spell.Level === 0) {
+		if (spell.MaxLevel === 0 || currLvl === 0) {
 			return
 		}
 
 		const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
-		// if invoker abilities draw level by text
-		if (
-			spell instanceof invoker_wex ||
-			spell instanceof invoker_quas ||
-			spell instanceof invoker_exort
-		) {
-			this.Text(currLvl.toString(), position, TextFlags.Right | TextFlags.Bottom)
+		if (currLvl >= 5) {
+			this.Text(
+				currLvl.toString(),
+				position,
+				TextFlags.Right | TextFlags.Bottom,
+				2,
+				levelColor
+			)
 			return
 		}
 
