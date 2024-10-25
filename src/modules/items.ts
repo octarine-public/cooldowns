@@ -6,7 +6,7 @@ export class ItemManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(unit: Nullable<Unit>) {
-		if (unit === undefined || !this.stateByMenu(unit) || !unit.CanUseItems) {
+		if (unit === undefined || !this.stateByMenu(unit)) {
 			return []
 		}
 		const inventory = unit.Inventory
@@ -24,6 +24,9 @@ export class ItemManager {
 	}
 
 	private stateByMenu(entity: Unit) {
+		if (entity.IsIllusion || entity.IsStrongIllusion) {
+			return false
+		}
 		const menu = this.menu.ItemMenu
 		switch (true) {
 			case entity.IsHero:

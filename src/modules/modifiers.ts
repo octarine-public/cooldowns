@@ -39,6 +39,9 @@ export class ModifierManager {
 		if (entity === undefined) {
 			return false
 		}
+		if (entity.IsIllusion && !entity.IsStrongIllusion) {
+			return false
+		}
 		const menu = this.menu.ModifierMenu
 		switch (true) {
 			case entity.IsHero:

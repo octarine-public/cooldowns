@@ -196,11 +196,7 @@ new (class CCooldowns {
 	}
 
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
-		// todo Entity#IsUnit() ?
 		if (!(entity instanceof Unit)) {
-			return false
-		}
-		if (!entity.CanUseAbilities && !entity.CanUseItems) {
 			return false
 		}
 		if (entity.IsHero || entity.IsRoshan || entity.IsCourier) {

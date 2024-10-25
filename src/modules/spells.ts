@@ -15,7 +15,7 @@ export class SpellManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(unit: Nullable<Unit>) {
-		if (unit === undefined || !this.stateByMenu(unit) || !unit.CanUseAbilities) {
+		if (unit === undefined || !this.stateByMenu(unit)) {
 			return []
 		}
 		return unit.Spells.filter(abil => this.shouldDrawable(unit, abil)) as Ability[]
@@ -35,6 +35,9 @@ export class SpellManager {
 	}
 
 	private stateByMenu(entity: Unit) {
+		if (entity.IsIllusion && !entity.IsStrongIllusion) {
+			return false
+		}
 		const menu = this.menu.SpellMenu
 		switch (true) {
 			case entity.IsHero:
