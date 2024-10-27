@@ -25,7 +25,8 @@
       "modifier_meepo_earthbind_chain_duration",
       "modifier_dazzle_poison_touch_split",
       "modifier_bounty_hunter_wind_walk_fade",
-      "modifier_slark_essence_shift_permanent_debuff"
+      "modifier_slark_essence_shift_permanent_debuff",
+      "modifier_smoke_of_deceit_secondary_application_cooldown"
   ],
   "checkStateList": [
       "modifier_lina_fiery_soul",

@@ -36,12 +36,12 @@ export class MenuManager {
 			false,
 			"Scales abilities, items and modifiers\nnear the mouse"
 		)
-		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 40, 100)
 		this.OpacityByCursor = this.baseNode.AddToggle(
 			"Opacity on hover",
 			false,
 			"Opacity abilities, items and modifiers\nnear the mouse"
 		)
+		this.Opacity = this.baseNode.AddSlider("Opacity", 100, 40, 100)
 
 		this.Team = this.baseNode.AddDropdown("Team", this.teamArray, ETeamState.Enemy)
 		this.Local = this.baseNode.AddToggle("Your hero", false)
