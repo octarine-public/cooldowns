@@ -35,13 +35,13 @@ export class ModifierManager {
 		this.InitData()
 	}
 
-	public StateByMenu(entity: Nullable<Unit>) {
-		if (entity === undefined) {
-			return false
-		}
-		if (entity.IsIllusion && !entity.IsStrongIllusion) {
-			return false
-		}
+	public Get(owner: Unit): Modifier[] {
+		return this.StateByMenu(owner)
+			? owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
+			: []
+	}
+
+	public StateByMenu(entity: Unit) {
 		const menu = this.menu.ModifierMenu
 		switch (true) {
 			case entity.IsHero:
@@ -63,15 +63,8 @@ export class ModifierManager {
 		}
 	}
 
-	public ShouldBeValid(owner: Nullable<Unit>, modifier: Modifier) {
+	public ShouldBeValid(owner: Unit, modifier: Modifier) {
 		return this.StateByMenu(owner) && this.shouldBeValid(modifier)
-	}
-
-	public Get(owner: Nullable<Unit>) {
-		if (owner === undefined || !this.StateByMenu(owner)) {
-			return []
-		}
-		return owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
 	}
 
 	private shouldBeValid(modifier: Modifier) {

@@ -86,15 +86,12 @@ new (class CCooldowns {
 	}
 
 	protected UnitPropertyChanged(entity: Unit) {
-		if (this.isIllusion(entity)) {
-			return
-		}
 		const getUnitData = this.units.get(entity)
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
 			getUnitData?.DisposeAll()
 			this.units.delete(entity)
 		}
-		if (entity.IsClone || entity.IsStrongIllusion) {
+		if (!this.isIllusion(entity)) {
 			this.updateAllManagers(entity)
 		}
 	}
@@ -177,11 +174,11 @@ new (class CCooldowns {
 	}
 
 	private isIllusion(unit: Unit) {
-		return unit.IsIllusion && !unit.IsStrongIllusion
+		return (unit.IsIllusion || unit.IsHiddenIllusion) && !unit.IsStrongIllusion
 	}
 
 	private getOrAddUnitData(entity: Unit) {
-		if (!entity.IsValid || this.isIllusion(entity) || !this.getStateByTeam(entity)) {
+		if (!entity.IsValid || !this.getStateByTeam(entity)) {
 			this.units.get(entity)?.DisposeAll()
 			this.units.delete(entity)
 			return
@@ -196,7 +193,7 @@ new (class CCooldowns {
 	}
 
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
-		if (!(entity instanceof Unit)) {
+		if (!(entity instanceof Unit) || this.isIllusion(entity)) {
 			return false
 		}
 		if (entity.IsHero || entity.IsRoshan || entity.IsCourier) {

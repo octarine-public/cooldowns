@@ -1,12 +1,16 @@
-import { DOTAScriptInventorySlot, Unit } from "github.com/octarine-public/wrapper/index"
+import {
+	DOTAScriptInventorySlot,
+	Item,
+	Unit
+} from "github.com/octarine-public/wrapper/index"
 
 import { MenuManager } from "../menu/index"
 
 export class ItemManager {
 	constructor(private readonly menu: MenuManager) {}
 
-	public Get(unit: Nullable<Unit>) {
-		if (unit === undefined || !this.stateByMenu(unit)) {
+	public Get(unit: Unit): Item[] {
+		if (!this.stateByMenu(unit) || unit.IsStrongIllusion) {
 			return []
 		}
 		const inventory = unit.Inventory
@@ -24,9 +28,6 @@ export class ItemManager {
 	}
 
 	private stateByMenu(entity: Unit) {
-		if (entity.IsIllusion || entity.IsStrongIllusion) {
-			return false
-		}
 		const menu = this.menu.ItemMenu
 		switch (true) {
 			case entity.IsHero:
