@@ -1,6 +1,7 @@
 import {
 	Ability,
 	Color,
+	DOTA_ABILITY_BEHAVIOR,
 	EAbilitySlot,
 	GUIInfo,
 	npc_dota_hero_doom_bringer,
@@ -36,9 +37,10 @@ export class SpellGUI extends BaseGUI {
 	public Draw(
 		mainAlpha: number,
 		menu: SpellMenu,
-		spells: Ability[],
+		spells: [Ability, number][],
 		additionalPosition: Vector2,
-		isDisable: boolean
+		isSilenced: boolean,
+		isPassiveDisabled: boolean
 	): void {
 		// hide item if contains dota hud
 		if (this.Contains()) {
@@ -49,7 +51,7 @@ export class SpellGUI extends BaseGUI {
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
 
 		for (let index = spells.length - 1; index > -1; index--) {
-			const spell = spells[index]
+			const [spell, idx] = spells[index]
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
@@ -67,12 +69,25 @@ export class SpellGUI extends BaseGUI {
 			const cooldown = spell.Cooldown,
 				texture = spell.TexturePath,
 				currCharges = spell.CurrentCharges,
-				grayScale = spell.Level === 0 || isDisable,
+				grayScale = spell.Level === 0 || !spell.IsActivated,
 				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
 				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
-				rounding = this.GetRounding(menu, vecSize)
+				rounding = this.GetRounding(menu, vecSize),
+				isAltCastState = spell.AltCastState,
+				hasRootDisable = spell.HasBehavior(
+					DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
+				)
+			let isDisabled = false,
+				isUniqueDisabled = false
+			if (spell.IsPassive) {
+				isDisabled = isPassiveDisabled
+			}
+			if (hasRootDisable) {
+				isUniqueDisabled = spell.Owner?.IsTethered ?? false
+			}
 			if (menu.IsMinimalistic.value) {
 				this.Minimilistic(
+					idx,
 					alpha,
 					spell,
 					vecPos,
@@ -81,8 +96,10 @@ export class SpellGUI extends BaseGUI {
 					border,
 					position,
 					cooldown,
-					isDisable,
-					noMana
+					isSilenced || isUniqueDisabled,
+					isDisabled,
+					noMana,
+					isAltCastState
 				)
 			} else {
 				this.Image(
@@ -95,8 +112,11 @@ export class SpellGUI extends BaseGUI {
 					cooldown,
 					grayScale,
 					isInPhase,
-					isDisable,
-					noMana
+					isSilenced || isUniqueDisabled,
+					isDisabled,
+					noMana,
+					isAltCastState,
+					spell.IsPassive
 				)
 			}
 
@@ -135,6 +155,7 @@ export class SpellGUI extends BaseGUI {
 	}
 
 	private Minimilistic(
+		idx: number,
 		alpha: number,
 		spell: Ability,
 		vecPos: Vector2,
@@ -143,11 +164,13 @@ export class SpellGUI extends BaseGUI {
 		width: number,
 		position: Rectangle,
 		cooldown: number,
-		isDisable: boolean,
-		noMana: boolean
+		isSilenced: boolean,
+		isPassiveDisabled: boolean,
+		noMana: boolean,
+		isAltCastState: boolean
 	) {
 		const minimalistic = position.Clone(),
-			ignoreMinimalistic = this.ignoreMinimalistic(spell),
+			ignoreMinimalistic = this.ignoreMinimalistic(spell, idx),
 			outlinedColor = noMana
 				? BaseGUI.noManaOutlineColor.SetA(180)
 				: Color.Black.SetA(180)
@@ -164,11 +187,20 @@ export class SpellGUI extends BaseGUI {
 			RendererSDK.FilledRect(minimalistic.pos1, minimalistic.Size, outlinedColor)
 			return
 		}
-
+		let isDisabled = false,
+			isUniqueDisabled = false
+		if (spell.IsPassive) {
+			isDisabled = isPassiveDisabled
+		}
 		const texture = spell.TexturePath,
-			grayScale = spell.Level === 0 || isDisable,
-			isInPhase = spell.IsInAbilityPhase || spell.IsChanneling
-
+			grayScale = spell.Level === 0 || isSilenced || !spell.IsActivated,
+			isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
+			hasRootDisable = spell.HasBehavior(
+				DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
+			)
+		if (hasRootDisable) {
+			isUniqueDisabled = spell.Owner?.IsTethered ?? false
+		}
 		this.Image(
 			alpha,
 			texture,
@@ -179,8 +211,11 @@ export class SpellGUI extends BaseGUI {
 			cooldown,
 			grayScale,
 			isInPhase,
-			isDisable,
-			noMana
+			isSilenced || isUniqueDisabled,
+			isDisabled,
+			noMana,
+			isAltCastState,
+			spell.IsPassive
 		)
 	}
 
@@ -194,18 +229,25 @@ export class SpellGUI extends BaseGUI {
 		cooldown: number,
 		grayScale: boolean,
 		isInPhase?: boolean,
-		isDisable?: boolean,
-		noMana?: boolean
+		isUniqueDisabled?: boolean,
+		isPassiveDisabled?: boolean,
+		noMana?: boolean,
+		isAltCastState?: boolean,
+		isPassive?: boolean
 	) {
-		const noManaColor = BaseGUI.noManaOutlineColor.Clone()
-
 		let outlinedColor = Color.Black
-
+		const noManaColor = BaseGUI.noManaOutlineColor.Clone()
 		if (noMana) {
 			outlinedColor = noManaColor.Clone()
+		} else if (isAltCastState) {
+			outlinedColor = Color.Aqua
 		} else if (isInPhase) {
 			outlinedColor = Color.Green
-		} else if (cooldown !== 0 || isDisable) {
+		} else if (
+			cooldown !== 0 ||
+			(isUniqueDisabled && !isPassive) ||
+			isPassiveDisabled
+		) {
 			outlinedColor = Color.Red
 		}
 
@@ -228,6 +270,12 @@ export class SpellGUI extends BaseGUI {
 			undefined,
 			grayScale
 		)
+		if (isPassiveDisabled) {
+			this.ImageMask(vecPos, vecSize, rounding, false)
+		}
+		if (isUniqueDisabled && !isPassive) {
+			this.ImageMask(vecPos, vecSize, rounding, true)
+		}
 		if (cooldown === 0) {
 			return
 		}
@@ -293,7 +341,7 @@ export class SpellGUI extends BaseGUI {
 		}
 	}
 
-	private ignoreMinimalistic(spell: Ability) {
+	private ignoreMinimalistic(spell: Ability, idx: number) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false
@@ -304,8 +352,8 @@ export class SpellGUI extends BaseGUI {
 			owner instanceof npc_dota_hero_doom_bringer
 		) {
 			return (
-				spell.AbilitySlot === EAbilitySlot.DOTA_SPELL_SLOT_4 ||
-				spell.AbilitySlot === EAbilitySlot.DOTA_SPELL_SLOT_5
+				idx === EAbilitySlot.DOTA_SPELL_SLOT_4 ||
+				idx === EAbilitySlot.DOTA_SPELL_SLOT_5
 			)
 		}
 		return false

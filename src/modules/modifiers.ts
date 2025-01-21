@@ -1,47 +1,27 @@
 import {
+	GameState,
 	Modifier,
 	npc_dota_brewmaster_earth,
 	npc_dota_brewmaster_storm,
 	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
-	Unit,
-	Utils
+	Unit
 } from "github.com/octarine-public/wrapper/index"
 
+import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
-
-interface IModifierData {
-	ignoreList: string[]
-	checkStateList: string[]
-}
+import { BaseModifierMenu } from "../menu/modifiers"
 
 export class ModifierManager {
-	// full ignore modifier name list
-	private readonly ignoreList = new Set<string>()
-	// check by stack count changed
-	private readonly checkStateList = new Set<string>()
-	// ignore ends with modifier name
-	private readonly ignoreByEnds: string[] = [
-		"_aura",
-		"_stack",
-		"_counter",
-		"_pull",
-		"_push",
-		"_tooltip",
-		"_fade"
-	]
-
-	constructor(private readonly menu: MenuManager) {
-		this.InitData()
-	}
+	constructor(private readonly menu: MenuManager) {}
 
 	public Get(owner: Unit): Modifier[] {
-		return this.StateByMenu(owner)
+		return this.EntityState(owner)
 			? owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
 			: []
 	}
 
-	public StateByMenu(entity: Unit) {
+	public EntityState(entity: Unit) {
 		const menu = this.menu.ModifierMenu
 		switch (true) {
 			case entity.IsHero:
@@ -64,45 +44,65 @@ export class ModifierManager {
 	}
 
 	public ShouldBeValid(owner: Unit, modifier: Modifier) {
-		return this.StateByMenu(owner) && this.shouldBeValid(modifier)
+		return this.shouldBeValid(modifier) && this.EntityState(owner)
 	}
 
 	private shouldBeValid(modifier: Modifier) {
-		if (!modifier.IsValid || modifier.IsAura) {
+		if (!modifier.IsValid || (modifier.IsHidden && !modifier.ForceVisible)) {
 			return false
 		}
-		if (modifier.GetTexturePath().length === 0) {
+		if (modifier.ForceVisible) {
+			return true
+		}
+		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
+			return true
+		}
+		if (modifier.IsAura) {
+			return this.stateAuras(modifier)
+		}
+		if (modifier.IsBuff()) {
+			return this.stateBuffs(modifier)
+		}
+		if (modifier.IsDebuff()) {
+			return this.stateDebuffs(modifier)
+		}
+		return false
+	}
+	private stateAuras(modifier: Modifier) {
+		const menu = this.menu.ModifierMenu.Auras
+		if (modifier.IsGlobally && !menu.Globally.value) {
 			return false
 		}
-		if (this.ignoreList.has(modifier.Name)) {
-			return false
+		return !this.isDisabled(menu, modifier)
+	}
+	private stateBuffs(modifier: Modifier) {
+		const menu = this.menu.ModifierMenu
+		return !this.isDisabled(menu.Buffs, modifier)
+	}
+	private stateDebuffs(modifier: Modifier) {
+		const menu = this.menu.ModifierMenu
+		return !this.isDisabled(menu.Debuffs, modifier)
+	}
+	private isDisabled(menu: BaseModifierMenu, modifier: Modifier) {
+		const owner = modifier.Parent
+		if (owner === undefined || !this.entityTeamState(owner, menu)) {
+			return true
 		}
-		if (this.checkStateList.has(modifier.Name)) {
-			return modifier.StackCount !== 0
-		}
-		if (this.isPostfix(modifier.Name)) {
-			return false
-		}
-		return modifier.Duration !== -1
+		const time = GameState.RawGameTime / 60
+		return !menu.State.value || time >= menu.DisableByTme.value
 	}
-
-	private isPostfix(modifierName: string) {
-		return this.ignoreByEnds.some(endName => modifierName.endsWith(endName))
-	}
-
-	private InitData() {
-		const { ignoreList, checkStateList } = this.getData()
-		this.addToList(ignoreList, this.ignoreList)
-		this.addToList(checkStateList, this.checkStateList)
-	}
-
-	private getData(): IModifierData {
-		return Utils.readJSON("modifier_data.json")
-	}
-
-	private addToList(list: string[], hashSet: Set<string>) {
-		for (let i = list.length - 1; i > -1; i--) {
-			hashSet.add(list[i])
+	private entityTeamState(entity: Unit, menu: BaseModifierMenu) {
+		switch (menu.TeamState.SelectedID) {
+			case ETeamState.All:
+				return true
+			case ETeamState.Ally:
+				return !entity.IsEnemy() && !entity.IsMyHero
+			case ETeamState.AllyAndLocal:
+				return !entity.IsEnemy() || entity.IsMyHero
+			case ETeamState.Enemy:
+				return entity.IsEnemy()
+			default:
+				return false
 		}
 	}
 }

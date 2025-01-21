@@ -3,7 +3,9 @@ import {
 	Color,
 	GUIInfo,
 	Input,
+	Item,
 	Modifier,
+	PathData,
 	Rectangle,
 	RendererSDK,
 	TextFlags,
@@ -32,9 +34,10 @@ export abstract class BaseGUI {
 	public abstract Draw(
 		alpha: number,
 		menu: BaseMenu,
-		data: Ability[] | Modifier[],
+		data: [Ability, number][] | Modifier[] | Item[],
 		additionalPosition: Vector2,
-		isDisable?: boolean
+		isDisable?: boolean,
+		isUniqueDisabled?: boolean
 	): void
 
 	protected Contains() {
@@ -103,5 +106,16 @@ export abstract class BaseGUI {
 			? TextFlags.Right | TextFlags.Top
 			: TextFlags.Right | TextFlags.Bottom
 		this.Text(value.toString(), position, flags, 2, color)
+	}
+
+	protected ImageMask(
+		vecPos: Vector2,
+		vecSize: Vector2,
+		rounding: number,
+		isSilenced: boolean
+	) {
+		const base = PathData.ImagePath + "/hud/reborn/"
+		const image = isSilenced ? "spells_silenced" : "passives_broken"
+		RendererSDK.Image(base + `${image}_psd.vtex_c`, vecPos, rounding, vecSize)
 	}
 }

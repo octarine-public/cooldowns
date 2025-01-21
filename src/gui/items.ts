@@ -1,5 +1,6 @@
 import {
 	Color,
+	DOTA_ABILITY_BEHAVIOR,
 	GUIInfo,
 	Item,
 	Rectangle,
@@ -36,7 +37,8 @@ export class ItemGUI extends BaseGUI {
 		menu: ItemMenu,
 		items: Item[],
 		additionalPosition: Vector2,
-		isDisable: boolean
+		isDisable: boolean,
+		isTethered: boolean
 	): void {
 		// hide item if contains dota hud
 		if (this.Contains()) {
@@ -62,12 +64,18 @@ export class ItemGUI extends BaseGUI {
 				items.length
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
-
-			const cooldown = item.Cooldown,
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize),
+				cooldown = item.Cooldown,
 				charge = item.CurrentCharges
+
+			const hasRootDisable = item.HasBehavior(
+				DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
+			)
+			const isUniqueDisabled = isTethered && hasRootDisable
 			const outlineColor = (
-				isDisable || item.IsMuted ? Color.Red : ItemGUI.outlineColor.Clone()
+				isDisable || isUniqueDisabled || item.IsMuted
+					? Color.Red
+					: ItemGUI.outlineColor.Clone()
 			).SetA(alpha)
 
 			const rounding = this.GetRounding(menu, vecSize)

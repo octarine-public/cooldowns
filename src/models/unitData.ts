@@ -1,5 +1,6 @@
 import {
 	Ability,
+	GameState,
 	GUIInfo,
 	Input,
 	Item,
@@ -12,17 +13,18 @@ import {
 	Vector2
 } from "github.com/octarine-public/wrapper/index"
 
+import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
 import { MenuManager } from "../menu/index"
 import { ItemMenu } from "../menu/items"
-import { ModifierMenu } from "../menu/modifiers"
+import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 
 export class UnitData {
 	private items: Item[] = []
-	private spells: Ability[] = []
+	private spells: [Ability, number][] = []
 	private modifiers: Modifier[] = []
 
 	private readonly itemGUI = new ItemGUI()
@@ -71,7 +73,8 @@ export class UnitData {
 				itemMenu,
 				this.items,
 				this.GetAdditionalPosition(itemMenu),
-				owner.IsMuted
+				owner.IsMuted,
+				owner.IsTethered
 			)
 		}
 
@@ -81,7 +84,8 @@ export class UnitData {
 				spellMenu,
 				this.spells,
 				this.GetAdditionalPosition(spellMenu),
-				owner.IsSilenced
+				owner.IsSilenced,
+				owner.IsPassiveDisabled
 			)
 		}
 
@@ -100,24 +104,24 @@ export class UnitData {
 		this.items.orderBy(x => x.ItemSlot)
 	}
 
-	public UnitAbilitiesChanged(newAbils: Ability[]) {
+	public UnitAbilitiesChanged(newAbils: [Ability, number][]) {
 		this.spells = newAbils
-		this.spells.orderBy(x => x.AbilitySlot)
+		this.spells.orderBy(([, idx]) => idx)
 	}
 
-	public ModifierCreated(modifier: Modifier) {
+	public ModifierCreated(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.push(modifier)
-		this.modifiers = this.SortModifiers()
+		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
 
-	public ModifierRemoved(modifier: Modifier) {
+	public ModifierRemoved(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.remove(modifier)
-		this.modifiers = this.SortModifiers()
+		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
 
-	public ModifierRestart(newModifiers: Modifier[]) {
+	public ModifierRestart(newModifiers: Modifier[], menu: ModifierMenu) {
 		this.modifiers = newModifiers
-		this.modifiers = this.SortModifiers()
+		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
 
 	public HasModifier(modifier: Modifier) {
@@ -131,8 +135,8 @@ export class UnitData {
 				this.items.orderBy(x => x.ItemSlot)
 				break
 			case entity instanceof Ability:
-				this.spells.remove(entity)
-				this.spells.orderBy(x => x.AbilitySlot)
+				this.spells.removeCallback(([x]) => x === entity)
+				this.spells.orderBy(([, idx]) => idx)
 				break
 		}
 	}
@@ -211,12 +215,16 @@ export class UnitData {
 		return Math.min(Math.max(0.5, value / startDistance), 1)
 	}
 
-	protected SortModifiers(modifiers: Modifier[] = this.modifiers) {
+	protected SortModifiers(modifiers: Modifier[], menu: ModifierMenu) {
 		const modifiersMap = new Map<string, Modifier>()
 		for (let i = 0, end = modifiers.length; i < end; i++) {
-			const modifier = modifiers[i],
-				keyName = this.getUniqueBuffKeyName(modifier)
-			if (!modifier.IsValid) {
+			const modifier = modifiers[i]
+			if (modifier === undefined || !modifier.IsValid) {
+				this.modifiers.remove(modifier)
+				continue
+			}
+			const keyName = this.getKeyName(modifier)
+			if (!this.stateModifiers(modifier, menu)) {
 				modifiersMap.delete(keyName)
 				this.modifiers.remove(modifier)
 				continue
@@ -232,13 +240,58 @@ export class UnitData {
 		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
 	}
 
-	private getUniqueBuffKeyName(modifier: Modifier) {
-		const texture = modifier.GetTexturePath(),
-			stackCount = modifier.StackCount
-		if (stackCount === 0) {
-			return texture
+	private getKeyName(modifier: Modifier) {
+		if (modifier.Name === "modifier_rubick_spell_steal") {
+			return modifier.GetTexturePath()
 		}
-		const isEnemy = modifier.IsEnemy()
-		return `${modifier.Name}_${isEnemy}`
+		return modifier.Name
+	}
+	private stateModifiers(modifier: Modifier, menu: ModifierMenu) {
+		if (modifier.ForceVisible) {
+			return true
+		}
+		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
+			return true
+		}
+		if (modifier.IsAura) {
+			return this.stateAuras(menu)
+		}
+		if (modifier.IsBuff()) {
+			return this.stateBuffs(menu)
+		}
+		if (modifier.IsDebuff()) {
+			return this.stateDebuffs(menu)
+		}
+		return false
+	}
+	private stateAuras(menu: ModifierMenu) {
+		return !this.isDisabledModifier(menu.Auras)
+	}
+	private stateBuffs(menu: ModifierMenu) {
+		return !this.isDisabledModifier(menu.Buffs)
+	}
+	private stateDebuffs(menu: ModifierMenu) {
+		return !this.isDisabledModifier(menu.Debuffs)
+	}
+	private isDisabledModifier(menu: BaseModifierMenu) {
+		return (
+			!menu.State.value ||
+			!this.entityTeamState(menu) ||
+			GameState.RawGameTime / 60 >= menu.DisableByTme.value
+		)
+	}
+	private entityTeamState(menu: BaseModifierMenu) {
+		switch (menu.TeamState.SelectedID) {
+			case ETeamState.All:
+				return true
+			case ETeamState.Ally:
+				return !this.Owner.IsEnemy() && !this.Owner.IsMyHero
+			case ETeamState.AllyAndLocal:
+				return !this.Owner.IsEnemy() || this.Owner.IsMyHero
+			case ETeamState.Enemy:
+				return this.Owner.IsEnemy()
+			default:
+				return false
+		}
 	}
 }

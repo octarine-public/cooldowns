@@ -15,13 +15,11 @@ import {
 	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
 	SpiritBear,
-	Team,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
 
-import { ETeamState } from "./enum"
 import { MenuManager } from "./menu/index"
-import { UnitData } from "./models/index"
+import { UnitData } from "./models/unitData"
 import { ItemManager } from "./modules/items"
 import { ModifierManager } from "./modules/modifiers"
 import { SpellManager } from "./modules/spells"
@@ -127,9 +125,9 @@ new (class CCooldowns {
 			return
 		}
 		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
-			unitData.ModifierCreated(modifier)
+			unitData.ModifierCreated(modifier, this.menu.ModifierMenu)
 		} else {
-			unitData.ModifierRemoved(modifier)
+			unitData.ModifierRemoved(modifier, this.menu.ModifierMenu)
 		}
 	}
 
@@ -139,46 +137,27 @@ new (class CCooldowns {
 			return
 		}
 		if (this.modifierManager.ShouldBeValid(owner, modifier)) {
-			this.getOrAddUnitData(owner)?.ModifierCreated(modifier)
+			this.getOrAddUnitData(owner)?.ModifierCreated(
+				modifier,
+				this.menu.ModifierMenu
+			)
 		}
 	}
 
 	protected ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.shouldBeUnit(owner) || !this.modifierManager.StateByMenu(owner)) {
+		if (!this.shouldBeUnit(owner) || !this.modifierManager.EntityState(owner)) {
 			return
 		}
-		const unitData = this.getOrAddUnitData(owner)
-		if (unitData === undefined) {
-			return
-		}
-		if (unitData.HasModifier(modifier)) {
-			unitData.ModifierRemoved(modifier)
-		}
-	}
-
-	private getStateByTeam(
-		unit: Unit,
-		teamState: ETeamState = this.menu.Team.SelectedID
-	) {
-		if (unit.IsMyHero && !this.menu.Local.value) {
-			return false
-		}
-		const isEnemy = unit.IsEnemy(),
-			stateAlly = teamState === ETeamState.Ally,
-			stateEnemy = teamState === ETeamState.Enemy
-		return (
-			!(stateEnemy && !isEnemy) &&
-			!(isEnemy && stateAlly && GameState.LocalTeam !== Team.Observer)
-		)
+		this.getOrAddUnitData(owner)?.ModifierRemoved(modifier, this.menu.ModifierMenu)
 	}
 
 	private isIllusion(unit: Unit) {
-		return (unit.IsIllusion || unit.IsHiddenIllusion) && !unit.IsStrongIllusion
+		return unit.IsIllusion && !unit.IsStrongIllusion
 	}
 
 	private getOrAddUnitData(entity: Unit) {
-		if (!entity.IsValid || !this.getStateByTeam(entity)) {
+		if (!entity.IsValid || this.isIllusion(entity)) {
 			this.units.get(entity)?.DisposeAll()
 			this.units.delete(entity)
 			return
@@ -210,23 +189,23 @@ new (class CCooldowns {
 		) {
 			return true
 		}
-		if (entity.IsCreep && entity.IsNeutral) {
-			return true
-		}
-		return false
+		return entity.IsCreep && entity.IsNeutral
 	}
 
 	private updateAllManagers(entity: Unit) {
 		const unitData = this.getOrAddUnitData(entity)
 		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
-		unitData?.ModifierRestart(this.modifierManager.Get(entity))
+		unitData?.ModifierRestart(
+			this.modifierManager.Get(entity),
+			this.menu.ModifierMenu
+		)
 		unitData?.UnitAbilitiesChanged(this.spellManager.Get(entity))
 	}
 
 	private menuChanged() {
 		const units = EntityManager.GetEntitiesByClass(Unit)
-		for (let index = units.length - 1; index > -1; index--) {
-			const unit = units[index]
+		for (let i = units.length - 1; i > -1; i--) {
+			const unit = units[i]
 			if (this.shouldBeUnit(unit)) {
 				this.updateAllManagers(unit)
 			}

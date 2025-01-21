@@ -60,20 +60,29 @@ export class ModifierGUI extends BaseGUI {
 
 			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
 
-			const duration = modifier.Duration,
-				charge = modifier.StackCount,
-				cooldown = modifier.RemainingTime
+			const charge = modifier.StackCount >> 0,
+				cooldown = modifier.RemainingTime,
+				duration = modifier.Duration,
+				noTimer = duration === -1 || cooldown === 0
 
-			const ratio = Math.max(
-				(cooldown / duration) * 100,
-				charge !== 0 && cooldown <= 0 ? 100 : 0
-			)
+			let ratio = Math.max((cooldown / duration) * 100, 0)
+			if ((charge !== 0 && cooldown <= 0) || noTimer) {
+				ratio = 100
+			}
 
-			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
-			const outlinedColor = (modifier.IsEnemy() ? Color.Red : Color.Green).SetA(
-				alpha
-			)
+			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize)),
+				isShieldBuff = modifier.IsShield() && modifier.IsBuff()
 
+			const outlinedColor = (
+				isShieldBuff ||
+				modifier.IsBuff() ||
+				modifier.IsChannel() ||
+				(modifier.ForceVisible && !modifier.IsEnemy(modifier.Caster))
+					? Color.Green
+					: Color.Red
+			).SetA(alpha)
+
+			this.InnerFillImage(modifier.Name, modeImage, position, alpha)
 			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 
 			// draw image item
@@ -85,9 +94,12 @@ export class ModifierGUI extends BaseGUI {
 				Color.White.SetA(alpha)
 			)
 
-			if (charge !== 0 && menu.Charges.value) {
-				const charges = charge.toString()
-				this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
+			if (charge !== 0) {
+				this.Text(
+					charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
+					position,
+					TextFlags.Right | TextFlags.Bottom
+				)
 			}
 
 			if (!menu.Remaining.value || cooldown <= 0) {
@@ -178,5 +190,25 @@ export class ModifierGUI extends BaseGUI {
 			outlineBorder,
 			true
 		)
+	}
+
+	private InnerFillImage(
+		modifierName: string,
+		modeImage: EModeImage,
+		position: Rectangle,
+		alpha: number
+	) {
+		if (
+			!modifierName.startsWith("modifier_rune_") &&
+			modifierName !== "modifier_juggernaut_bladeform" &&
+			!modifierName.startsWith("modifier_axe_one_")
+		) {
+			return
+		}
+		if (modeImage !== EModeImage.Round) {
+			RendererSDK.FilledRect(position.pos1, position.Size, Color.Black.SetA(alpha))
+			return
+		}
+		RendererSDK.FilledCircle(position.pos1, position.Size, Color.Black.SetA(alpha))
 	}
 }

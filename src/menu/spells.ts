@@ -28,7 +28,7 @@ export class SpellMenu extends BaseMenu {
 
 	constructor(node: Menu.Node) {
 		super({ node, defaultSize: 1, nodeName: "Spells" })
-		this.Tree.SortNodes = false
+		this.Tree.SortNodes = true
 		this.Size.max /= 4
 		this.IsMinimalistic = this.Tree.AddToggle("Minimalistic", false)
 		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
@@ -50,6 +50,11 @@ export class SpellMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
+		this.Size.OnValue(() => callback())
+		this.State.OnValue(() => callback())
+		this.Rounding.OnValue(() => callback())
+		this.TeamState.OnValue(() => callback())
+
 		this.Hero.MenuChanged(callback)
 		this.Creep.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)

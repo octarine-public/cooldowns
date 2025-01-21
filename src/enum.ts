@@ -1,7 +1,8 @@
 export const enum ETeamState {
 	All,
 	Enemy,
-	Ally
+	Ally,
+	AllyAndLocal
 }
 
 export const enum EModeImage {

@@ -9,15 +9,28 @@ import {
 	Unit
 } from "github.com/octarine-public/wrapper/index"
 
+import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
 
 export class SpellManager {
 	constructor(private readonly menu: MenuManager) {}
 
-	public Get(unit: Unit): Ability[] {
-		return this.stateByMenu(unit)
-			? (unit.Spells.filter(abil => this.shouldDrawable(unit, abil)) as Ability[])
-			: []
+	public Get(unit: Unit): [Ability, number][] {
+		if (unit.IsCreep && !unit.IsNeutral) {
+			return []
+		}
+		if (!this.entityState(unit) || !this.entityTeamState(unit)) {
+			return []
+		}
+		const abilities: [Ability, number][] = []
+		for (let i = 0, end = unit.Spells.length; i < end; i++) {
+			const abil = unit.Spells[i]
+			if (!this.shouldDrawable(unit, abil)) {
+				continue
+			}
+			abilities.push([abil!, i])
+		}
+		return abilities
 	}
 
 	private shouldDrawable(unit: Unit, abil: Nullable<Ability>) {
@@ -33,7 +46,23 @@ export class SpellManager {
 		return true
 	}
 
-	private stateByMenu(entity: Unit) {
+	private entityTeamState(entity: Unit) {
+		switch (this.menu.SpellMenu.TeamState.SelectedID) {
+			case ETeamState.All:
+				return true
+			case ETeamState.Ally: {
+				return !entity.IsEnemy() && !entity.IsMyHero
+			}
+			case ETeamState.AllyAndLocal:
+				return !entity.IsEnemy() || entity.IsMyHero
+			case ETeamState.Enemy:
+				return entity.IsEnemy()
+			default:
+				return false
+		}
+	}
+
+	private entityState(entity: Unit) {
 		const menu = this.menu.SpellMenu
 		switch (true) {
 			case entity.IsHero:

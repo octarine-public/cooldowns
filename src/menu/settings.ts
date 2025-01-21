@@ -93,7 +93,7 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "Creeps",
-			texture: ImageData.Paths.Icons.icon_svg_creep
+			texture: ImageData.Icons.icon_svg_creep
 		})
 	}
 
@@ -138,7 +138,7 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "npc_dota_courier",
-			texture: ImageData.Paths.Icons.icon_svg_courier,
+			texture: ImageData.Icons.icon_svg_courier,
 			defaultState: {
 				[EMenuType.Item]: true,
 				[EMenuType.Spell]: false,
@@ -188,7 +188,7 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "npc_dota_roshan",
-			texture: ImageData.Paths.Icons.icon_roshan,
+			texture: ImageData.Icons.icon_roshan,
 			defaultX: {
 				[EMenuType.Item]: 0,
 				[EMenuType.Spell]: 0,
@@ -223,7 +223,7 @@ export class FamiliarSettingsMenu extends BaseSettingsMenu {
 }
 
 /**
- * @description Offset & State from Familiars
+ * @description Offset & State from Pandas
  */
 export class PandasSettingsMenu extends BaseSettingsMenu {
 	constructor(node: Menu.Node, mType = EMenuType.Spell) {

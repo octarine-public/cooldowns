@@ -18,7 +18,7 @@ export class ItemMenu extends BaseMenu {
 
 	constructor(node: Menu.Node) {
 		super({ node, nodeName: "Items" })
-		this.Tree.SortNodes = false
+		this.Tree.SortNodes = true
 		this.SquareMode = this.Tree.AddDropdown("Shape", ["Rectangle", "Square"])
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Item)
@@ -28,7 +28,13 @@ export class ItemMenu extends BaseMenu {
 	}
 
 	public MenuChanged(callback: () => void) {
+		this.Size.OnValue(() => callback())
+		this.State.OnValue(() => callback())
+		this.Rounding.OnValue(() => callback())
+		this.TeamState.OnValue(() => callback())
 		this.SquareMode.OnValue(() => callback())
+
+		this.SpiritBear.MenuChanged(callback)
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
