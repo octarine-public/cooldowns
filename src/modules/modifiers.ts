@@ -13,11 +13,13 @@ import { MenuManager } from "../menu/index"
 import { BaseModifierMenu } from "../menu/modifiers"
 
 export class ModifierManager {
+	private readonly ignoreModifiers = ["modifier_phased", "modifier_magic_immune"]
+
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(owner: Unit): Modifier[] {
 		return this.EntityState(owner)
-			? owner.Buffs.filter(modifier => this.shouldBeValid(modifier))
+			? owner.Buffs.filter(modifier => this.shouldBeValid(owner, modifier))
 			: []
 	}
 
@@ -44,18 +46,21 @@ export class ModifierManager {
 	}
 
 	public ShouldBeValid(owner: Unit, modifier: Modifier) {
-		return this.shouldBeValid(modifier) && this.EntityState(owner)
+		return this.shouldBeValid(owner, modifier) && this.EntityState(owner)
 	}
 
-	private shouldBeValid(modifier: Modifier) {
+	private shouldBeValid(owner: Unit, modifier: Modifier) {
 		if (!modifier.IsValid || (modifier.IsHidden && !modifier.ForceVisible)) {
+			return false
+		}
+		if (owner.IsCourier && this.ignoreModifiers.includes(modifier.Name)) {
 			return false
 		}
 		if (modifier.ForceVisible) {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return true
+			return this.entityTeamState(owner, this.menu.ModifierMenu.Important)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(modifier)

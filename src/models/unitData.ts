@@ -251,7 +251,7 @@ export class UnitData {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return true
+			return this.entityTeamState(menu.Important)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(menu)

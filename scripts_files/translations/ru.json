@@ -46,6 +46,8 @@
 	"Show remaining time": "Показывать оставшееся время",
 	"Opacity on hover": "Прозрачность при наведении",
 	"Disable by time": "Отключить по времени",
+	"Important" : "Важные",
+	"Important modifiers (stun, silence, shields, etc.)": "Важные модификаторы (станы, сайленсы, щиты, и т.д.)",
 	"Additional timer size and hero image": "Доп. Размер таймера и изображения героя",
 	"Displays cooldowns for spells and items": "Отображает время восстановления\nспособностей и предметов",
 	"Scales abilities, items and modifiers\nnear the mouse": "Масштабирует способности, предметы и модификаторы\n рядом с мышкой",

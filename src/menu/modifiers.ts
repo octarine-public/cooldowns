@@ -25,8 +25,14 @@ export class BaseModifierMenu {
 		"Only allies and local"
 	]
 
-	constructor(node: Menu.Node, nodeName: string, defaultStateTime = 5, icon: string) {
-		this.Tree = node.AddNode(nodeName, icon, undefined, 0)
+	constructor(
+		node: Menu.Node,
+		nodeName: string,
+		defaultStateTime = 5,
+		icon: string,
+		tooltip?: string
+	) {
+		this.Tree = node.AddNode(nodeName, icon, tooltip, 0)
 		this.State = this.Tree.AddToggle("State", true)
 		this.TeamState = this.Tree.AddDropdown(
 			"Team",
@@ -80,6 +86,21 @@ class DebuffSettingsMenu extends BaseModifierMenu {
 	}
 }
 
+class ImportantSettingsMenu extends BaseModifierMenu {
+	constructor(node: Menu.Node) {
+		super(
+			node,
+			"Important",
+			120,
+			ImageData.GetItemTexture("item_sheepstick"),
+			"Important modifiers (stun, silence, shields, etc.)"
+		)
+		this.DisableByTme.IsHidden = true
+		this.DisableByTme.max = 9999
+		this.DisableByTme.value = 9999
+	}
+}
+
 export class ModifierMenu extends BaseMenu {
 	public readonly Remaining: Menu.Toggle
 	public readonly ModeImage: Menu.Dropdown
@@ -92,6 +113,7 @@ export class ModifierMenu extends BaseMenu {
 	public readonly Familiar: FamiliarSettingsMenu
 	public readonly Pandas: PandasSettingsMenu
 
+	public readonly Important: ImportantSettingsMenu
 	public readonly Auras: AurasSettingsMenu
 	public readonly Buffs: BuffSettingsMenu
 	public readonly Debuffs: DebuffSettingsMenu
@@ -117,6 +139,7 @@ export class ModifierMenu extends BaseMenu {
 			EPositionType.Horizontal
 		)
 
+		this.Important = new ImportantSettingsMenu(this.Tree)
 		this.Auras = new AurasSettingsMenu(this.Tree)
 		this.Buffs = new BuffSettingsMenu(this.Tree)
 		this.Debuffs = new DebuffSettingsMenu(this.Tree)
