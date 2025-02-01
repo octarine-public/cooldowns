@@ -18,12 +18,7 @@ export class BaseModifierMenu {
 
 	protected readonly Tree: Menu.Node
 
-	private readonly teamArr = [
-		"All",
-		"Only enemies",
-		"Only allies",
-		"Only allies and local"
-	]
+	private readonly teamArr = ["All", "Enemies", "Allies", "Allies and local"]
 
 	constructor(
 		node: Menu.Node,
