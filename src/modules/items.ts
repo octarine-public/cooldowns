@@ -11,7 +11,10 @@ export class ItemManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(unit: Unit): Item[] {
-		if ((unit.IsCreep && !unit.IsNeutral) || unit.IsStrongIllusion) {
+		if (unit.IsCreep && !unit.IsNeutral) {
+			return []
+		}
+		if (unit.IsStrongIllusion && !unit.CanUseAllItems) {
 			return []
 		}
 		if (!this.entityState(unit) || !this.entityTeamState(unit)) {
