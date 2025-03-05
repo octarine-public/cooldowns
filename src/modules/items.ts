@@ -1,8 +1,4 @@
-import {
-	DOTAScriptInventorySlot,
-	Item,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
+import { Item, Unit } from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
@@ -20,15 +16,7 @@ export class ItemManager {
 		if (!this.entityState(unit) || !this.entityTeamState(unit)) {
 			return []
 		}
-		return unit.Inventory.GetItems(
-			DOTAScriptInventorySlot.DOTA_ITEM_SLOT_1,
-			DOTAScriptInventorySlot.DOTA_ITEM_SLOT_6
-		).concat(
-			unit.Inventory.GetItems(
-				DOTAScriptInventorySlot.DOTA_ITEM_TP_SCROLL,
-				DOTAScriptInventorySlot.DOTA_ITEM_NEUTRAL_SLOT
-			)
-		)
+		return unit.Inventory.Items
 	}
 
 	private entityTeamState(entity: Unit) {
