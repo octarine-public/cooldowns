@@ -70,7 +70,7 @@ export class SpellGUI extends BaseGUI {
 				texture = spell.TexturePath,
 				currCharges = spell.CurrentCharges,
 				grayScale = spell.Level === 0 || !spell.IsActivated,
-				noMana = (spell.Owner?.Mana ?? 0) < spell.ManaCost,
+				noMana = !spell.IsManaEnough(),
 				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
 				rounding = this.GetRounding(menu, vecSize),
 				isAltCastState = spell.AltCastState,
@@ -314,7 +314,7 @@ export class SpellGUI extends BaseGUI {
 			return
 		}
 
-		const fillColor = !(minimalistic && (spell.Owner?.Mana ?? 0) < spell.ManaCost)
+		const fillColor = !(minimalistic && !spell.IsManaEnough())
 			? levelColor
 			: BaseGUI.noManaOutlineColor
 
