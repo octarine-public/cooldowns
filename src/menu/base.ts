@@ -31,7 +31,7 @@ export class BaseMenu {
 		this.State = this.Tree.AddToggle("State", options.defaultState ?? true)
 		this.TeamState = this.Tree.AddDropdown(
 			"Team",
-			["All", "Only enemies", "Only allies", "Only allies and local"],
+			["All", "Only enemies", "Only allies", "Only allies and local", "Anyone but local"],
 			options.defaultTeamState ?? ETeamState.Enemy,
 			"Show on team"
 		)

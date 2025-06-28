@@ -27,6 +27,8 @@ export class ItemManager {
 				return !entity.IsEnemy() && !entity.IsMyHero
 			case ETeamState.AllyAndLocal:
 				return !entity.IsEnemy() || entity.IsMyHero
+			case ETeamState.AnyoneButLocal:
+				return !entity.IsMyHero
 			case ETeamState.Enemy:
 				return entity.IsEnemy()
 			default:
