@@ -19,19 +19,19 @@ export class ItemGUI extends BaseGUI {
 	private readonly size = new Vector2()
 
 	public Update(
-		healthBarPosition: Vector2,
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
 		scale: number
 	) {
-		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
+		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
 		const square = ItemGUI.minSize + additionalSize
 
 		this.size.CopyFrom(
 			GUIInfo.ScaleVector(square * (88 / 64) * scale, square * scale)
 		)
 	}
-
 	public Draw(
 		mainAlpha: number,
 		menu: ItemMenu,
@@ -40,12 +40,40 @@ export class ItemGUI extends BaseGUI {
 		isDisable: boolean,
 		isTethered: boolean
 	): void {
+		this.DrawItems(
+			this.position,
+			mainAlpha,
+			menu,
+			items,
+			additionalPosition,
+			isDisable,
+			isTethered
+		)
+		this.DrawItems(
+			this.positionEnd,
+			mainAlpha,
+			menu,
+			items,
+			additionalPosition,
+			isDisable,
+			isTethered
+		)
+	}
+
+	protected DrawItems(
+		recPosition: Rectangle,
+		mainAlpha: number,
+		menu: ItemMenu,
+		items: Item[],
+		additionalPosition: Vector2,
+		isDisable: boolean,
+		isTethered: boolean
+	) {
 		// hide item if contains dota hud
-		if (this.Contains()) {
+		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
-		const recPosition = this.position,
-			additionalSize = menu.Size.value,
+		const additionalSize = menu.Size.value,
 			vecSize = new Vector2(
 				!!menu.SquareMode.SelectedID ? this.size.y : this.size.x,
 				this.size.y

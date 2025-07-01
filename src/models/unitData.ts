@@ -9,8 +9,10 @@ import {
 	npc_dota_brewmaster_storm,
 	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
+	RendererSDK,
 	Unit,
-	Vector2
+	Vector2,
+	Vector3
 } from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
@@ -33,6 +35,10 @@ export class UnitData {
 
 	constructor(public readonly Owner: Unit) {}
 
+	public get IsTeleported() {
+		return this.Owner.TPStartPosition.IsValid && this.Owner.TPEndPosition.IsValid
+	}
+
 	public Draw(menu: MenuManager) {
 		const itemMenu = menu.ItemMenu,
 			spellMenu = menu.SpellMenu,
@@ -46,26 +52,30 @@ export class UnitData {
 			return
 		}
 		const owner = this.Owner
-		const isVisible = owner.IsFogVisible || owner.IsVisible
+		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
 		if (!isVisible || !owner.IsAlive || owner.HideHud) {
 			return
 		}
 		if (owner.IsCreep && !owner.IsSpawned) {
 			return
 		}
-		const position = owner.HealthBarPosition()
-		if (position === undefined) {
-			return
+
+		const position = this.HealthBarPosition(owner)
+		let positionEnd: Nullable<Vector2>
+		if (this.IsTeleported) {
+			positionEnd = this.HealthBarPosition(owner, owner.TPEndPosition)
 		}
 
-		const cursor = Input.CursorOnScreen,
-			distanceScale = this.CalculateScale(cursor.Distance(position))
+		const distanceScale =
+			position !== undefined
+				? this.CalculateScale(Input.CursorOnScreen.Distance(position))
+				: 1
 
 		const scale = menu.Scale.value ? distanceScale : 1
 		const alpha =
 			menu.Opacity.value * (255 / 100) * (menu.OpacityByCursor.value ? -1 : 1)
 
-		this.UpdateGUI(scale, position, itemMenu, spellMenu, modifierMenu)
+		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
 		if (itemState && this.items.length) {
 			this.itemGUI.Draw(
@@ -140,13 +150,11 @@ export class UnitData {
 				break
 		}
 	}
-
 	public DisposeAll() {
 		this.items.clear()
 		this.spells.clear()
 		this.modifiers.clear()
 	}
-
 	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
 		const owner = this.Owner
 		if (
@@ -179,10 +187,10 @@ export class UnitData {
 				return new Vector2()
 		}
 	}
-
 	protected UpdateGUI(
 		scale: number,
-		position: Vector2,
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>,
 		itemMenu: ItemMenu,
 		spellMenu: SpellMenu,
 		modifierMenu: ModifierMenu
@@ -193,28 +201,39 @@ export class UnitData {
 			healthBarSize = this.Owner.HealthBarSize
 
 		if (itemState) {
-			this.itemGUI.Update(position, healthBarSize, itemMenu.Size.value, scale)
+			this.itemGUI.Update(
+				position,
+				positionEnd,
+				healthBarSize,
+				itemMenu.Size.value,
+				scale
+			)
 		}
 
 		if (spellState) {
-			this.spellGUI.Update(position, healthBarSize, spellMenu.Size.value, scale)
+			this.spellGUI.Update(
+				position,
+				positionEnd,
+				healthBarSize,
+				spellMenu.Size.value,
+				scale
+			)
 		}
 
 		if (modifierState) {
 			this.modifierGUI.Update(
 				position,
+				positionEnd,
 				healthBarSize,
 				modifierMenu.Size.value,
 				scale
 			)
 		}
 	}
-
 	protected CalculateScale(value: number) {
 		const startDistance = GUIInfo.ScaleHeight(150)
 		return Math.min(Math.max(0.5, value / startDistance), 1)
 	}
-
 	protected SortModifiers(modifiers: Modifier[], menu: ModifierMenu) {
 		const modifiersMap = new Map<string, Modifier>()
 		for (let i = 0, end = modifiers.length; i < end; i++) {
@@ -239,7 +258,22 @@ export class UnitData {
 		}
 		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
 	}
-
+	public HealthBarPosition(
+		owner: Unit,
+		origin: Nullable<Vector3> = undefined
+	): Nullable<Vector2> {
+		const position = (origin ?? owner.Position)
+			.Clone()
+			.AddScalarZ(owner.HealthBarOffset)
+		const screenPosition = RendererSDK.WorldToScreen(position)
+		if (screenPosition === undefined) {
+			return undefined
+		}
+		if (owner.HasVisualShield) {
+			screenPosition.AddScalarY(5)
+		}
+		return screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
+	}
 	private getKeyName(modifier: Modifier) {
 		if (modifier.Name === "modifier_rubick_spell_steal") {
 			return modifier.GetTexturePath()

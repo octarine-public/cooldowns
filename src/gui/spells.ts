@@ -22,18 +22,18 @@ export class SpellGUI extends BaseGUI {
 	private readonly size = new Vector2()
 
 	public Update(
-		healthBarPosition: Vector2,
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
 		scale: number
 	) {
-		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
+		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
 		const size = SpellGUI.minSize + additionalSize * 4
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 		this.size.x -= (this.size.x + 1) % 2
 		this.size.y -= (this.size.y + 1) % 2
 	}
-
 	public Draw(
 		mainAlpha: number,
 		menu: SpellMenu,
@@ -42,14 +42,40 @@ export class SpellGUI extends BaseGUI {
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	): void {
+		this.DrawSpells(
+			this.position,
+			mainAlpha,
+			menu,
+			spells,
+			additionalPosition,
+			isSilenced,
+			isPassiveDisabled
+		)
+		this.DrawSpells(
+			this.positionEnd,
+			mainAlpha,
+			menu,
+			spells,
+			additionalPosition,
+			isSilenced,
+			isPassiveDisabled
+		)
+	}
+	protected DrawSpells(
+		recPosition: Rectangle,
+		mainAlpha: number,
+		menu: SpellMenu,
+		spells: [Ability, number][],
+		additionalPosition: Vector2,
+		isSilenced: boolean,
+		isPassiveDisabled: boolean
+	) {
 		// hide item if contains dota hud
-		if (this.Contains()) {
+		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
 		const vecSize = this.size,
-			recPosition = this.position,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
-
 		for (let index = spells.length - 1; index > -1; index--) {
 			const [spell, idx] = spells[index]
 			const vecPos = this.GetPosition(
@@ -86,7 +112,7 @@ export class SpellGUI extends BaseGUI {
 				isUniqueDisabled = spell.Owner?.IsTethered ?? false
 			}
 			if (menu.IsMinimalistic.value) {
-				this.Minimilistic(
+				this.minimilistic(
 					idx,
 					alpha,
 					spell,
@@ -102,7 +128,7 @@ export class SpellGUI extends BaseGUI {
 					isAltCastState
 				)
 			} else {
-				this.Image(
+				this.image(
 					alpha,
 					texture,
 					vecPos,
@@ -132,7 +158,7 @@ export class SpellGUI extends BaseGUI {
 
 			switch (levelType) {
 				case ELevelType.Square:
-					this.SquareLevel(
+					this.squareLevel(
 						spell,
 						vecPos,
 						vecSize,
@@ -153,8 +179,7 @@ export class SpellGUI extends BaseGUI {
 			}
 		}
 	}
-
-	private Minimilistic(
+	private minimilistic(
 		idx: number,
 		alpha: number,
 		spell: Ability,
@@ -201,7 +226,7 @@ export class SpellGUI extends BaseGUI {
 		if (hasRootDisable) {
 			isUniqueDisabled = spell.Owner?.IsTethered ?? false
 		}
-		this.Image(
+		this.image(
 			alpha,
 			texture,
 			vecPos,
@@ -218,8 +243,7 @@ export class SpellGUI extends BaseGUI {
 			spell.IsPassive
 		)
 	}
-
-	private Image(
+	private image(
 		alpha: number,
 		texture: string,
 		vecPos: Vector2,
@@ -288,8 +312,7 @@ export class SpellGUI extends BaseGUI {
 			1
 		)
 	}
-
-	private SquareLevel(
+	private squareLevel(
 		spell: Ability,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -340,7 +363,6 @@ export class SpellGUI extends BaseGUI {
 			pos.AddScalarX(step)
 		}
 	}
-
 	private ignoreMinimalistic(spell: Ability, idx: number) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {

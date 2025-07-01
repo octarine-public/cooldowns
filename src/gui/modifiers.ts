@@ -17,29 +17,43 @@ export class ModifierGUI extends BaseGUI {
 	private readonly size = new Vector2()
 
 	public Update(
-		healthBarPosition: Vector2,
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
 		scale: number
 	): void {
-		super.Update(healthBarPosition, healthBarSize, additionalSize, scale)
+		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
 		const size = ModifierGUI.minSize + additionalSize
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 	}
-
 	public Draw(
 		mainAlpha: number,
 		menu: ModifierMenu,
 		modifiers: Modifier[],
 		additionalPosition: Vector2
 	): void {
+		this.DrawModifiers(this.position, mainAlpha, menu, modifiers, additionalPosition)
+		this.DrawModifiers(
+			this.positionEnd,
+			mainAlpha,
+			menu,
+			modifiers,
+			additionalPosition
+		)
+	}
+	protected DrawModifiers(
+		recPosition: Rectangle,
+		mainAlpha: number,
+		menu: ModifierMenu,
+		modifiers: Modifier[],
+		additionalPosition: Vector2
+	) {
 		// hide item if contains dota hud
-		if (this.Contains()) {
+		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
-
 		const vecSize = this.size,
-			recPosition = this.position,
 			additionalSize = menu.Size.value,
 			modeImage = menu.ModeImage.SelectedID,
 			modePos = menu.ModePosition.SelectedID,
@@ -119,7 +133,6 @@ export class ModifierGUI extends BaseGUI {
 			this.Text(cdText, textPosition, flags, 2.75)
 		}
 	}
-
 	protected GetPosition(
 		rec: Rectangle,
 		size: Vector2,
@@ -136,7 +149,6 @@ export class ModifierGUI extends BaseGUI {
 		}
 		return pos1.AddForThis(additional).RoundForThis()
 	}
-
 	private outline(
 		alpha: number,
 		ratio: number,
@@ -191,7 +203,6 @@ export class ModifierGUI extends BaseGUI {
 			true
 		)
 	}
-
 	private InnerFillImage(
 		modifierName: string,
 		modeImage: EModeImage,

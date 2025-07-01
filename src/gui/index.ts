@@ -20,15 +20,30 @@ export abstract class BaseGUI {
 	protected static readonly noManaOutlineColor = new Color(77, 131, 247)
 
 	protected readonly position = new Rectangle()
+	protected readonly positionEnd = new Rectangle()
 
 	public Update(
-		position: Vector2,
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>,
 		size: Vector2,
 		_additionalSize: number,
 		_scale: number
 	): void {
-		this.position.pos1.CopyFrom(position)
-		this.position.pos2.CopyFrom(position.Add(size))
+		if (position === undefined) {
+			this.position.pos1.Invalidate()
+			this.position.pos2.Invalidate()
+		} else {
+			this.position.pos1.CopyFrom(position)
+			this.position.pos2.CopyFrom(position.Add(size))
+		}
+
+		if (positionEnd === undefined) {
+			this.positionEnd.pos1.Invalidate()
+			this.positionEnd.pos2.Invalidate()
+		} else {
+			this.positionEnd.pos1.CopyFrom(positionEnd)
+			this.positionEnd.pos2.CopyFrom(positionEnd.Add(size))
+		}
 	}
 
 	public abstract Draw(
