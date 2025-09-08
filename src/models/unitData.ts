@@ -322,6 +322,8 @@ export class UnitData {
 				return !this.Owner.IsEnemy() && !this.Owner.IsMyHero
 			case ETeamState.AllyAndLocal:
 				return !this.Owner.IsEnemy() || this.Owner.IsMyHero
+			case ETeamState.AnyoneButLocal:
+				return !this.Owner.IsMyHero
 			case ETeamState.Enemy:
 				return this.Owner.IsEnemy()
 			default:
