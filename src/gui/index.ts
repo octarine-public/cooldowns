@@ -59,10 +59,12 @@ export abstract class BaseGUI {
 		return (
 			GUIInfo.ContainsShop(this.position.pos1) ||
 			GUIInfo.ContainsMiniMap(this.position.pos1) ||
-			GUIInfo.ContainsScoreboard(this.position.pos1)
+			GUIInfo.ContainsScoreboard(this.position.pos1) ||
+			GUIInfo.ContainsShop(this.positionEnd.pos1) ||
+			GUIInfo.ContainsMiniMap(this.positionEnd.pos1) ||
+			GUIInfo.ContainsScoreboard(this.positionEnd.pos1)
 		)
 	}
-
 	protected Text(
 		text: string,
 		position: Rectangle,
@@ -72,7 +74,6 @@ export abstract class BaseGUI {
 	) {
 		RendererSDK.TextByFlags(text, position, color, division, flags, BaseGUI.fontWidth)
 	}
-
 	protected GetPosition(
 		rec: Rectangle,
 		size: Vector2,

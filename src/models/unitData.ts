@@ -53,19 +53,20 @@ export class UnitData {
 		}
 		const owner = this.Owner
 		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
-		if (!isVisible || !owner.IsAlive || owner.HideHud) {
+		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
 			return
 		}
 		if (owner.IsCreep && !owner.IsSpawned) {
 			return
 		}
-
-		const position = this.HealthBarPosition(owner)
-		let positionEnd: Nullable<Vector2>
-		if (this.IsTeleported) {
-			positionEnd = this.HealthBarPosition(owner, owner.TPEndPosition)
-		}
-
+		const position = this.HealthBarPosition(
+			owner,
+			this.IsTeleported ? owner.TPStartPosition : undefined
+		)
+		const positionEnd = this.HealthBarPosition(
+			owner,
+			this.IsTeleported ? owner.TPEndPosition : undefined
+		)
 		const distanceScale =
 			position !== undefined
 				? this.CalculateScale(Input.CursorOnScreen.Distance(position))
