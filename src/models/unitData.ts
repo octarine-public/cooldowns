@@ -38,7 +38,15 @@ export class UnitData {
 	public get IsTeleported() {
 		return this.Owner.TPStartPosition.IsValid && this.Owner.TPEndPosition.IsValid
 	}
-
+	protected get Positions(): [Nullable<Vector2>, Nullable<Vector2>] {
+		const owner = this.Owner,
+			start = this.IsTeleported ? owner.TPStartPosition : owner.Position,
+			end = this.IsTeleported ? owner.TPEndPosition : undefined
+		return [
+			this.HealthBarPosition(owner, start),
+			end?.IsValid ? this.HealthBarPosition(owner, end) : undefined
+		]
+	}
 	public Draw(menu: MenuManager) {
 		const itemMenu = menu.ItemMenu,
 			spellMenu = menu.SpellMenu,
@@ -59,18 +67,8 @@ export class UnitData {
 		if (owner.IsCreep && !owner.IsSpawned) {
 			return
 		}
-		const position = this.HealthBarPosition(
-			owner,
-			this.IsTeleported ? owner.TPStartPosition : undefined
-		)
-		const positionEnd = this.HealthBarPosition(
-			owner,
-			this.IsTeleported ? owner.TPEndPosition : undefined
-		)
-		const distanceScale =
-			position !== undefined
-				? this.CalculateScale(Input.CursorOnScreen.Distance(position))
-				: 1
+		const [position, positionEnd] = this.Positions
+		const distanceScale = this.getDistanceScale(position, positionEnd)
 
 		const scale = menu.Scale.value ? distanceScale : 1
 		const alpha =
@@ -328,5 +326,11 @@ export class UnitData {
 			default:
 				return false
 		}
+	}
+	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
+		const position = start ?? end
+		return position !== undefined
+			? this.CalculateScale(Input.CursorOnScreen.Distance(position))
+			: 1
 	}
 }
