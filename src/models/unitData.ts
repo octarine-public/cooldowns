@@ -25,6 +25,7 @@ import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 
 export class UnitData {
+	public Priority: number = Infinity
 	private items: Item[] = []
 	private spells: [Ability, number][] = []
 	private modifiers: Modifier[] = []
@@ -107,36 +108,29 @@ export class UnitData {
 			)
 		}
 	}
-
 	public UnitItemsChanged(newItems: Item[]) {
 		this.items = newItems
 		this.items.orderBy(x => x.ItemSlot)
 	}
-
 	public UnitAbilitiesChanged(newAbils: [Ability, number][]) {
 		this.spells = newAbils
 		this.spells.orderBy(([, idx]) => idx)
 	}
-
 	public ModifierCreated(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.push(modifier)
 		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
-
 	public ModifierRemoved(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.remove(modifier)
 		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
-
 	public ModifierRestart(newModifiers: Modifier[], menu: ModifierMenu) {
 		this.modifiers = newModifiers
 		this.modifiers = this.SortModifiers(this.modifiers, menu)
 	}
-
 	public HasModifier(modifier: Modifier) {
 		return this.modifiers.includes(modifier)
 	}
-
 	public EntityDestroyed(entity: Item | Ability) {
 		switch (true) {
 			case entity instanceof Item:
@@ -208,7 +202,6 @@ export class UnitData {
 				scale
 			)
 		}
-
 		if (spellState) {
 			this.spellGUI.Update(
 				position,
@@ -218,7 +211,6 @@ export class UnitData {
 				scale
 			)
 		}
-
 		if (modifierState) {
 			this.modifierGUI.Update(
 				position,
@@ -228,6 +220,7 @@ export class UnitData {
 				scale
 			)
 		}
+		this.setPriority()
 	}
 	protected CalculateScale(value: number) {
 		const startDistance = GUIInfo.ScaleHeight(150)
@@ -332,5 +325,20 @@ export class UnitData {
 		return position !== undefined
 			? this.CalculateScale(Input.CursorOnScreen.Distance(position))
 			: 1
+	}
+	private setPriority() {
+		let w2s = RendererSDK.WorldToScreen(this.Owner.Position)
+		const [start, end] = this.Positions
+		if (w2s === undefined) {
+			w2s = start
+		}
+		if (w2s === undefined) {
+			w2s = end
+		}
+		if (w2s === undefined) {
+			this.Priority = Infinity
+			return
+		}
+		this.Priority = w2s.DistanceSqr(Input.CursorOnScreen)
 	}
 }

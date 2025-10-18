@@ -18,7 +18,6 @@ export class ItemManager {
 		}
 		return unit.Inventory.Items
 	}
-
 	private entityTeamState(entity: Unit) {
 		switch (this.menu.ItemMenu.TeamState.SelectedID) {
 			case ETeamState.All:
@@ -33,7 +32,6 @@ export class ItemManager {
 				return false
 		}
 	}
-
 	private entityState(entity: Unit) {
 		const menu = this.menu.ItemMenu
 		switch (true) {

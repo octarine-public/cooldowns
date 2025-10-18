@@ -29,8 +29,7 @@ new (class CCooldowns {
 	private readonly itemManager = new ItemManager(this.menu)
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
-
-	private readonly units = new Map<Unit, UnitData>()
+	private readonly units: UnitData[] = []
 
 	constructor() {
 		EventsSDK.on("Draw", this.Draw.bind(this))
@@ -50,50 +49,44 @@ new (class CCooldowns {
 	private get state() {
 		return this.menu.State.value
 	}
-
 	private get isPostGame() {
 		return (
 			GameRules === undefined ||
 			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
-
 	private get isUIGame() {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
-
 	protected Draw() {
-		if (!this.state || this.isPostGame) {
+		if (!this.state || this.isPostGame || !this.isUIGame) {
 			return
 		}
-		if (this.isUIGame) {
-			this.units.forEach(unit => unit.Draw(this.menu))
+		const arr = this.units.orderBy(x => x.Priority)
+		for (let i = arr.length - 1; i > -1; i--) {
+			arr[i].Draw(this.menu)
 		}
 	}
-
 	protected EntityCreated(entity: Entity) {
 		if (this.shouldBeUnit(entity)) {
 			this.updateAllManagers(entity)
 		}
 	}
-
 	protected EntityDestroyed(entity: Entity) {
 		if (this.shouldBeUnit(entity)) {
-			this.units.delete(entity)
+			this.units.removeCallback(x => x.Owner === entity)
 		}
 	}
-
 	protected UnitPropertyChanged(entity: Unit) {
-		const getUnitData = this.units.get(entity)
+		const getUnitData = this.units.find(x => x.Owner === entity)
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
 			getUnitData?.DisposeAll()
-			this.units.delete(entity)
+			this.units.removeCallback(x => x.Owner === entity)
 		}
 		if (!this.isIllusion(entity)) {
 			this.updateAllManagers(entity)
 		}
 	}
-
 	protected AbilityHiddenChanged(abil: Ability) {
 		const owner = abil.Owner
 		if (this.shouldBeUnit(owner)) {
@@ -102,19 +95,16 @@ new (class CCooldowns {
 			)
 		}
 	}
-
 	protected UnitItemsChanged(unit: Unit) {
 		if (this.shouldBeUnit(unit)) {
 			this.getOrAddUnitData(unit)?.UnitItemsChanged(this.itemManager.Get(unit))
 		}
 	}
-
 	protected UnitAbilitiesChanged(unit: Unit) {
 		if (this.shouldBeUnit(unit)) {
 			this.getOrAddUnitData(unit)?.UnitAbilitiesChanged(this.spellManager.Get(unit))
 		}
 	}
-
 	protected ModifierChanged(modifier: Modifier) {
 		const owner = modifier.Parent
 		if (!this.shouldBeUnit(owner)) {
@@ -143,34 +133,30 @@ new (class CCooldowns {
 			)
 		}
 	}
-
 	protected ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.shouldBeUnit(owner) || !this.modifierManager.EntityState(owner)) {
+		if (!this.shouldBeUnit(owner) || !this.modifierManager.State(owner)) {
 			return
 		}
 		this.getOrAddUnitData(owner)?.ModifierRemoved(modifier, this.menu.ModifierMenu)
 	}
-
 	private isIllusion(unit: Unit) {
 		return unit.IsIllusion && !unit.IsStrongIllusion
 	}
-
 	private getOrAddUnitData(entity: Unit) {
 		if (!entity.IsValid || this.isIllusion(entity)) {
-			this.units.get(entity)?.DisposeAll()
-			this.units.delete(entity)
+			this.units.find(x => x.Owner === entity)?.DisposeAll()
+			this.units.removeCallback(x => x.Owner === entity)
 			return
 		}
-		let getUnitData = this.units.get(entity)
+		let getUnitData = this.units.find(x => x.Owner === entity)
 		if (getUnitData === undefined) {
 			getUnitData = new UnitData(entity)
-			this.units.set(entity, getUnitData)
+			this.units.push(getUnitData)
 			return getUnitData
 		}
 		return getUnitData
 	}
-
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
 		if (!(entity instanceof Unit) || this.isIllusion(entity)) {
 			return false
@@ -191,7 +177,6 @@ new (class CCooldowns {
 		}
 		return entity.IsCreep && entity.IsNeutral
 	}
-
 	private updateAllManagers(entity: Unit) {
 		const unitData = this.getOrAddUnitData(entity)
 		unitData?.UnitItemsChanged(this.itemManager.Get(entity))
@@ -201,7 +186,6 @@ new (class CCooldowns {
 		)
 		unitData?.UnitAbilitiesChanged(this.spellManager.Get(entity))
 	}
-
 	private menuChanged() {
 		const units = EntityManager.GetEntitiesByClass(Unit)
 		for (let i = units.length - 1; i > -1; i--) {

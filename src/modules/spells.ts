@@ -32,7 +32,6 @@ export class SpellManager {
 		}
 		return abilities
 	}
-
 	private shouldDrawable(unit: Unit, abil: Nullable<Ability>) {
 		if (abil === undefined || !abil.ShouldBeDrawable || abil.IsHidden) {
 			return false
@@ -45,7 +44,6 @@ export class SpellManager {
 		}
 		return true
 	}
-
 	private entityTeamState(entity: Unit) {
 		switch (this.menu.SpellMenu.TeamState.SelectedID) {
 			case ETeamState.All:
@@ -61,7 +59,6 @@ export class SpellManager {
 				return false
 		}
 	}
-
 	private entityState(entity: Unit) {
 		const menu = this.menu.SpellMenu
 		switch (true) {

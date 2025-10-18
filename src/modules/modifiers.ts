@@ -18,12 +18,12 @@ export class ModifierManager {
 	constructor(private readonly menu: MenuManager) {}
 
 	public Get(owner: Unit): Modifier[] {
-		return this.EntityState(owner)
+		return this.State(owner)
 			? owner.Buffs.filter(modifier => this.shouldBeValid(owner, modifier))
 			: []
 	}
 
-	public EntityState(entity: Unit) {
+	public State(entity: Unit) {
 		const menu = this.menu.ModifierMenu
 		switch (true) {
 			case entity.IsHero:
@@ -44,11 +44,9 @@ export class ModifierManager {
 				return false
 		}
 	}
-
 	public ShouldBeValid(owner: Unit, modifier: Modifier) {
-		return this.shouldBeValid(owner, modifier) && this.EntityState(owner)
+		return this.shouldBeValid(owner, modifier) && this.State(owner)
 	}
-
 	private shouldBeValid(owner: Unit, modifier: Modifier) {
 		if (!modifier.IsValid || (modifier.IsHidden && !modifier.ForceVisible)) {
 			return false
