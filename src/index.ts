@@ -30,6 +30,7 @@ new (class CCooldowns {
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
 	private readonly units: UnitData[] = []
+	private readonly cachedUnits = new Set<Unit>()
 
 	constructor() {
 		EventsSDK.on("Draw", this.Draw.bind(this))
@@ -73,11 +74,15 @@ new (class CCooldowns {
 		}
 	}
 	protected EntityDestroyed(entity: Entity) {
-		if (this.shouldBeUnit(entity)) {
+		if (entity instanceof Unit && this.cachedUnits.has(entity)) {
 			this.units.removeCallback(x => x.Owner === entity)
+			this.cachedUnits.delete(entity)
 		}
 	}
 	protected UnitPropertyChanged(entity: Unit) {
+		if (!this.cachedUnits.has(entity)) {
+			return
+		}
 		const getUnitData = this.units.find(x => x.Owner === entity)
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
 			getUnitData?.DisposeAll()
@@ -135,10 +140,15 @@ new (class CCooldowns {
 	}
 	protected ModifierRemoved(modifier: Modifier) {
 		const owner = modifier.Parent
-		if (!this.shouldBeUnit(owner) || !this.modifierManager.State(owner)) {
+		if (!this.shouldBeUnit(owner)) {
 			return
 		}
-		this.getOrAddUnitData(owner)?.ModifierRemoved(modifier, this.menu.ModifierMenu)
+		if (this.modifierManager.State(owner)) {
+			this.getOrAddUnitData(owner)?.ModifierRemoved(
+				modifier,
+				this.menu.ModifierMenu
+			)
+		}
 	}
 	private isIllusion(unit: Unit) {
 		return unit.IsIllusion && !unit.IsStrongIllusion
@@ -153,6 +163,7 @@ new (class CCooldowns {
 		if (getUnitData === undefined) {
 			getUnitData = new UnitData(entity)
 			this.units.push(getUnitData)
+			this.cachedUnits.add(entity)
 			return getUnitData
 		}
 		return getUnitData
