@@ -30,7 +30,7 @@ new (class CCooldowns {
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
 	private readonly units: UnitData[] = []
-	private readonly cachedUnits = new Set<Unit>()
+	private readonly cachedUnits = new WeakSet<Unit>()
 
 	constructor() {
 		EventsSDK.on("Draw", this.Draw.bind(this))
@@ -86,6 +86,7 @@ new (class CCooldowns {
 		const getUnitData = this.units.find(x => x.Owner === entity)
 		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
 			getUnitData?.DisposeAll()
+			this.cachedUnits.delete(entity)
 			this.units.removeCallback(x => x.Owner === entity)
 		}
 		if (!this.isIllusion(entity)) {
@@ -157,6 +158,7 @@ new (class CCooldowns {
 		if (!entity.IsValid || this.isIllusion(entity)) {
 			this.units.find(x => x.Owner === entity)?.DisposeAll()
 			this.units.removeCallback(x => x.Owner === entity)
+			this.cachedUnits.delete(entity)
 			return
 		}
 		let getUnitData = this.units.find(x => x.Owner === entity)
