@@ -74,7 +74,7 @@ new (class CCooldowns {
 		}
 	}
 	protected EntityDestroyed(entity: Entity) {
-		if (entity instanceof Unit && this.cachedUnits.has(entity)) {
+		if (this.isUnit(entity) && this.cachedUnits.has(entity)) {
 			this.units.removeCallback(x => x.Owner === entity)
 			this.cachedUnits.delete(entity)
 		}
@@ -84,7 +84,7 @@ new (class CCooldowns {
 			return
 		}
 		const getUnitData = this.units.find(x => x.Owner === entity)
-		if (entity instanceof SpiritBear && !entity.ShouldRespawn) {
+		if (this.isSpiritBear(entity) && !entity.ShouldRespawn) {
 			getUnitData?.DisposeAll()
 			this.cachedUnits.delete(entity)
 			this.units.removeCallback(x => x.Owner === entity)
@@ -151,9 +151,6 @@ new (class CCooldowns {
 			)
 		}
 	}
-	private isIllusion(unit: Unit) {
-		return unit.IsIllusion && !unit.IsStrongIllusion
-	}
 	private getOrAddUnitData(entity: Unit) {
 		if (!entity.IsValid || this.isIllusion(entity)) {
 			this.units.find(x => x.Owner === entity)?.DisposeAll()
@@ -171,13 +168,13 @@ new (class CCooldowns {
 		return getUnitData
 	}
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
-		if (!(entity instanceof Unit) || this.isIllusion(entity)) {
+		if (!this.isUnit(entity) || this.isIllusion(entity)) {
 			return false
 		}
 		if (entity.IsHero || entity.IsRoshan || entity.IsCourier) {
 			return true
 		}
-		if (entity instanceof SpiritBear) {
+		if (this.isSpiritBear(entity)) {
 			return entity.ShouldRespawn
 		}
 		if (
@@ -207,5 +204,14 @@ new (class CCooldowns {
 				this.updateAllManagers(unit)
 			}
 		}
+	}
+	private isIllusion(unit: Unit) {
+		return unit.IsIllusion && !unit.IsStrongIllusion
+	}
+	private isUnit(entity: Nullable<Entity>): entity is Unit {
+		return entity?.IsUnit ?? false
+	}
+	private isSpiritBear(unit: Unit): unit is SpiritBear {
+		return unit.IsSpiritBear
 	}
 })()
