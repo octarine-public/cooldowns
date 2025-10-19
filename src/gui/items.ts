@@ -15,7 +15,20 @@ import { BaseGUI } from "./index"
 export class ItemGUI extends BaseGUI {
 	private static readonly minSize = 16
 	private static readonly outlineColor = Color.Black
-
+	private static readonly higlightColorItems = new Set([
+		"item_gem",
+		"item_dust",
+		"item_rapier",
+		"item_aegis",
+		"item_cheese",
+		"item_sphere",
+		"item_aeon_disk",
+		"item_refresher_shard",
+		"item_smoke_of_deceit",
+		"item_ward_sentry",
+		"item_ward_observer",
+		"item_ward_dispenser"
+	])
 	private readonly size = new Vector2()
 
 	public Update(
@@ -59,7 +72,6 @@ export class ItemGUI extends BaseGUI {
 			isTethered
 		)
 	}
-
 	protected DrawItems(
 		recPosition: Rectangle,
 		mainAlpha: number,
@@ -103,7 +115,9 @@ export class ItemGUI extends BaseGUI {
 			const outlineColor = (
 				isDisable || isUniqueDisabled || item.IsMuted
 					? Color.Red
-					: ItemGUI.outlineColor.Clone()
+					: ItemGUI.higlightColorItems.has(item.Name)
+						? Color.Yellow
+						: ItemGUI.outlineColor.Clone()
 			).SetA(alpha)
 
 			const rounding = this.GetRounding(menu, vecSize)
