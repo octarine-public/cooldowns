@@ -98,6 +98,8 @@ export class ModifierManager {
 		switch (menu.TeamState.SelectedID) {
 			case ETeamState.All:
 				return true
+			case ETeamState.AllExceptSelf:
+				return !entity.IsMyHero
 			case ETeamState.Ally:
 				return !entity.IsEnemy() && !entity.IsMyHero
 			case ETeamState.AllyAndLocal:

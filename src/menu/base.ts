@@ -20,6 +20,14 @@ export class BaseMenu {
 	public readonly Rounding: Menu.Slider
 	public readonly TeamState: Menu.Dropdown
 
+	private readonly arrTeam = [
+		"All",
+		"All except local",
+		"Only enemies",
+		"Only allies",
+		"Only allies and local"
+	]
+
 	constructor(options: IBaseBaseMenu) {
 		this.Tree = options.node.AddNode(
 			options.nodeName,
@@ -31,7 +39,7 @@ export class BaseMenu {
 		this.State = this.Tree.AddToggle("State", options.defaultState ?? true)
 		this.TeamState = this.Tree.AddDropdown(
 			"Team",
-			["All", "Only enemies", "Only allies", "Only allies and local"],
+			this.arrTeam,
 			options.defaultTeamState ?? ETeamState.Enemy,
 			"Show on team"
 		)

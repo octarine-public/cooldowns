@@ -1,5 +1,6 @@
 export const enum ETeamState {
 	All,
+	AllExceptSelf,
 	Enemy,
 	Ally,
 	AllyAndLocal

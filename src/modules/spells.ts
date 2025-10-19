@@ -48,9 +48,10 @@ export class SpellManager {
 		switch (this.menu.SpellMenu.TeamState.SelectedID) {
 			case ETeamState.All:
 				return true
-			case ETeamState.Ally: {
+			case ETeamState.AllExceptSelf:
+				return !entity.IsMyHero
+			case ETeamState.Ally:
 				return !entity.IsEnemy() && !entity.IsMyHero
-			}
 			case ETeamState.AllyAndLocal:
 				return !entity.IsEnemy() || entity.IsMyHero
 			case ETeamState.Enemy:
