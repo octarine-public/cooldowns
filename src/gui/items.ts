@@ -69,8 +69,7 @@ export class ItemGUI extends BaseGUI {
 		isDisable: boolean,
 		isTethered: boolean
 	) {
-		// hide item if contains dota hud
-		if (!recPosition.pos1.IsValid || this.Contains()) {
+		if (!recPosition.pos1.IsValid) {
 			return
 		}
 		const additionalSize = menu.Size.value,

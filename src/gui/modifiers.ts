@@ -49,8 +49,7 @@ export class ModifierGUI extends BaseGUI {
 		modifiers: Modifier[],
 		additionalPosition: Vector2
 	) {
-		// hide item if contains dota hud
-		if (!recPosition.pos1.IsValid || this.Contains()) {
+		if (!recPosition.pos1.IsValid) {
 			return
 		}
 		const vecSize = this.size,

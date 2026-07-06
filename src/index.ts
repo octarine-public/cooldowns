@@ -14,6 +14,7 @@ import {
 	npc_dota_brewmaster_storm,
 	npc_dota_brewmaster_void,
 	npc_dota_visage_familiar,
+	RendererSDK,
 	SpiritBear,
 	Unit
 } from "github.com/octarine-public/wrapper/index"
@@ -33,7 +34,7 @@ new (class CCooldowns {
 	private readonly cachedUnits = new WeakSet<Unit>()
 
 	constructor() {
-		EventsSDK.on("Draw", this.Draw.bind(this))
+		EventsSDK.on("Draw2D", this.DrawContent.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
 		EventsSDK.on("UnitItemsChanged", this.UnitItemsChanged.bind(this))
@@ -59,13 +60,13 @@ new (class CCooldowns {
 	private get isUIGame() {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
-	protected Draw() {
+	protected DrawContent() {
 		if (!this.state || this.isPostGame || !this.isUIGame) {
 			return
 		}
 		const arr = this.units.orderBy(x => x.Priority)
 		for (let i = arr.length - 1; i > -1; i--) {
-			arr[i].Draw(this.menu)
+			arr[i].DrawContent2D(this.menu)
 		}
 	}
 	protected EntityCreated(entity: Entity) {
@@ -204,6 +205,7 @@ new (class CCooldowns {
 				this.updateAllManagers(unit)
 			}
 		}
+		RendererSDK.InvalidateDraw2D()
 	}
 	private isIllusion(unit: Unit) {
 		return unit.IsIllusion && !unit.IsStrongIllusion

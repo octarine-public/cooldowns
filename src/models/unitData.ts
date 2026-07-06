@@ -1,5 +1,6 @@
 import {
 	Ability,
+	AnchorKind,
 	GameState,
 	GUIInfo,
 	Input,
@@ -24,6 +25,8 @@ import { ItemMenu } from "../menu/items"
 import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 
+const TP_END_KIND = RendererSDK.AllocateAnchorKind()
+
 export class UnitData {
 	public Priority: number = Infinity
 	private items: Item[] = []
@@ -33,6 +36,8 @@ export class UnitData {
 	private readonly itemGUI = new ItemGUI()
 	private readonly spellGUI = new SpellGUI()
 	private readonly modifierGUI = new ModifierGUI()
+
+	private static readonly drawAnchor = new Vector2()
 
 	constructor(public readonly Owner: Unit) {}
 
@@ -48,65 +53,114 @@ export class UnitData {
 			end?.IsValid ? this.HealthBarPosition(owner, end) : undefined
 		]
 	}
-	public Draw(menu: MenuManager) {
+	public DrawContent2D(menu: MenuManager): void {
+		this.Priority = Infinity
+		if (!this.isShown()) {
+			return
+		}
 		const itemMenu = menu.ItemMenu,
 			spellMenu = menu.SpellMenu,
 			modifierMenu = menu.ModifierMenu
 
-		const itemState = itemMenu.State.value,
-			spellState = spellMenu.State.value,
-			modifierState = modifierMenu.State.value
+		if (
+			!itemMenu.State.value &&
+			!spellMenu.State.value &&
+			!modifierMenu.State.value
+		) {
+			return
+		}
+		if (!this.items.length && !this.spells.length && !this.modifiers.length) {
+			return
+		}
 
-		if (!itemState && !spellState && !modifierState) {
+		let [position, positionEnd] = this.Positions
+		if (position !== undefined && UnitData.hudContains(position)) {
+			position = undefined
+		}
+		if (positionEnd !== undefined && UnitData.hudContains(positionEnd)) {
+			positionEnd = undefined
+		}
+		if (position === undefined && positionEnd === undefined) {
 			return
 		}
-		const owner = this.Owner
-		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
-		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
-			return
-		}
-		if (owner.IsCreep && !owner.IsSpawned) {
-			return
-		}
-		const [position, positionEnd] = this.Positions
-		const distanceScale = this.getDistanceScale(position, positionEnd)
-
-		const scale = menu.Scale.value ? distanceScale : 1
+		this.setPriority(position, positionEnd)
+		const scale = menu.Scale.value
+			? this.getDistanceScale(position, positionEnd)
+			: 1
 		const alpha =
 			menu.Opacity.value * (255 / 100) * (menu.OpacityByCursor.value ? -1 : 1)
 
-		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
+		this.UpdateGUI(
+			scale,
+			UnitData.drawAnchor,
+			undefined,
+			itemMenu,
+			spellMenu,
+			modifierMenu
+		)
 
-		if (itemState && this.items.length) {
+		const index = this.Owner.Index
+		if (position !== undefined) {
+			RendererSDK.DrawEntityRelative(
+				index,
+				AnchorKind.HealthBar,
+				() => this.Positions[0],
+				() => this.DrawBlock(menu, alpha, position)
+			)
+		}
+		if (this.IsTeleported && positionEnd !== undefined) {
+			RendererSDK.DrawEntityRelative(
+				index,
+				TP_END_KIND,
+				() => this.Positions[1],
+				() => this.DrawBlock(menu, alpha, positionEnd)
+			)
+		}
+	}
+	private DrawBlock(menu: MenuManager, alpha: number, realAnchor: Vector2) {
+		const owner = this.Owner
+		this.itemGUI.realAnchor.CopyFrom(realAnchor)
+		this.spellGUI.realAnchor.CopyFrom(realAnchor)
+		this.modifierGUI.realAnchor.CopyFrom(realAnchor)
+		if (menu.ItemMenu.State.value && this.items.length) {
 			this.itemGUI.Draw(
 				alpha,
-				itemMenu,
+				menu.ItemMenu,
 				this.items,
-				this.GetAdditionalPosition(itemMenu),
+				this.GetAdditionalPosition(menu.ItemMenu),
 				owner.IsMuted,
 				owner.IsTethered
 			)
 		}
-
-		if (spellState && this.spells.length) {
+		if (menu.SpellMenu.State.value && this.spells.length) {
 			this.spellGUI.Draw(
 				alpha,
-				spellMenu,
+				menu.SpellMenu,
 				this.spells,
-				this.GetAdditionalPosition(spellMenu),
+				this.GetAdditionalPosition(menu.SpellMenu),
 				owner.IsSilenced,
 				owner.IsPassiveDisabled
 			)
 		}
-
-		if (modifierState && this.modifiers.length) {
+		if (menu.ModifierMenu.State.value && this.modifiers.length) {
 			this.modifierGUI.Draw(
 				alpha,
-				modifierMenu,
+				menu.ModifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(modifierMenu)
+				this.GetAdditionalPosition(menu.ModifierMenu)
 			)
 		}
+	}
+	private isShown(): boolean {
+		const owner = this.Owner
+		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
+		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
+			return false
+		}
+		if (owner.IsCreep && !owner.IsSpawned) {
+			return false
+		}
+		return true
 	}
 	public UnitItemsChanged(newItems: Item[]) {
 		this.items = newItems
@@ -220,7 +274,6 @@ export class UnitData {
 				scale
 			)
 		}
-		this.setPriority()
 	}
 	protected CalculateScale(value: number) {
 		const startDistance = GUIInfo.ScaleHeight(150)
@@ -326,19 +379,16 @@ export class UnitData {
 			? this.CalculateScale(Input.CursorOnScreen.Distance(position))
 			: 1
 	}
-	private setPriority() {
-		let w2s = RendererSDK.WorldToScreen(this.Owner.Position)
-		const [start, end] = this.Positions
-		if (w2s === undefined) {
-			w2s = start
-		}
-		if (w2s === undefined) {
-			w2s = end
-		}
-		if (w2s === undefined) {
-			this.Priority = Infinity
-			return
-		}
-		this.Priority = w2s.DistanceSqr(Input.CursorOnScreen)
+	private setPriority(start: Nullable<Vector2>, end: Nullable<Vector2>) {
+		const w2s = RendererSDK.WorldToScreen(this.Owner.Position) ?? start ?? end
+		this.Priority =
+			w2s !== undefined ? w2s.DistanceSqr(Input.CursorOnScreen) : Infinity
+	}
+	private static hudContains(position: Vector2): boolean {
+		return (
+			GUIInfo.ContainsShop(position) ||
+			GUIInfo.ContainsMiniMap(position) ||
+			GUIInfo.ContainsScoreboard(position)
+		)
 	}
 }

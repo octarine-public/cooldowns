@@ -70,8 +70,7 @@ export class SpellGUI extends BaseGUI {
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	) {
-		// hide item if contains dota hud
-		if (!recPosition.pos1.IsValid || this.Contains()) {
+		if (!recPosition.pos1.IsValid) {
 			return
 		}
 		const vecSize = this.size,

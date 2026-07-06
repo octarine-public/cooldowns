@@ -1,7 +1,6 @@
 import {
 	Ability,
 	Color,
-	GUIInfo,
 	Input,
 	Item,
 	Modifier,
@@ -21,6 +20,7 @@ export abstract class BaseGUI {
 
 	protected readonly position = new Rectangle()
 	protected readonly positionEnd = new Rectangle()
+	public readonly realAnchor = new Vector2()
 
 	public Update(
 		position: Nullable<Vector2>,
@@ -55,16 +55,6 @@ export abstract class BaseGUI {
 		isUniqueDisabled?: boolean
 	): void
 
-	protected Contains() {
-		return (
-			GUIInfo.ContainsShop(this.position.pos1) ||
-			GUIInfo.ContainsMiniMap(this.position.pos1) ||
-			GUIInfo.ContainsScoreboard(this.position.pos1) ||
-			GUIInfo.ContainsShop(this.positionEnd.pos1) ||
-			GUIInfo.ContainsMiniMap(this.positionEnd.pos1) ||
-			GUIInfo.ContainsScoreboard(this.positionEnd.pos1)
-		)
-	}
 	protected Text(
 		text: string,
 		position: Rectangle,
@@ -105,7 +95,7 @@ export abstract class BaseGUI {
 		}
 		const startDistance = (vecSize.x + vecSize.y) * 4
 		const distance = Input.CursorOnScreen.Distance(
-			vecPos.Add(vecSize.DivideScalar(2))
+			this.realAnchor.Add(vecPos).Add(vecSize.DivideScalar(2))
 		)
 		return -1 * mainAlpha * Math.min(Math.max(0.5, distance / startDistance), 1)
 	}
