@@ -1,9 +1,3 @@
-import {
-	GUIInfo,
-	ImageData,
-	Menu,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
 
 import { EMenuType } from "../enum"
 

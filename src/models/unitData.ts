@@ -1,19 +1,3 @@
-import {
-	Ability,
-	GameState,
-	GUIInfo,
-	Input,
-	Item,
-	Modifier,
-	npc_dota_brewmaster_earth,
-	npc_dota_brewmaster_storm,
-	npc_dota_brewmaster_void,
-	npc_dota_visage_familiar,
-	RendererSDK,
-	Unit,
-	Vector2,
-	Vector3
-} from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
@@ -323,7 +307,7 @@ export class UnitData {
 	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		const position = start ?? end
 		return position !== undefined
-			? this.CalculateScale(Input.CursorOnScreen.Distance(position))
+			? this.CalculateScale(InputManager.CursorOnScreen.Distance(position))
 			: 1
 	}
 	private setPriority() {
@@ -339,6 +323,6 @@ export class UnitData {
 			this.Priority = Infinity
 			return
 		}
-		this.Priority = w2s.DistanceSqr(Input.CursorOnScreen)
+		this.Priority = w2s.DistanceSqr(InputManager.CursorOnScreen)
 	}
 }

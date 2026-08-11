@@ -1,12 +1,3 @@
-import {
-	Color,
-	GUIInfo,
-	Modifier,
-	Rectangle,
-	RendererSDK,
-	TextFlags,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
 
 import { EModeImage, EPositionType } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"

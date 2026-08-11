@@ -1,17 +1,3 @@
-import {
-	Ability,
-	Color,
-	DOTA_ABILITY_BEHAVIOR,
-	EAbilitySlot,
-	GUIInfo,
-	npc_dota_hero_doom_bringer,
-	npc_dota_hero_invoker,
-	npc_dota_hero_rubick,
-	Rectangle,
-	RendererSDK,
-	TextFlags,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
 
 import { ELevelType } from "../enum"
 import { SpellMenu } from "../menu/spells"

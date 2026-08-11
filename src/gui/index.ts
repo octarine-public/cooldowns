@@ -1,16 +1,3 @@
-import {
-	Ability,
-	Color,
-	GUIInfo,
-	Input,
-	Item,
-	Modifier,
-	PathData,
-	Rectangle,
-	RendererSDK,
-	TextFlags,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
 
 import { BaseMenu } from "../menu/base"
 
@@ -104,7 +91,7 @@ export abstract class BaseGUI {
 			return mainAlpha
 		}
 		const startDistance = (vecSize.x + vecSize.y) * 4
-		const distance = Input.CursorOnScreen.Distance(
+		const distance = InputManager.CursorOnScreen.Distance(
 			vecPos.Add(vecSize.DivideScalar(2))
 		)
 		return -1 * mainAlpha * Math.min(Math.max(0.5, distance / startDistance), 1)

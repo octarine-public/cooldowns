@@ -1,4 +1,3 @@
-import { ImageData, Menu } from "github.com/octarine-public/wrapper/index"
 
 import { ETeamState } from "../enum"
 

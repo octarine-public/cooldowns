@@ -1,13 +1,3 @@
-import {
-	Color,
-	DOTA_ABILITY_BEHAVIOR,
-	GUIInfo,
-	Item,
-	Rectangle,
-	RendererSDK,
-	TextFlags,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
 
 import { ItemMenu } from "../menu/items"
 import { BaseGUI } from "./index"

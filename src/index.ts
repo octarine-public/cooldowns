@@ -1,23 +1,5 @@
 import "./translations"
 
-import {
-	Ability,
-	DOTAGameState,
-	DOTAGameUIState,
-	Entity,
-	EntityManager,
-	EventsSDK,
-	GameRules,
-	GameState,
-	Modifier,
-	npc_dota_brewmaster_earth,
-	npc_dota_brewmaster_storm,
-	npc_dota_brewmaster_void,
-	npc_dota_visage_familiar,
-	SpiritBear,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
-
 import { MenuManager } from "./menu/index"
 import { UnitData } from "./models/unitData"
 import { ItemManager } from "./modules/items"
@@ -52,8 +34,8 @@ new (class CCooldowns {
 	}
 	private get isPostGame() {
 		return (
-			GameRules === undefined ||
-			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
+			Dota2SDK.GameRules === undefined ||
+			Dota2SDK.GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
 	private get isUIGame() {
