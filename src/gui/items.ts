@@ -1,3 +1,4 @@
+import { canvas } from "../../render"
 import { ItemMenu } from "../menu/items"
 import { BaseGUI } from "./index"
 
@@ -17,9 +18,7 @@ export class ItemGUI extends BaseGUI {
 		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
 		const square = ItemGUI.minSize + additionalSize
 
-		this.size.CopyFrom(
-			GUIInfo.ScaleVector(square * (88 / 64) * scale, square * scale)
-		)
+		this.size.CopyFrom(GUIInfo.ScaleVector(square * 1.375 * scale, square * scale))
 	}
 	public Draw(
 		mainAlpha: number,
@@ -58,7 +57,6 @@ export class ItemGUI extends BaseGUI {
 		isDisable: boolean,
 		isTethered: boolean
 	) {
-		// hide item if contains dota hud
 		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
@@ -77,7 +75,7 @@ export class ItemGUI extends BaseGUI {
 				border,
 				index,
 				additionalPosition,
-				false, // vertical
+				false,
 				items.length
 			)
 
@@ -97,23 +95,18 @@ export class ItemGUI extends BaseGUI {
 
 			const rounding = this.GetRounding(menu, vecSize)
 
-			RendererSDK.RectRounded(
-				vecPos,
-				vecSize,
-				rounding,
-				Color.fromUint32(0),
-				outlineColor,
-				border + +(rounding > 0)
-			)
+			canvas.Rect(vecPos, vecSize, {
+				color: Color.fromUint32(0),
+				borderColor: outlineColor,
+				borderWidth: border + +(rounding > 0),
+				radius: Math.max(rounding / 2, 0)
+			})
 
-			// draw image item
-			RendererSDK.Image(
-				item.TexturePath,
-				vecPos,
-				rounding,
-				vecSize,
-				Color.White.SetA(alpha)
-			)
+			canvas.Image(item.TexturePath, vecPos, vecSize, {
+				color: Color.White.SetA(alpha),
+				radius: Math.max(rounding / 2, 0),
+				circle: rounding === 0
+			})
 
 			if (!charge && !cooldown) {
 				continue
@@ -131,7 +124,7 @@ export class ItemGUI extends BaseGUI {
 
 			const minOffset = 3
 			const noCharge = charge === 0
-			// if no charge draw cooldown by center
+
 			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
 			const canOffset = !noCharge && additionalSize >= minOffset

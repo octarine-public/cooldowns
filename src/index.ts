@@ -56,7 +56,13 @@ new (class CCooldowns {
 		}
 	}
 	protected EntityDestroyed(entity: Entity) {
+		if (entity instanceof Ability) {
+			for (const unit of this.units) {
+				unit.EntityDestroyed(entity)
+			}
+		}
 		if (this.isUnit(entity) && this.cachedUnits.has(entity)) {
+			this.units.find(unit => unit.Owner === entity)?.DisposeAll()
 			this.units.removeCallback(x => x.Owner === entity)
 			this.cachedUnits.delete(entity)
 		}

@@ -1,4 +1,4 @@
-
+import { canvas } from "../../render"
 import { EModeImage, EPositionType } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"
 import { BaseGUI } from "./index"
@@ -40,7 +40,6 @@ export class ModifierGUI extends BaseGUI {
 		modifiers: Modifier[],
 		additionalPosition: Vector2
 	) {
-		// hide item if contains dota hud
 		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
@@ -68,9 +67,9 @@ export class ModifierGUI extends BaseGUI {
 			const charge = modifier.StackCount >> 0,
 				cooldown = modifier.RemainingTime,
 				duration = modifier.Duration,
-				noTimer = duration === -1 || cooldown === 0
+				noTimer = duration <= 0 || cooldown <= 0
 
-			let ratio = Math.max((cooldown / duration) * 100, 0)
+			let ratio = noTimer ? 100 : Math.clamp((cooldown / duration) * 100, 0, 100)
 			if ((charge !== 0 && cooldown <= 0) || noTimer) {
 				ratio = 100
 			}
@@ -90,14 +89,11 @@ export class ModifierGUI extends BaseGUI {
 			this.InnerFillImage(modifier.Name, modeImage, position, alpha)
 			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
 
-			// draw image item
-			RendererSDK.Image(
-				modifier.GetTexturePath(),
-				vecPos,
-				modeImage === EModeImage.Round ? 0 : -1,
-				vecSize,
-				Color.White.SetA(alpha)
-			)
+			canvas.Image(modifier.GetTexturePath(), vecPos, vecSize, {
+				color: Color.White.SetA(alpha),
+
+				circle: modeImage === EModeImage.Round
+			})
 
 			if (charge !== 0) {
 				this.Text(
@@ -113,7 +109,7 @@ export class ModifierGUI extends BaseGUI {
 
 			const minOffset = 3
 			const noCharge = charge === 0
-			// if no charge draw cooldown by center
+
 			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
 			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
 			const canOffset = !noCharge && additionalSize >= minOffset
@@ -134,9 +130,9 @@ export class ModifierGUI extends BaseGUI {
 	) {
 		const pos1 = new Vector2(rec.x, rec.y)
 		if (vertical) {
-			pos1.AddScalarY(index * (size.y + border * 2)) // border 2 * 2
+			pos1.AddScalarY(index * (size.y + border * 2))
 		} else {
-			pos1.AddScalarX(index * (size.x + border * 2)) // border 2 * 2
+			pos1.AddScalarX(index * (size.x + border * 2))
 		}
 		return pos1.AddForThis(additional).RoundForThis()
 	}
@@ -152,46 +148,40 @@ export class ModifierGUI extends BaseGUI {
 		const outlineBorder = border + 1
 
 		if (modeImage === EModeImage.Round) {
-			RendererSDK.OutlinedCircle(
-				position.pos1,
-				position.Size,
-				Color.Black.SetA(alpha),
-				outlineBorder * 2
-			)
-			RendererSDK.Arc(
-				-90,
-				ratio,
-				position.pos1,
-				position.Size,
-				false,
-				outlineBorder * 2,
-				outlinedColor,
-				0,
-				undefined,
-				false,
-				false
-			)
+			canvas.Circle(position.pos1, position.Size, {
+				color: Color.fromUint32(0),
+				borderColor: Color.Black.SetA(alpha),
+				borderWidth: outlineBorder * 2
+			})
+			canvas.Circle(position.pos1, position.Size, {
+				color: Color.fromUint32(0),
+				borderColor: outlinedColor,
+				borderWidth: outlineBorder * 2,
+				start: -90,
+				sweep: -ratio * 3.6
+			})
 			return
 		}
 
-		RendererSDK.OutlinedRect(
+		canvas.Rect(
 			position.pos1.AddScalar(-1),
 			position.Size.AddScalar(outlineBorder - 1),
-			outlineBorder,
-			Color.Black.SetA(alpha)
+			{
+				color: Color.fromUint32(0),
+				borderColor: Color.Black.SetA(alpha),
+				borderWidth: outlineBorder
+			}
 		)
-		RendererSDK.Radial(
-			-90,
-			ratio,
-			position.pos1,
-			position.Size,
-			outlinedColor,
-			undefined,
-			undefined,
-			outlinedColor,
-			false,
-			outlineBorder,
-			true
+		canvas.Rect(
+			position.pos1.AddScalar(-Math.round(outlineBorder / 4)),
+			position.Size.AddScalar(Math.round(outlineBorder / 2)),
+			{
+				color: Color.fromUint32(0),
+				borderColor: outlinedColor,
+				borderWidth: outlineBorder,
+				start: -90,
+				sweep: -ratio * 3.6
+			}
 		)
 	}
 	private InnerFillImage(
@@ -208,9 +198,9 @@ export class ModifierGUI extends BaseGUI {
 			return
 		}
 		if (modeImage !== EModeImage.Round) {
-			RendererSDK.FilledRect(position.pos1, position.Size, Color.Black.SetA(alpha))
+			canvas.Rect(position.pos1, position.Size, { color: Color.Black.SetA(alpha) })
 			return
 		}
-		RendererSDK.FilledCircle(position.pos1, position.Size, Color.Black.SetA(alpha))
+		canvas.Circle(position.pos1, position.Size, { color: Color.Black.SetA(alpha) })
 	}
 }

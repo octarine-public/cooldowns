@@ -1,4 +1,3 @@
-
 import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
@@ -56,8 +55,7 @@ export class UnitData {
 		const distanceScale = this.getDistanceScale(position, positionEnd)
 
 		const scale = menu.Scale.value ? distanceScale : 1
-		const alpha =
-			menu.Opacity.value * (255 / 100) * (menu.OpacityByCursor.value ? -1 : 1)
+		const alpha = menu.Opacity.value * 2.55 * (menu.OpacityByCursor.value ? -1 : 1)
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
@@ -204,7 +202,7 @@ export class UnitData {
 				scale
 			)
 		}
-		this.setPriority()
+		this.setPriority(position, positionEnd)
 	}
 	protected CalculateScale(value: number) {
 		const startDistance = GUIInfo.ScaleHeight(150)
@@ -215,13 +213,10 @@ export class UnitData {
 		for (let i = 0, end = modifiers.length; i < end; i++) {
 			const modifier = modifiers[i]
 			if (modifier === undefined || !modifier.IsValid) {
-				this.modifiers.remove(modifier)
 				continue
 			}
 			const keyName = this.getKeyName(modifier)
 			if (!this.stateModifiers(modifier, menu)) {
-				modifiersMap.delete(keyName)
-				this.modifiers.remove(modifier)
 				continue
 			}
 			const modifierInMap = modifiersMap.get(keyName)
@@ -310,9 +305,8 @@ export class UnitData {
 			? this.CalculateScale(InputManager.CursorOnScreen.Distance(position))
 			: 1
 	}
-	private setPriority() {
+	private setPriority(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		let w2s = RendererSDK.WorldToScreen(this.Owner.Position)
-		const [start, end] = this.Positions
 		if (w2s === undefined) {
 			w2s = start
 		}

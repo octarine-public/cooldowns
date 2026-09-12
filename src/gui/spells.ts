@@ -1,4 +1,4 @@
-
+import { canvas } from "../../render"
 import { ELevelType } from "../enum"
 import { SpellMenu } from "../menu/spells"
 import { BaseGUI } from "./index"
@@ -56,12 +56,11 @@ export class SpellGUI extends BaseGUI {
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	) {
-		// hide item if contains dota hud
 		if (!recPosition.pos1.IsValid || this.Contains()) {
 			return
 		}
 		const vecSize = this.size,
-			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
 		for (let index = spells.length - 1; index > -1; index--) {
 			const [spell, idx] = spells[index]
 			const vecPos = this.GetPosition(
@@ -70,13 +69,12 @@ export class SpellGUI extends BaseGUI {
 				border,
 				index,
 				additionalPosition,
-				false, // vertical
+				false,
 				spells.length
 			)
 
 			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
 
-			// width of outlined
 			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 			const cooldown = spell.Cooldown,
 				texture = spell.TexturePath,
@@ -137,7 +135,6 @@ export class SpellGUI extends BaseGUI {
 				levelColor = menu.LevelColor.SelectedColor.Clone().SetA(alphaCorrect),
 				chargeColor = menu.ChargeColor.SelectedColor.Clone().SetA(alphaCorrect)
 
-			// draw charges
 			if (currCharges !== 0) {
 				this.textChargeOrLevel(currCharges, true, position, chargeColor)
 			}
@@ -195,7 +192,7 @@ export class SpellGUI extends BaseGUI {
 		}
 
 		if (cooldown === 0 || !ignoreMinimalistic) {
-			RendererSDK.FilledRect(minimalistic.pos1, minimalistic.Size, outlinedColor)
+			canvas.Rect(minimalistic.pos1, minimalistic.Size, { color: outlinedColor })
 			return
 		}
 		let isDisabled = false,
@@ -261,25 +258,19 @@ export class SpellGUI extends BaseGUI {
 			outlinedColor = Color.Red
 		}
 
-		RendererSDK.RectRounded(
-			vecPos,
-			vecSize,
-			rounding,
-			Color.fromUint32(0),
-			outlinedColor.SetA(alpha),
-			Math.round(border)
-		)
+		canvas.Rect(vecPos, vecSize, {
+			color: Color.fromUint32(0),
+			borderColor: outlinedColor.SetA(alpha),
+			borderWidth: Math.round(border),
+			radius: Math.max(rounding / 2, 0)
+		})
 
-		RendererSDK.Image(
-			texture,
-			vecPos,
-			rounding,
-			vecSize,
-			(noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
-			undefined,
-			undefined,
-			grayScale
-		)
+		canvas.Image(texture, vecPos, vecSize, {
+			color: (noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
+			radius: Math.max(rounding / 2, 0),
+			circle: rounding === 0,
+			grayscale: grayScale
+		})
 		if (isPassiveDisabled) {
 			this.ImageMask(vecPos, vecSize, rounding, false)
 		}
@@ -289,14 +280,12 @@ export class SpellGUI extends BaseGUI {
 		if (cooldown === 0) {
 			return
 		}
-		RendererSDK.RectRounded(
-			vecPos,
-			vecSize,
-			rounding,
-			Color.Black.SetA(alpha * (100 / 255)),
-			Color.fromUint32(0),
-			1
-		)
+		canvas.Rect(vecPos, vecSize, {
+			color: Color.Black.SetA(alpha * (100 / 255)),
+			borderColor: Color.fromUint32(0),
+			borderWidth: 1,
+			radius: Math.max(rounding / 2, 0)
+		})
 	}
 	private squareLevel(
 		spell: Ability,
@@ -331,20 +320,20 @@ export class SpellGUI extends BaseGUI {
 		const maxLvl = 4
 		const step = ((vecSize.x + borderThickness * 2) / maxLvl) | 0
 		const borderSize = new Vector2(borderThickness, borderThickness)
-		const squareSize = new Vector2(step, Math.round(step * (1 / 2))).Add(borderSize)
+		const squareSize = new Vector2(step, Math.round(step * 0.5)).Add(borderSize)
 
 		const pos = position.pos1
 			.Clone()
-			.AddScalarX((vecSize.x - (step * maxLvl + borderThickness)) / 2) // 1px fix
-			.AddScalarX(step * (maxLvl - currLvl) * 0.5) // center
+			.AddScalarX((vecSize.x - (step * maxLvl + borderThickness)) / 2)
+			.AddScalarX(step * (maxLvl - currLvl) * 0.5)
 			.AddScalarY(position.Size.y - squareSize.y)
 
 		for (let i = 0; i < currLvl; i++) {
-			RendererSDK.FilledRect(pos, squareSize, outlineColor)
-			RendererSDK.FilledRect(
+			canvas.Rect(pos, squareSize, { color: outlineColor })
+			canvas.Rect(
 				pos.Add(borderSize),
 				squareSize.Subtract(borderSize.MultiplyScalar(2)),
-				fillColor
+				{ color: fillColor }
 			)
 			pos.AddScalarX(step)
 		}

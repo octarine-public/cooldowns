@@ -1,4 +1,4 @@
-
+import { canvas } from "../../render"
 import { BaseMenu } from "../menu/base"
 
 export abstract class BaseGUI {
@@ -59,7 +59,12 @@ export abstract class BaseGUI {
 		division = 2,
 		color = Color.White
 	) {
-		RendererSDK.TextByFlags(text, position, color, division, flags, BaseGUI.fontWidth)
+		canvas.TextIn(text, position, {
+			color,
+			size: position.Height / Math.max(division, 1.2) + 4,
+			flags,
+			weight: BaseGUI.fontWidth
+		})
 	}
 	protected GetPosition(
 		rec: Rectangle,
@@ -119,6 +124,9 @@ export abstract class BaseGUI {
 	) {
 		const base = PathData.ImagePath + "/hud/reborn/"
 		const image = isSilenced ? "spells_silenced" : "passives_broken"
-		RendererSDK.Image(base + `${image}_psd.vtex_c`, vecPos, rounding, vecSize)
+		canvas.Image(base + `${image}_psd.vtex_c`, vecPos, vecSize, {
+			radius: Math.max(rounding / 2, 0),
+			circle: rounding === 0
+		})
 	}
 }
