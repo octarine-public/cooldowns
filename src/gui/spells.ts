@@ -316,7 +316,7 @@ export class SpellGUI extends BaseGUI {
 			? levelColor
 			: BaseGUI.noManaOutlineColor
 
-		const borderThickness = Math.max(GUIInfo.ScaleHeight(1), 1)
+		const borderThickness = 1
 		const maxLvl = 4
 		const step = ((vecSize.x + borderThickness * 2) / maxLvl) | 0
 		const borderSize = new Vector2(borderThickness, borderThickness)

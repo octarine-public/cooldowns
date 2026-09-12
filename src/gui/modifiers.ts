@@ -87,7 +87,7 @@ export class ModifierGUI extends BaseGUI {
 			).SetA(alpha)
 
 			this.InnerFillImage(modifier.Name, modeImage, position, alpha)
-			this.outline(alpha, ratio, border, position, modeImage, outlinedColor)
+			this.outline(alpha, ratio, position, modeImage, outlinedColor)
 
 			canvas.Image(modifier.GetTexturePath(), vecPos, vecSize, {
 				color: Color.White.SetA(alpha),
@@ -139,50 +139,40 @@ export class ModifierGUI extends BaseGUI {
 	private outline(
 		alpha: number,
 		ratio: number,
-		border: number,
-		position_: Rectangle,
+		position: Rectangle,
 		modeImage: EModeImage,
 		outlinedColor: Color
 	) {
-		const position = position_.Clone()
-		const outlineBorder = border + 1
+		const outlineBorder = 2
 
 		if (modeImage === EModeImage.Round) {
 			canvas.Circle(position.pos1, position.Size, {
 				color: Color.fromUint32(0),
 				borderColor: Color.Black.SetA(alpha),
-				borderWidth: outlineBorder * 2
+				borderWidth: outlineBorder
 			})
 			canvas.Circle(position.pos1, position.Size, {
 				color: Color.fromUint32(0),
 				borderColor: outlinedColor,
-				borderWidth: outlineBorder * 2,
+				borderWidth: outlineBorder,
 				start: -90,
 				sweep: -ratio * 3.6
 			})
 			return
 		}
 
-		canvas.Rect(
-			position.pos1.AddScalar(-1),
-			position.Size.AddScalar(outlineBorder - 1),
-			{
-				color: Color.fromUint32(0),
-				borderColor: Color.Black.SetA(alpha),
-				borderWidth: outlineBorder
-			}
-		)
-		canvas.Rect(
-			position.pos1.AddScalar(-Math.round(outlineBorder / 4)),
-			position.Size.AddScalar(Math.round(outlineBorder / 2)),
-			{
-				color: Color.fromUint32(0),
-				borderColor: outlinedColor,
-				borderWidth: outlineBorder,
-				start: -90,
-				sweep: -ratio * 3.6
-			}
-		)
+		canvas.Rect(position.pos1, position.Size, {
+			color: Color.fromUint32(0),
+			borderColor: Color.Black.SetA(alpha),
+			borderWidth: outlineBorder
+		})
+		canvas.Rect(position.pos1, position.Size, {
+			color: Color.fromUint32(0),
+			borderColor: outlinedColor,
+			borderWidth: outlineBorder,
+			start: -90,
+			sweep: -ratio * 3.6
+		})
 	}
 	private InnerFillImage(
 		modifierName: string,

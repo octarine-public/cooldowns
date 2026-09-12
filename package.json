@@ -31,5 +31,8 @@
 		"directory": "/",
 		"url": "https://github.com/octarine-public/cooldowns.git"
 	},
-	"octarineBundle": true
+	"octarineBundle": true,
+	"octarineMinimize": true,
+	"octarineObfuscate": true,
+	"octarineTreeShaking": true
 }
