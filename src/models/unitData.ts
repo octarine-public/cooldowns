@@ -1,4 +1,3 @@
-import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
@@ -6,6 +5,7 @@ import { MenuManager } from "../menu/index"
 import { ItemMenu } from "../menu/items"
 import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
+import { IsTeamSelected } from "../menu/team"
 
 export class UnitData {
 	public Priority: number = Infinity
@@ -256,7 +256,7 @@ export class UnitData {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return this.entityTeamState(menu.Important)
+			return IsTeamSelected(this.Owner, menu.Important.TeamState)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(menu)
@@ -281,23 +281,9 @@ export class UnitData {
 	private isDisabledModifier(menu: BaseModifierMenu) {
 		return (
 			!menu.State.value ||
-			!this.entityTeamState(menu) ||
+			!IsTeamSelected(this.Owner, menu.TeamState) ||
 			GameState.RawGameTime / 60 >= menu.DisableByTme.value
 		)
-	}
-	private entityTeamState(menu: BaseModifierMenu) {
-		switch (menu.TeamState.SelectedID) {
-			case ETeamState.All:
-				return true
-			case ETeamState.Ally:
-				return !this.Owner.IsEnemy() && !this.Owner.IsMyHero
-			case ETeamState.AllyAndLocal:
-				return !this.Owner.IsEnemy() || this.Owner.IsMyHero
-			case ETeamState.Enemy:
-				return this.Owner.IsEnemy()
-			default:
-				return false
-		}
 	}
 	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		const position = start ?? end

@@ -1,6 +1,6 @@
-
-import { EMenuType, EPositionType, ETeamState } from "../enum"
+import { EMenuType, EPositionType } from "../enum"
 import { BaseMenu } from "./base"
+import { CooldownIcons } from "./icons"
 import {
 	BearSettingsMenu,
 	CourierSettingsMenu,
@@ -9,15 +9,15 @@ import {
 	PandasSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
+import { TextStyleMenu } from "./style"
+import { CreateTeamSelect } from "./team"
 
 export class BaseModifierMenu {
 	public readonly State: Menu.Toggle
-	public readonly TeamState: Menu.Dropdown
+	public readonly TeamState: Menu.MultiSelect
 	public readonly DisableByTme: Menu.Slider
 
-	protected readonly Tree: Menu.Node
-
-	private readonly teamArr = ["All", "Enemies", "Allies", "Allies and local"]
+	public readonly Tree: Menu.Node
 
 	constructor(
 		node: Menu.Node,
@@ -26,14 +26,10 @@ export class BaseModifierMenu {
 		icon: string,
 		tooltip?: string
 	) {
-		this.Tree = node.AddNode(nodeName, icon, tooltip, 0)
+		this.Tree = node.AddSettings(nodeName, icon, tooltip)
 		this.State = this.Tree.AddToggle("State", true)
-		this.TeamState = this.Tree.AddDropdown(
-			"Team",
-			this.teamArr,
-			ETeamState.All,
-			"Show on team"
-		)
+		this.Tree.HeaderControl = this.State
+		this.TeamState = CreateTeamSelect(this.Tree)
 		this.DisableByTme = this.Tree.AddSlider(
 			"Disable by time",
 			defaultStateTime,
@@ -42,6 +38,7 @@ export class BaseModifierMenu {
 			0,
 			"Time in minutes"
 		)
+		this.DisableByTme.IconPath = Menu.Icons.Hourglass
 	}
 
 	public MenuChanged(callback: () => void) {
@@ -55,13 +52,9 @@ class AurasSettingsMenu extends BaseModifierMenu {
 	public readonly Globally: Menu.Toggle
 
 	constructor(node: Menu.Node) {
-		super(
-			node,
-			"Auras",
-			10,
-			ImageData.GetSpellTexture("crystal_maiden_brilliance_aura")
-		)
+		super(node, "Auras", 10, CooldownIcons.Auras)
 		this.Globally = this.Tree.AddToggle("Globally")
+		this.Globally.IconPath = Menu.Icons.Globe
 	}
 
 	public MenuChanged(callback: () => void): void {
@@ -71,12 +64,12 @@ class AurasSettingsMenu extends BaseModifierMenu {
 }
 class BuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Buffs", 20, ImageData.GetSpellTexture("invoker_alacrity"))
+		super(node, "Buffs", 20, CooldownIcons.Buffs)
 	}
 }
 class DebuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Debuffs", 20, ImageData.GetSpellTexture("pudge_rot"))
+		super(node, "Debuffs", 20, CooldownIcons.Debuffs)
 	}
 }
 
@@ -86,7 +79,7 @@ class ImportantSettingsMenu extends BaseModifierMenu {
 			node,
 			"Important",
 			120,
-			ImageData.GetItemTexture("item_sheepstick"),
+			CooldownIcons.Important,
 			"Important modifiers (stun, silence, shields, etc.)"
 		)
 		this.DisableByTme.IsHidden = true
@@ -115,8 +108,13 @@ export class ModifierMenu extends BaseMenu {
 	private readonly modeImageNames = ["Square", "Circle"]
 	private readonly positionNames = ["Vertical", "Horizontal"]
 
-	constructor(node: Menu.Node) {
-		super({ node, nodeName: "Modifiers" })
+	constructor(node: Menu.Node, textStyle: TextStyleMenu) {
+		super({
+			node,
+			textStyle,
+			nodeName: "Modifiers",
+			texture: CooldownIcons.Modifiers
+		})
 		this.Tree.SortNodes = false
 		this.Rounding.IsHidden = true
 		this.TeamState.IsHidden = true
@@ -126,12 +124,16 @@ export class ModifierMenu extends BaseMenu {
 			false,
 			"Show remaining time"
 		)
+		this.Remaining.IconPath = Menu.Icons.ClockSeconds
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames, 1)
+		this.ModeImage.IconPath = Menu.Icons.GridPick
 		this.ModePosition = this.Tree.AddDropdown(
 			"Position",
 			this.positionNames,
 			EPositionType.Horizontal
 		)
+		this.ModePosition.IconPath = Menu.Icons.ArrowUpDown
+		this.AddStyle()
 
 		this.Important = new ImportantSettingsMenu(this.Tree)
 		this.Auras = new AurasSettingsMenu(this.Tree)
@@ -157,6 +159,7 @@ export class ModifierMenu extends BaseMenu {
 		this.Auras.MenuChanged(callback)
 		this.Buffs.MenuChanged(callback)
 		this.Debuffs.MenuChanged(callback)
+		this.Important.MenuChanged(callback)
 
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)

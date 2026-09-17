@@ -1,6 +1,5 @@
-
-import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
+import { IsTeamSelected } from "../menu/team"
 
 export class SpellManager {
 	constructor(private readonly menu: MenuManager) {}
@@ -9,7 +8,10 @@ export class SpellManager {
 		if (unit.IsCreep && !unit.IsNeutral) {
 			return []
 		}
-		if (!this.entityState(unit) || !this.entityTeamState(unit)) {
+		if (
+			!this.entityState(unit) ||
+			!IsTeamSelected(unit, this.menu.SpellMenu.TeamState)
+		) {
 			return []
 		}
 		const abilities: [Ability, number][] = []
@@ -33,22 +35,6 @@ export class SpellManager {
 			return abil instanceof courier_burst || abil instanceof courier_shield
 		}
 		return true
-	}
-	private entityTeamState(entity: Unit) {
-		switch (this.menu.SpellMenu.TeamState.SelectedID) {
-			case ETeamState.All:
-				return true
-			case ETeamState.AllExceptSelf:
-				return !entity.IsMyHero
-			case ETeamState.Ally:
-				return !entity.IsEnemy() && !entity.IsMyHero
-			case ETeamState.AllyAndLocal:
-				return !entity.IsEnemy() || entity.IsMyHero
-			case ETeamState.Enemy:
-				return entity.IsEnemy()
-			default:
-				return false
-		}
 	}
 	private entityState(entity: Unit) {
 		const menu = this.menu.SpellMenu

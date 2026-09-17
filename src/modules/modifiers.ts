@@ -1,7 +1,6 @@
-
-import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
 import { BaseModifierMenu } from "../menu/modifiers"
+import { IsTeamSelected } from "../menu/team"
 
 export class ModifierManager {
 	private readonly ignoreModifiers = ["modifier_phased", "modifier_magic_immune"]
@@ -49,7 +48,7 @@ export class ModifierManager {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return this.entityTeamState(owner, this.menu.ModifierMenu.Important)
+			return IsTeamSelected(owner, this.menu.ModifierMenu.Important.TeamState)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(modifier)
@@ -79,26 +78,10 @@ export class ModifierManager {
 	}
 	private isDisabled(menu: BaseModifierMenu, modifier: Modifier) {
 		const owner = modifier.Parent
-		if (owner === undefined || !this.entityTeamState(owner, menu)) {
+		if (owner === undefined || !IsTeamSelected(owner, menu.TeamState)) {
 			return true
 		}
 		const time = GameState.RawGameTime / 60
 		return !menu.State.value || time >= menu.DisableByTme.value
-	}
-	private entityTeamState(entity: Unit, menu: BaseModifierMenu) {
-		switch (menu.TeamState.SelectedID) {
-			case ETeamState.All:
-				return true
-			case ETeamState.AllExceptSelf:
-				return !entity.IsMyHero
-			case ETeamState.Ally:
-				return !entity.IsEnemy() && !entity.IsMyHero
-			case ETeamState.AllyAndLocal:
-				return !entity.IsEnemy() || entity.IsMyHero
-			case ETeamState.Enemy:
-				return entity.IsEnemy()
-			default:
-				return false
-		}
 	}
 }

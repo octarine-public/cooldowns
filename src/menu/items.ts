@@ -1,12 +1,13 @@
-
 import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
+import { CooldownIcons } from "./icons"
 import {
 	BearSettingsMenu,
 	CourierSettingsMenu,
 	HeroSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
+import { TextStyleMenu } from "./style"
 
 export class ItemMenu extends BaseMenu {
 	public readonly Hero: HeroSettingsMenu
@@ -15,10 +16,12 @@ export class ItemMenu extends BaseMenu {
 	public readonly Courier: CourierSettingsMenu
 	public readonly SquareMode: Menu.Dropdown
 
-	constructor(node: Menu.Node) {
-		super({ node, nodeName: "Items" })
+	constructor(node: Menu.Node, textStyle: TextStyleMenu) {
+		super({ node, textStyle, nodeName: "Items", texture: CooldownIcons.Items })
 		this.Tree.SortNodes = true
 		this.SquareMode = this.Tree.AddDropdown("Shape", ["Rectangle", "Square"])
+		this.SquareMode.IconPath = Menu.Icons.GridPick
+		this.AddStyle()
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Item)
 		this.Roshan = new RoshanSettingsMenu(this.Tree, EMenuType.Item)
@@ -37,6 +40,5 @@ export class ItemMenu extends BaseMenu {
 		this.Hero.MenuChanged(callback)
 		this.Roshan.MenuChanged(callback)
 		this.Courier.MenuChanged(callback)
-		this.SpiritBear.MenuChanged(callback)
 	}
 }

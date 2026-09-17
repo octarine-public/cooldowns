@@ -1,12 +1,11 @@
-
 import { EMenuType } from "../enum"
+import { CooldownIcons } from "./icons"
 
 interface IBaseSettingsMenu {
 	node: Menu.Node
 	nodeName: string
 	mType: EMenuType
-	texture?: string
-	round?: number
+	texture: string
 	tooltip?: string
 	defaultState?: {
 		[EMenuType.Item]: boolean
@@ -30,25 +29,27 @@ export abstract class BaseSettingsMenu {
 	public readonly PositionX: Menu.Slider
 	public readonly PositionY: Menu.Slider
 
-	protected readonly Tree: Menu.Node
+	public readonly Tree: Menu.Node
 
 	constructor(private readonly options: IBaseSettingsMenu) {
-		this.Tree = options.node.AddNode(
+		// a settings row rather than a fold: the unit's switch rides the row and
+		// the gear beside it opens the offsets, so a tab stays one flat card
+		this.Tree = options.node.AddSettings(
 			options.nodeName,
 			options.texture,
-			options.tooltip,
-			options.round ?? -1
+			options.tooltip
 		)
+		// below the rows the whole element shares, in tabs that sort their own
+		this.Tree.Priority = 1
 
 		this.Tree.SortNodes = false
 		this.State = this.Tree.AddToggle("State", this.defaultState)
+		this.Tree.HeaderControl = this.State
 
-		//const bnd = GUIInfo.ScaleHeight(100) | 0 // bound
-		//this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -bnd, bnd)
-		//this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -bnd, bnd)
-
-		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -50, 250)
-		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -50, 250)
+		this.PositionX = this.Tree.AddSlider("Position: X", this.defaultX, -250, 250)
+		this.PositionX.IconPath = Menu.Icons.ArrowRight
+		this.PositionY = this.Tree.AddSlider("Position: Y", this.defaultY, -250, 250)
+		this.PositionY.IconPath = Menu.Icons.ArrowUpDown
 	}
 
 	public get Position() {
@@ -87,7 +88,7 @@ export class CreepSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "Creeps",
-			texture: ImageData.Icons.icon_svg_creep
+			texture: CooldownIcons.Creeps
 		})
 	}
 
@@ -104,9 +105,8 @@ export class BearSettingsMenu extends BaseSettingsMenu {
 		super({
 			node,
 			mType,
-			round: 0,
 			nodeName: "Bear",
-			texture: ImageData.GetBearTexture(),
+			texture: CooldownIcons.Bear,
 			defaultY: {
 				[EMenuType.Item]: -32,
 				[EMenuType.Spell]: -6,
@@ -132,7 +132,7 @@ export class CourierSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "npc_dota_courier",
-			texture: ImageData.Icons.icon_svg_courier,
+			texture: CooldownIcons.Courier,
 			defaultState: {
 				[EMenuType.Item]: true,
 				[EMenuType.Spell]: false,
@@ -163,7 +163,7 @@ export class HeroSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "Heroes",
-			texture: "menu/icons/juggernaut.svg",
+			texture: CooldownIcons.Heroes,
 			defaultY: {
 				[EMenuType.Item]: -32,
 				[EMenuType.Spell]: -6,
@@ -182,7 +182,7 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 			node,
 			mType,
 			nodeName: "npc_dota_roshan",
-			texture: ImageData.Icons.icon_roshan,
+			texture: CooldownIcons.Roshan,
 			defaultX: {
 				[EMenuType.Item]: 0,
 				[EMenuType.Spell]: 0,
@@ -205,9 +205,8 @@ export class FamiliarSettingsMenu extends BaseSettingsMenu {
 		super({
 			node,
 			mType,
-			round: 0,
 			nodeName: "Familiars",
-			texture: ImageData.GetHeroTexture("npc_dota_visage_familiar"),
+			texture: CooldownIcons.Familiars,
 			defaultY: {
 				[EMenuType.Spell]: 1,
 				[EMenuType.Modifier]: 15
@@ -224,9 +223,8 @@ export class PandasSettingsMenu extends BaseSettingsMenu {
 		super({
 			node,
 			mType,
-			round: 0,
 			nodeName: "Pandas",
-			texture: ImageData.GetHeroTexture("npc_dota_brewmaster_void"),
+			texture: CooldownIcons.Pandas,
 			defaultY: {
 				[EMenuType.Spell]: 1,
 				[EMenuType.Modifier]: 15

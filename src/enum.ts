@@ -1,20 +1,13 @@
 export const enum ETeamState {
-	All,
-	AllExceptSelf,
 	Enemy,
 	Ally,
-	AllyAndLocal
+	Local
 }
 
 export const enum EModeImage {
 	Square,
 	Round,
 	Minimilistic
-}
-
-export const enum ELevelType {
-	Square,
-	Text
 }
 
 export const enum EPositionType {
