@@ -1,6 +1,5 @@
-import { canvas } from "../../render"
 import { ItemMenu } from "../menu/items"
-import { BaseGUI } from "./index"
+import { BaseGUI, ItemDisplay } from "./index"
 
 export class ItemGUI extends BaseGUI {
 	private static readonly minSize = 16
@@ -23,12 +22,15 @@ export class ItemGUI extends BaseGUI {
 	public Draw(
 		mainAlpha: number,
 		menu: ItemMenu,
-		items: Item[],
+		items: ItemDisplay[],
 		additionalPosition: Vector2,
 		isDisable: boolean,
 		isTethered: boolean
 	): void {
-		this.DrawItems(
+		if (this.Contains()) {
+			return
+		}
+		this.DrawAt(
 			this.position,
 			mainAlpha,
 			menu,
@@ -37,7 +39,7 @@ export class ItemGUI extends BaseGUI {
 			isDisable,
 			isTethered
 		)
-		this.DrawItems(
+		this.DrawAt(
 			this.positionEnd,
 			mainAlpha,
 			menu,
@@ -48,16 +50,16 @@ export class ItemGUI extends BaseGUI {
 		)
 	}
 
-	protected DrawItems(
+	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
 		menu: ItemMenu,
-		items: Item[],
+		items: ItemDisplay[],
 		additionalPosition: Vector2,
 		isDisable: boolean,
 		isTethered: boolean
 	) {
-		if (!recPosition.pos1.IsValid || this.Contains()) {
+		if (!recPosition.pos1.IsValid) {
 			return
 		}
 		const additionalSize = menu.Size.value,
@@ -95,14 +97,14 @@ export class ItemGUI extends BaseGUI {
 
 			const rounding = this.GetRounding(menu, vecSize)
 
-			canvas.Rect(vecPos, vecSize, {
+			this.canvas.Rect(vecPos, vecSize, {
 				color: Color.fromUint32(0),
 				borderColor: outlineColor,
 				borderWidth: border + +(rounding > 0),
 				radius: Math.max(rounding / 2, 0)
 			})
 
-			canvas.Image(item.TexturePath, vecPos, vecSize, {
+			this.canvas.Image(item.TexturePath, vecPos, vecSize, {
 				color: Color.White.SetA(alpha),
 				radius: Math.max(rounding / 2, 0),
 				circle: rounding === 0
@@ -115,7 +117,15 @@ export class ItemGUI extends BaseGUI {
 			const position = new Rectangle(vecPos, vecPos.Add(vecSize))
 			if (charge !== 0) {
 				const charges = charge.toString()
-				this.Text(charges, position, TextFlags.Right | TextFlags.Bottom)
+				this.Text(
+					menu.TextStyle,
+					charges,
+					position,
+					TextFlags.Right | TextFlags.Bottom,
+					2.75,
+					undefined,
+					additionalSize === 0 ? 100 : 70
+				)
 			}
 
 			if (cooldown <= 0) {
@@ -132,7 +142,7 @@ export class ItemGUI extends BaseGUI {
 			if (canOffset) {
 				textPosition.Add(GUIInfo.ScaleVector(minOffset, minOffset))
 			}
-			this.Text(cdText, textPosition, flags)
+			this.Text(menu.TextStyle, cdText, textPosition, flags)
 		}
 	}
 }

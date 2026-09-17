@@ -1,7 +1,6 @@
-import { canvas } from "../../render"
-import { ELevelType } from "../enum"
 import { SpellMenu } from "../menu/spells"
-import { BaseGUI } from "./index"
+import { TextStyleMenu } from "../menu/style"
+import { BaseGUI, SpellDisplay } from "./index"
 
 export class SpellGUI extends BaseGUI {
 	private static readonly minSize = 17
@@ -23,12 +22,15 @@ export class SpellGUI extends BaseGUI {
 	public Draw(
 		mainAlpha: number,
 		menu: SpellMenu,
-		spells: [Ability, number][],
+		spells: [SpellDisplay, number][],
 		additionalPosition: Vector2,
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	): void {
-		this.DrawSpells(
+		if (this.Contains()) {
+			return
+		}
+		this.DrawAt(
 			this.position,
 			mainAlpha,
 			menu,
@@ -37,7 +39,7 @@ export class SpellGUI extends BaseGUI {
 			isSilenced,
 			isPassiveDisabled
 		)
-		this.DrawSpells(
+		this.DrawAt(
 			this.positionEnd,
 			mainAlpha,
 			menu,
@@ -47,16 +49,16 @@ export class SpellGUI extends BaseGUI {
 			isPassiveDisabled
 		)
 	}
-	protected DrawSpells(
+	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
 		menu: SpellMenu,
-		spells: [Ability, number][],
+		spells: [SpellDisplay, number][],
 		additionalPosition: Vector2,
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	) {
-		if (!recPosition.pos1.IsValid || this.Contains()) {
+		if (!recPosition.pos1.IsValid) {
 			return
 		}
 		const vecSize = this.size,
@@ -130,42 +132,41 @@ export class SpellGUI extends BaseGUI {
 				)
 			}
 
-			const levelType = menu.LevelType.SelectedID,
-				alphaCorrect = Math.min(alpha * 1.75, 255),
+			const alphaCorrect = Math.min(alpha * 1.75, 255),
 				levelColor = menu.LevelColor.SelectedColor.Clone().SetA(alphaCorrect),
 				chargeColor = menu.ChargeColor.SelectedColor.Clone().SetA(alphaCorrect)
 
 			if (currCharges !== 0) {
-				this.textChargeOrLevel(currCharges, true, position, chargeColor)
+				this.Text(
+					menu.TextStyle,
+					currCharges.toString(),
+					position,
+					TextFlags.Right | TextFlags.Top,
+					2.75,
+					chargeColor
+				)
 			}
 
-			switch (levelType) {
-				case ELevelType.Square:
-					this.squareLevel(
-						spell,
-						vecPos,
-						vecSize,
-						menu.IsMinimalistic.value,
-						levelColor,
-						Color.Black.SetA(alpha)
-					)
-					break
-				default: {
-					this.textChargeOrLevel(spell.Level, false, position, levelColor)
-					break
-				}
-			}
+			this.squareLevel(
+				spell,
+				vecPos,
+				vecSize,
+				menu.IsMinimalistic.value,
+				levelColor,
+				Color.Black.SetA(alpha),
+				menu.TextStyle
+			)
 
 			if (cooldown !== 0) {
 				const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
-				this.Text(cdText, position, TextFlags.Center)
+				this.Text(menu.TextStyle, cdText, position, TextFlags.Center)
 			}
 		}
 	}
 	private minimilistic(
 		idx: number,
 		alpha: number,
-		spell: Ability,
+		spell: SpellDisplay,
 		vecPos: Vector2,
 		vecSize: Vector2,
 		rounding: number,
@@ -180,7 +181,7 @@ export class SpellGUI extends BaseGUI {
 		const minimalistic = position.Clone(),
 			ignoreMinimalistic = this.ignoreMinimalistic(spell, idx),
 			outlinedColor = noMana
-				? BaseGUI.noManaOutlineColor.SetA(180)
+				? BaseGUI.noManaOutlineColor.Clone().SetA(180)
 				: Color.Black.SetA(180)
 
 		if (cooldown === 0) {
@@ -192,7 +193,9 @@ export class SpellGUI extends BaseGUI {
 		}
 
 		if (cooldown === 0 || !ignoreMinimalistic) {
-			canvas.Rect(minimalistic.pos1, minimalistic.Size, { color: outlinedColor })
+			this.canvas.Rect(minimalistic.pos1, minimalistic.Size, {
+				color: outlinedColor
+			})
 			return
 		}
 		let isDisabled = false,
@@ -258,14 +261,14 @@ export class SpellGUI extends BaseGUI {
 			outlinedColor = Color.Red
 		}
 
-		canvas.Rect(vecPos, vecSize, {
+		this.canvas.Rect(vecPos, vecSize, {
 			color: Color.fromUint32(0),
 			borderColor: outlinedColor.SetA(alpha),
 			borderWidth: Math.round(border),
 			radius: Math.max(rounding / 2, 0)
 		})
 
-		canvas.Image(texture, vecPos, vecSize, {
+		this.canvas.Image(texture, vecPos, vecSize, {
 			color: (noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
 			radius: Math.max(rounding / 2, 0),
 			circle: rounding === 0,
@@ -280,20 +283,22 @@ export class SpellGUI extends BaseGUI {
 		if (cooldown === 0) {
 			return
 		}
-		canvas.Rect(vecPos, vecSize, {
+		this.canvas.Rect(vecPos, vecSize, {
 			color: Color.Black.SetA(alpha * (100 / 255)),
-			borderColor: Color.fromUint32(0),
-			borderWidth: 1,
-			radius: Math.max(rounding / 2, 0)
+			radius:
+				rounding === 0
+					? Math.min(vecSize.x, vecSize.y) / 2
+					: Math.max(rounding / 2, 0)
 		})
 	}
 	private squareLevel(
-		spell: Ability,
+		spell: SpellDisplay,
 		vecPos: Vector2,
 		vecSize: Vector2,
 		minimalistic: boolean,
 		levelColor: Color,
-		outlineColor: Color
+		outlineColor: Color,
+		textStyle: TextStyleMenu
 	) {
 		const currLvl = spell.Level
 		if (spell.MaxLevel === 0 || currLvl === 0) {
@@ -303,6 +308,7 @@ export class SpellGUI extends BaseGUI {
 		const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 		if (currLvl >= 5) {
 			this.Text(
+				textStyle,
 				currLvl.toString(),
 				position,
 				TextFlags.Right | TextFlags.Bottom,
@@ -329,8 +335,8 @@ export class SpellGUI extends BaseGUI {
 			.AddScalarY(position.Size.y - squareSize.y)
 
 		for (let i = 0; i < currLvl; i++) {
-			canvas.Rect(pos, squareSize, { color: outlineColor })
-			canvas.Rect(
+			this.canvas.Rect(pos, squareSize, { color: outlineColor })
+			this.canvas.Rect(
 				pos.Add(borderSize),
 				squareSize.Subtract(borderSize.MultiplyScalar(2)),
 				{ color: fillColor }
@@ -338,7 +344,7 @@ export class SpellGUI extends BaseGUI {
 			pos.AddScalarX(step)
 		}
 	}
-	private ignoreMinimalistic(spell: Ability, idx: number) {
+	private ignoreMinimalistic(spell: SpellDisplay, idx: number) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false

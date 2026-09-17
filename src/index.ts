@@ -1,10 +1,12 @@
 import "./translations"
 
+import { surface } from "../render"
 import { MenuManager } from "./menu/index"
 import { UnitData } from "./models/unitData"
 import { ItemManager } from "./modules/items"
 import { ModifierManager } from "./modules/modifiers"
 import { SpellManager } from "./modules/spells"
+import { MountCooldownPreview } from "./preview"
 
 new (class CCooldowns {
 	private readonly menu = new MenuManager()
@@ -15,6 +17,7 @@ new (class CCooldowns {
 	private readonly cachedUnits = new WeakSet<Unit>()
 
 	constructor() {
+		MountCooldownPreview(this.menu)
 		EventsSDK.on("Draw", this.Draw.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
@@ -42,12 +45,22 @@ new (class CCooldowns {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
 	protected Draw() {
-		if (!this.state || this.isPostGame || !this.isUIGame) {
-			return
-		}
-		const arr = this.units.orderBy(x => x.Priority)
-		for (let i = arr.length - 1; i > -1; i--) {
-			arr[i].Draw(this.menu)
+		surface.Begin()
+		try {
+			if (
+				!this.state ||
+				this.isPostGame ||
+				!this.isUIGame ||
+				!MenuSDK.HostCanDrawOverlays()
+			) {
+				return
+			}
+			const arr = this.units.orderBy(x => x.Priority)
+			for (let i = arr.length - 1; i > -1; i--) {
+				arr[i].Draw(this.menu)
+			}
+		} finally {
+			surface.End()
 		}
 	}
 	protected EntityCreated(entity: Entity) {

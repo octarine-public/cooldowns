@@ -1,13 +1,39 @@
-import { canvas } from "../../render"
+import { canvas as timerCanvas, surface } from "../../render"
 import { BaseMenu } from "../menu/base"
+import { TextStyleMenu } from "../menu/style"
+import { DrawStyledText } from "./text"
+import {
+	GuiCanvas,
+	ItemDisplay,
+	ModifierDisplay,
+	SpellDisplay,
+	TextSurface
+} from "./types"
+
+export type { ItemDisplay, ModifierDisplay, SpellDisplay } from "./types"
+
+const ORIGIN = new Vector2()
 
 export abstract class BaseGUI {
 	protected static readonly border = 2
-	protected static readonly fontWidth = 500
 	protected static readonly noManaOutlineColor = new Color(77, 131, 247)
 
 	protected readonly position = new Rectangle()
 	protected readonly positionEnd = new Rectangle()
+
+	/**
+	 * `timers` is the SDK canvas a round icon is drawn on as its circular timer, the way
+	 * teleport-esp draws its markers, and `origin` is where this surface's own top left corner
+	 * stands on that canvas: nowhere in the game, where both are the screen, and at the stage's
+	 * frame in the preview. A surface with no such canvas draws its rings itself.
+	 */
+	constructor(
+		protected readonly canvas: GuiCanvas = surface,
+		protected readonly textSurface: TextSurface = surface,
+		private readonly cursor: () => Vector2 = () => InputManager.CursorOnScreen,
+		protected readonly timers: MenuSDK.Canvas | null = timerCanvas,
+		protected readonly origin: () => Vector2 = () => ORIGIN
+	) {}
 
 	public Update(
 		position: Nullable<Vector2>,
@@ -21,7 +47,7 @@ export abstract class BaseGUI {
 			this.position.pos2.Invalidate()
 		} else {
 			this.position.pos1.CopyFrom(position)
-			this.position.pos2.CopyFrom(position.Add(size))
+			this.position.pos2.CopyFrom(position).AddForThis(size)
 		}
 
 		if (positionEnd === undefined) {
@@ -29,14 +55,14 @@ export abstract class BaseGUI {
 			this.positionEnd.pos2.Invalidate()
 		} else {
 			this.positionEnd.pos1.CopyFrom(positionEnd)
-			this.positionEnd.pos2.CopyFrom(positionEnd.Add(size))
+			this.positionEnd.pos2.CopyFrom(positionEnd).AddForThis(size)
 		}
 	}
 
 	public abstract Draw(
 		alpha: number,
 		menu: BaseMenu,
-		data: [Ability, number][] | Modifier[] | Item[],
+		data: [SpellDisplay, number][] | ModifierDisplay[] | ItemDisplay[],
 		additionalPosition: Vector2,
 		isDisable?: boolean,
 		isUniqueDisabled?: boolean
@@ -53,18 +79,24 @@ export abstract class BaseGUI {
 		)
 	}
 	protected Text(
+		style: TextStyleMenu,
 		text: string,
 		position: Rectangle,
 		flags: TextFlags,
 		division = 2,
-		color = Color.White
+		color = style.Color.SelectedColor,
+		minTextScale = 70
 	) {
-		canvas.TextIn(text, position, {
-			color,
-			size: position.Height / Math.max(division, 1.2) + 4,
+		DrawStyledText(
+			style,
+			text,
+			position,
 			flags,
-			weight: BaseGUI.fontWidth
-		})
+			position.Height / Math.max(division, 1.2) + 4,
+			color,
+			this.textSurface,
+			minTextScale
+		)
 	}
 	protected GetPosition(
 		rec: Rectangle,
@@ -96,26 +128,13 @@ export abstract class BaseGUI {
 			return mainAlpha
 		}
 		const startDistance = (vecSize.x + vecSize.y) * 4
-		const distance = InputManager.CursorOnScreen.Distance(
-			vecPos.Add(vecSize.DivideScalar(2))
+		const cursor = this.cursor()
+		const distance = Math.hypot(
+			cursor.x - (vecPos.x + vecSize.x / 2),
+			cursor.y - (vecPos.y + vecSize.y / 2)
 		)
 		return -1 * mainAlpha * Math.min(Math.max(0.5, distance / startDistance), 1)
 	}
-	protected textChargeOrLevel(
-		value: number,
-		isCharge: boolean,
-		position: Rectangle,
-		color: Color
-	) {
-		if (value === 0) {
-			return
-		}
-		const flags = isCharge
-			? TextFlags.Right | TextFlags.Top
-			: TextFlags.Right | TextFlags.Bottom
-		this.Text(value.toString(), position, flags, 2, color)
-	}
-
 	protected ImageMask(
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -124,7 +143,7 @@ export abstract class BaseGUI {
 	) {
 		const base = PathData.ImagePath + "/hud/reborn/"
 		const image = isSilenced ? "spells_silenced" : "passives_broken"
-		canvas.Image(base + `${image}_psd.vtex_c`, vecPos, vecSize, {
+		this.canvas.Image(base + `${image}_psd.vtex_c`, vecPos, vecSize, {
 			radius: Math.max(rounding / 2, 0),
 			circle: rounding === 0
 		})
