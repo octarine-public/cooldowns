@@ -3,6 +3,7 @@ import { ItemMenu } from "./items"
 import { ModifierMenu } from "./modifiers"
 import { SpellMenu } from "./spells"
 import { TextStyleMenu } from "./style"
+import { MigrateTeamRow, StoredNode } from "./team"
 
 export class MenuManager {
 	public readonly General: Menu.Node
@@ -29,9 +30,9 @@ export class MenuManager {
 		this.baseNode.SortNodes = true
 		this.baseNode.TabbedChildren = true
 		MenuSDK.AddConfigMigration(raw =>
-			this.migrateGeneralSettings(MenuSDK.ConfigSubtreeOf(raw, this.baseNode.entry))
+			this.migrate(MenuSDK.ConfigSubtreeOf(raw, this.baseNode.entry))
 		)
-		this.migrateGeneralSettings(this.baseNode.entry.stored)
+		this.migrate(this.baseNode.entry.stored)
 
 		const general = this.baseNode.AddNode("General", CooldownIcons.General)
 		this.General = general
@@ -80,19 +81,38 @@ export class MenuManager {
 		return this.baseNode
 	}
 
+	/** Every node that carried the team dropdown the multi-selects replaced, by its path. */
+	private static readonly teamRows: readonly string[][] = [
+		["Spells"],
+		["Items"],
+		["Modifiers"],
+		["Modifiers", "Important"],
+		["Modifiers", "Auras"],
+		["Modifiers", "Buffs"],
+		["Modifiers", "Debuffs"]
+	]
+
+	private migrate(stored: Nullable<MenuSDK.ConfigObject>) {
+		this.migrateGeneralSettings(stored)
+		for (const path of MenuManager.teamRows) {
+			let node = stored
+			for (const name of path) {
+				node = node === undefined ? undefined : StoredNode(node[name])
+			}
+			MigrateTeamRow(node)
+		}
+	}
+
 	private migrateGeneralSettings(stored: Nullable<MenuSDK.ConfigObject>) {
 		const names = ["State", "Scale", "Opacity on hover", "Opacity", "Preview"]
 		if (stored === undefined || !names.some(name => stored[name] !== undefined)) {
 			return
 		}
 		const existing = stored.General
-		if (
-			existing !== undefined &&
-			(typeof existing !== "object" || existing === null || Array.isArray(existing))
-		) {
+		if (existing !== undefined && StoredNode(existing) === undefined) {
 			return
 		}
-		const general = (existing ?? {}) as MenuSDK.ConfigObject
+		const general = StoredNode(existing) ?? {}
 		for (const name of names) {
 			if (stored[name] !== undefined) {
 				general[name] ??= stored[name]
