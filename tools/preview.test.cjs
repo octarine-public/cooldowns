@@ -51,7 +51,7 @@ for (const [key, rgb] of Object.entries({ White: [255, 255, 255], Black: [0, 0, 
 Color.WhiteReadonly = new Color(255, 255, 255)
 Color.ZeroReadonly = new Color(0, 0, 0, 0)
 
-function runtime(ratio = 1, gameScale = 1) {
+function runtime(ratio = 1, gameScale = 1, seed) {
 	let move, end, opened, activePage, released = 0, now = 1
 	const listeners = new Map()
 	const input = {
@@ -93,6 +93,8 @@ function runtime(ratio = 1, gameScale = 1) {
 		WriteText(element, text) { element.text = text },
 		applyStyle(element, style) { Object.assign(element.style, style) }
 	}
+	const unitModels = new Map()
+	const gameFiles = new Map()
 	const icons = new Proxy({}, { get: (_, name) => String(name) })
 	const context = vm.createContext({
 		React: { Fragment: "fragment", createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() }) },
@@ -106,11 +108,20 @@ function runtime(ratio = 1, gameScale = 1) {
 		},
 		InputManager: { CursorOnScreen: new Vector2() },
 		AbilityData: { GetAbilityByName: () => undefined },
-		PathData: { ItemImagePath: "items", AbilityImagePath: "spells" },
+		// the host reads the game's own files; a test gives it whichever roster it is examining
+		parseKV: path => gameFiles.get(path) ?? new Map(),
+		// The unit data a joined server hands the script; empty until a test says otherwise.
+		UnitData: { GetUnitDataByName: name => unitModels.has(name) ? { ModelName: unitModels.get(name) } : undefined },
+		PathData: { ItemImagePath: "items", AbilityImagePath: "spells", HeroIconsPath: "heroes/icons" },
 		TextFlags: { Top: 1, Center: 2, Bottom: 4, Left: 8, Right: 16 },
 		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1 },
 		__OCT_PACKAGE_ROOT__: "cooldowns"
 	})
+	// KeyValues as the host hands them back, built INSIDE the script's realm: a map minted out
+	// here is not an instance of the Map the script tests against
+	const makeMap = vm.runInContext("entries => new Map(entries)", context)
+	const kv = entries => makeMap(Object.entries(entries))
+
 	const cache = new Map()
 	function load(name) {
 		if (name === "render") return { canvas: {}, surface: {} }
@@ -132,12 +143,16 @@ function runtime(ratio = 1, gameScale = 1) {
 		Name: name, entry: { name, parent: parent?.entry },
 		AddNode(label) { return node(label, this) },
 		AddSettings(label) { return node(label, this) },
-		AddToggle(label, value = false) { return { value, OnValue(callback) { this.changed = callback; callback(); return this } } },
+		AddToggle(label, value = false) { return { label, value, IsVisible: true, OnValue(callback) { this.changed = callback; callback(); return this } } },
 		AddSlider(label, value, min, max) { return slider(value, min, max) },
 		AddMultiSelect() { return team() },
 		AddColorPicker(label, SelectedColor) { return { SelectedColor, SolidOnly() { return this } } },
 		Update() {},
-		AddDropdown(label, values, SelectedID = 0) { return { values, SelectedID, OnValue(callback) { this.changed = callback; callback(); return this } } }
+		AddDropdown(label, values, SelectedID = 0) { return { label, values, SelectedID, executeOnAdd: true, IsVisible: true, icons: [],
+			SetOptionIcons(icons) { this.icons = icons; return this },
+			OnValue(callback) { this.changed = callback; if (this.executeOnAdd) callback(this); return this },
+			Pick(index) { this.SelectedID = index; this.changed?.(this) } } },
+		AddButton(label) { return { label, OnValue(callback) { this.press = () => callback(this); return this } } }
 	})
 	const root = node("Cooldowns")
 	const unit = name => ({
@@ -158,6 +173,7 @@ function runtime(ratio = 1, gameScale = 1) {
 	menu.ItemMenu.Hero.PositionY.value = -32
 	menu.ModifierMenu.Hero.PositionY.value = 19
 	const { PreviewController } = load("src/preview/controller")
+	seed?.({ gameFiles, kv })
 	const preview = new PreviewController(menu)
 	Object.assign(preview.Frame, { x: 40, y: 60, w: 300 * gameScale, h: 450 * gameScale })
 	const roots = preview.Groups.map(group => { const element = makeElement(); group.Canvas.Ref(element); group.AreaRef(makeElement()); return element })
@@ -169,7 +185,7 @@ function runtime(ratio = 1, gameScale = 1) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, gameFiles, kv,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -704,4 +720,168 @@ test("derived paint is built once per element and rebuilt when its own inputs ch
 	r.tick(true)
 	assert.ok(shapes > 0)
 	assert.notDeepEqual(root.children.map(child => child.style.decorator), faded)
+})
+
+test("the stage stands the unit the picker names, and the creep of the side it is dressed for", () => {
+	const r = runtime()
+	const paths = [
+		// the hero row stands whichever hero the card is dressed for, not a unit of its own
+		"models/heroes/bard/bard_frog_base.vmdl",
+		"models/heroes/lone_druid/spirit_bear.vmdl",
+		"models/props_gameplay/donkey.vmdl",
+		"models/creeps/roshan/roshan.vmdl",
+		"models/heroes/visage/visage_familiar.vmdl",
+		"models/heroes/brewmaster/brewmaster_earthspirit.vmdl",
+		"models/creeps/lane_creeps/creep_bad_melee/creep_bad_melee.vmdl"
+	]
+	// Every row of the picker stands something, in the dashboard where no unit data is loaded.
+	assert.equal(r.preview.Unit.values.length, paths.length)
+	for (let unit = 0; unit < paths.length; unit++) {
+		r.preview.Unit.SelectedID = unit
+		assert.equal(r.preview.Model(), paths[unit])
+	}
+	// The lane creep is the one subject whose look is the side it fights for.
+	const creep = paths.length - 1
+	for (const [team, model] of [[1, "radiant_melee"], [2, "radiant_melee"], [0, "creep_bad_melee"]]) {
+		r.preview.Team.SelectedID = team
+		assert.ok(r.preview.Model().includes(model))
+	}
+	// A model the game renamed is followed, once the data behind the name is there to say so.
+	r.preview.Unit.SelectedID = 2
+	r.preview.Team.SelectedID = 0
+	r.unitModels.set("npc_dota_courier", "models/props_gameplay/donkey_v2.vmdl")
+	assert.equal(r.preview.Model(), "models/props_gameplay/donkey_v2.vmdl")
+})
+
+test("the hero picker offers the game's own roster and dresses the one it is set to", () => {
+	// the roster is read as the menu is built, so the files are there before it: the option that
+	// was picked last time has to be in the list for the setting to come back to it
+	const r = runtime(1, 1, ({ gameFiles, kv }) => {
+		// npc_heroes.txt is a list of #base includes; the host follows them, so one read is the roster
+		gameFiles.set(
+			"scripts/npc/npc_heroes.txt",
+			kv({
+				DOTAHeroes: kv({
+					// the block every hero inherits from, which is not a hero
+					npc_dota_hero_base: kv({ Model: "models/heroes/base.vmdl" }),
+					npc_dota_hero_axe: kv({
+						Model: "models/heroes/axe/axe.vmdl",
+						Enabled: "1",
+						workshop_guide_name: "Axe",
+						Ability1: "axe_berserkers_call",
+						// a hidden slot sits among the four a player sees, and the ultimate is
+						// pushed past it - so the bar is not simply the first four
+						Ability2: "generic_hidden",
+						Ability3: "axe_battle_hunger",
+						Ability4: "axe_counter_helix",
+						Ability5: "axe_culling_blade",
+						Ability10: "special_bonus_attack_speed_20"
+					}),
+					npc_dota_hero_largo: kv({
+						Model: "models/heroes/bard/bard_frog_base.vmdl",
+						Enabled: "1",
+						workshop_guide_name: "Largo",
+						Ability1: "largo_catchy_lick"
+					}),
+					// one the game ships but has not turned on
+					npc_dota_hero_unreleased: kv({
+						Model: "models/heroes/unreleased.vmdl",
+						workshop_guide_name: "Unreleased"
+					})
+				})
+			})
+		)
+		gameFiles.set(
+			"scripts/items/items_game.txt",
+			kv({
+				items_game: kv({
+					items: kv({
+						1: kv({
+							prefab: "default_item",
+							model_player: "models/heroes/axe/axe_weapon.vmdl",
+							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
+						}),
+						// a cosmetic somebody bought is not part of how the hero looks
+						2: kv({
+							prefab: "wearable_item",
+							model_player: "models/items/axe/carnival.vmdl",
+							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
+						}),
+						// nor is the set of a persona, which is a different body wearing his name
+						3: kv({
+							prefab: "default_item",
+							item_slot: "weapon_persona_1",
+							model_player: "models/heroes/axe_persona/axe_persona_weapon.vmdl",
+							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
+						})
+					})
+				})
+			})
+		)
+	})
+	// every hero the game lets you pick, by the name it writes down, each carrying its own face
+	assert.deepEqual([...r.preview.Hero.values], ["Axe", "Largo"])
+	assert.deepEqual(
+		[...r.preview.Hero.icons],
+		["heroes/icons/npc_dota_hero_axe_png.vtex_c", "heroes/icons/npc_dota_hero_largo_png.vtex_c"]
+	)
+	// and it opens on the hero the card is dressed for
+	assert.equal(r.preview.Model(), "models/heroes/bard/bard_frog_base.vmdl")
+
+	r.preview.Hero.Pick(0)
+	assert.equal(r.preview.Model(), "models/heroes/axe/axe.vmdl")
+	assert.deepEqual([...r.preview.Wearables()], ["models/heroes/axe/axe_weapon.vmdl"])
+	assert.equal(r.preview.HealthBar.Hero, "npc_dota_hero_axe")
+
+	// and the strip over him is his own bar, the hidden slots left out
+	r.tick(true)
+	const art = r.roots[0].children
+		.flatMap(child => child.children.map(piece => piece.source))
+		.join(" ")
+	assert.ok(art.includes("axe_berserkers_call"))
+	assert.ok(art.includes("axe_culling_blade"))
+	assert.ok(!art.includes("generic_hidden"))
+	assert.ok(!art.includes("special_bonus"))
+	assert.ok(!art.includes("largo_"))
+})
+
+test("the hero picker is the hero row's own, and is put away with it", () => {
+	const r = runtime()
+	assert.equal(r.preview.Hero.IsVisible, true)
+	for (let unit = 1; unit < r.preview.Unit.values.length; unit++) {
+		r.preview.Unit.SelectedID = unit
+		r.preview.Unit.changed()
+		assert.equal(r.preview.Hero.IsVisible, false)
+		assert.equal(r.preview.ShowWearables.IsVisible, false)
+	}
+	r.preview.Unit.SelectedID = 0
+	r.preview.Unit.changed()
+	assert.equal(r.preview.Hero.IsVisible, true)
+	assert.equal(r.preview.ShowWearables.IsVisible, true)
+})
+
+test("the wearables can be turned off, and the body stands in what the game ships him as", () => {
+	const r = runtime()
+	assert.equal(r.preview.Wearables().length, 3)
+	r.preview.ShowWearables.value = false
+	// the body alone - what the game draws before a hero is dressed
+	assert.deepEqual([...r.preview.Wearables()], [])
+	assert.equal(r.preview.Model(), "models/heroes/bard/bard_frog_base.vmdl")
+	r.preview.ShowWearables.value = true
+	assert.equal(r.preview.Wearables().length, 3)
+})
+
+test("the hero wears his default items and nothing else on the stage does", () => {
+	const r = runtime()
+	// A hero is a bare body: his hair, armour, belt and weapon are each their own model.
+	// the script's array comes out of its own realm, so copy it into one of ours to compare
+	assert.deepEqual([...r.preview.Wearables()], [
+		"models/heroes/bard/bard_frog_upperbody.vmdl",
+		"models/heroes/bard/bard_frog_lowerbody.vmdl",
+		"models/heroes/bard/bard_frog_weapon.vmdl"
+	])
+	for (let unit = 1; unit < r.preview.Unit.values.length; unit++) {
+		r.preview.Unit.SelectedID = unit
+		assert.deepEqual([...r.preview.Wearables()], [])
+	}
 })

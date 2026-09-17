@@ -129,37 +129,6 @@ export function PreviewStage({ preview }: { preview: PreviewController }) {
 	return (
 		<React.Fragment>
 			<div
-				style={{
-					position: "absolute",
-					left: "30%",
-					top: "48%",
-					width: "40%",
-					height: "32%",
-					display: "flex",
-					flexDirection: "column",
-					alignItems: "center",
-					justifyContent: "center",
-					pointerEvents: "none",
-					color: MenuSDK.Tokens.TextMuted
-				}}
-			>
-				<MenuSDK.Icon
-					path={CooldownIcons.Heroes}
-					size={72}
-					tint={MenuSDK.Tokens.TextDisabled}
-				/>
-				<div
-					style={{
-						marginTop: 12,
-						fontSize: 11,
-						textAlign: "center",
-						whiteSpace: "normal"
-					}}
-				>
-					{localize("3D model will be added later")}
-				</div>
-			</div>
-			<div
 				ref={preview.AnchorRef}
 				style={{
 					position: "absolute",

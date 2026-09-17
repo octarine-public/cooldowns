@@ -26,6 +26,8 @@ function levelDrop(sizePx: number): number {
 
 export class PreviewHealthBar {
 	public readonly Bounds: MenuSDK.ScreenRect = { x: 0, y: 0, w: 0, h: 0 }
+	/** The hero whose portrait sits in the bar, by unit name. */
+	public Hero = "npc_dota_hero_largo"
 	private root: Nullable<HTMLElement>
 	private icon: Nullable<HTMLElement>
 	private readonly parts: HTMLElement[] = []
@@ -142,7 +144,7 @@ export class PreviewHealthBar {
 			if (this.icon !== undefined) {
 				MenuSDK.WriteSizedArt(
 					this.icon,
-					`${PathData.HeroIconsPath}/npc_dota_hero_void_spirit_png.vtex_c`,
+					`${PathData.HeroIconsPath}/${this.Hero}_png.vtex_c`,
 					Math.round(pixel * 26),
 					Math.round(pixel * 26)
 				)

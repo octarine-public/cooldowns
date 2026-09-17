@@ -9,8 +9,19 @@ import { PreviewDrag } from "./drag"
 import { PreviewGroup } from "./group"
 import { PreviewGuides } from "./guides"
 import { PreviewHealthBar } from "./healthbar"
+import { DefaultHero, Dressed, HeroIcon, HeroRoster, PreviewHero } from "./heroes"
+import { EPreviewUnit, PreviewModel, PreviewWearables } from "./models"
 import { PreviewSamples, SampleModifier } from "./samples"
 import { PreviewSilence } from "./silence"
+
+const heroHint =
+	"The hero the card is dressed for: his body, the items he is given and the abilities the" +
+	" sample strip is drawn from"
+const wearHint =
+	"Stand the hero in the items the game gives him. Turned off, he stands in the body" +
+	" underneath them, which is what the game draws before a hero is dressed"
+/** The body alone, for a card showing a hero undressed; handed out rather than minted a frame. */
+const bare: readonly string[] = []
 
 export class PreviewController {
 	public readonly Menu: MenuManager
@@ -20,6 +31,8 @@ export class PreviewController {
 	public readonly HealthBar = new PreviewHealthBar()
 	public readonly Silence = new PreviewSilence()
 	public readonly ShowSilence: Menu.Toggle
+	public readonly Hero: Menu.Dropdown
+	public readonly ShowWearables: Menu.Toggle
 	public readonly Node: Menu.Node
 	public readonly Unit: Menu.Dropdown
 	public readonly Team: Menu.Dropdown
@@ -50,6 +63,10 @@ export class PreviewController {
 	private readonly modifiers: ModifierGUI
 	private readonly visibleModifiers: SampleModifier[] = []
 	private scale = 1
+	/** The hero the card is dressed for: its body, its default items and its abilities. */
+	private hero: PreviewHero = DefaultHero
+	/** Every hero the picker offers, in the order its options are in. */
+	private readonly roster: readonly PreviewHero[]
 
 	constructor(menu: MenuManager) {
 		this.Menu = menu
@@ -65,6 +82,32 @@ export class PreviewController {
 			"Creeps"
 		])
 		this.Unit.IconPath = CooldownIcons.Heroes
+		// the roster is read here rather than when the row is opened: the list has to hold every
+		// hero for the one that was picked last time to still be there to pick. It is the hero
+		// FILES, though - what a hero wears is the econ file, and that is read only for the hero
+		// who ends up on the stage
+		const roster = HeroRoster()
+		this.roster = roster.length > 0 ? roster : [DefaultHero]
+		this.Hero = this.Node.AddDropdown(
+			"Preview hero",
+			this.roster.map(hero => hero.label),
+			Math.max(
+				0,
+				this.roster.findIndex(hero => hero.name === DefaultHero.name)
+			),
+			heroHint
+		)
+		this.Hero.SetOptionIcons(this.roster.map(hero => HeroIcon(hero.name)))
+		// the row carries no icon of its own: the option it is set to carries the hero's face, and
+		// the same picture twice on one row reads as a mistake. Nor is it dressed here - that is
+		// done below, where the drag the change cancels already exists
+		this.Hero.executeOnAdd = false
+		this.Hero.OnValue(picked => {
+			this.Dress(this.roster[picked.SelectedID] ?? DefaultHero)
+			this.Drag.Cancel()
+			MenuSDK.RefreshPanels()
+		})
+		this.ShowWearables = this.Node.AddToggle("Show wearables", true, wearHint)
 		this.Team = this.Node.AddDropdown(
 			"Preview team",
 			["Enemies", "Allies", "Your hero"],
@@ -72,6 +115,7 @@ export class PreviewController {
 		)
 		this.Team.IconPath = Menu.Icons.ListFilter
 		this.ShowSilence = this.Node.AddToggle("Show silence", true)
+		this.Dress(this.roster[this.Hero.SelectedID] ?? DefaultHero)
 		const spell = menu.SpellMenu
 		const item = menu.ItemMenu
 		const modifier = menu.ModifierMenu
@@ -135,6 +179,9 @@ export class PreviewController {
 			() => this.stage.SetVector(this.Frame.x, this.Frame.y)
 		)
 		this.Unit.OnValue(() => {
+			const hero = this.Unit.SelectedID === EPreviewUnit.Hero
+			this.Hero.IsVisible = hero
+			this.ShowWearables.IsVisible = hero
 			this.Drag.Cancel()
 			MenuSDK.RefreshPanels()
 		})
@@ -153,6 +200,47 @@ export class PreviewController {
 			page = page.parent
 		}
 		return false
+	}
+
+	/**
+	 * The unit standing on the stage this frame. The host asks every frame and reloads only when
+	 * the answer changes, so the picker moving the model costs nothing while it stands still.
+	 */
+	public Model(): Nullable<string> {
+		return PreviewModel(this.Unit.SelectedID, this.Team.SelectedID, this.hero)
+	}
+
+	/**
+	 * What that unit wears over it, which for everything but a hero is nothing.
+	 * Nothing, while the wearables are turned off: a hero's items are most of what makes him
+	 * look like himself, and without them the stage shows the body the game ships him as.
+	 *
+	 *
+	 * The hero is dressed HERE rather than where he is picked, because this is the first moment
+	 * anyone is looking at him: what a hero wears is fifty megabytes of econ file away, and a
+	 * menu that read it to open would be paying for a stage nobody has looked at yet.
+	 */
+	public Wearables(): readonly string[] {
+		if (!this.ShowWearables.value) {
+			return bare
+		}
+		if (this.Unit.SelectedID === EPreviewUnit.Hero) {
+			this.hero = Dressed(this.hero)
+		}
+		return PreviewWearables(this.Unit.SelectedID, this.Team.SelectedID, this.hero)
+	}
+
+	/**
+	 * Shows another hero: its body, the default items that make it look like itself, the portrait
+	 * beside the health bar and the abilities the sample strip is drawn from. The card is a
+	 * drawing of the settings, and every part of it is of the same hero or none of it is.
+	 */
+	public Dress(hero: PreviewHero): void {
+		this.hero = hero
+		this.HealthBar.Hero = hero.name
+		this.samples.SetAbilities(
+			hero.abilities.length > 0 ? hero.abilities : DefaultHero.abilities
+		)
 	}
 
 	public Open(node: Menu.Node): void {

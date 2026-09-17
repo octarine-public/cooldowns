@@ -81,13 +81,16 @@ export class SampleModifier implements ModifierDisplay {
 	}
 }
 
+/** The shape of the sample strip: a level and, on the last one, charges, per slot. */
+const SPELL_SLOTS: readonly [level: number, maxLevel: number, charges: number][] = [
+	[4, 4, 0],
+	[2, 4, 0],
+	[3, 4, 0],
+	[2, 3, 2]
+]
+
 export class PreviewSamples {
-	public readonly Spells: [SampleSpell, number][] = [
-		[new SampleSpell("void_spirit_aether_remnant", 4), 0],
-		[new SampleSpell("void_spirit_dissimilate", 2), 1],
-		[new SampleSpell("void_spirit_resonant_pulse", 3), 2],
-		[new SampleSpell("void_spirit_astral_step", 2, 3, 2), 3]
-	]
+	public Spells: [SampleSpell, number][] = []
 	public readonly Items = [
 		new SampleItem("item_blink"),
 		new SampleItem("item_black_king_bar"),
@@ -102,6 +105,22 @@ export class PreviewSamples {
 		new SampleModifier("Debuffs", "silencer_curse_of_the_silent"),
 		new SampleModifier("Auras", "item_shivas_guard")
 	]
+
+	/**
+	 * Points the sample spells at a hero's own abilities, so the strip over a body is that body's
+	 * bar. A hero with fewer than four keeps the slots it has; the levels and charges are the
+	 * strip's rather than the hero's, since what is being shown is the drawing, not a build.
+	 */
+	public SetAbilities(abilities: readonly string[]): void {
+		this.Spells = []
+		for (let slot = 0; slot < abilities.length && slot < SPELL_SLOTS.length; slot++) {
+			const [level, maxLevel, charges] = SPELL_SLOTS[slot]
+			this.Spells.push([
+				new SampleSpell(abilities[slot], level, maxLevel, charges),
+				slot
+			])
+		}
+	}
 
 	public Tick(): void {
 		const now = MenuSDK.PreviewClock()
