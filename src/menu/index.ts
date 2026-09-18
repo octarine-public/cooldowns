@@ -10,6 +10,7 @@ export class MenuManager {
 	public readonly State: Menu.Toggle
 	public readonly Scale: Menu.Toggle
 	public readonly OpacityByCursor: Menu.Toggle
+	public readonly Animation: Menu.Toggle
 
 	public readonly Opacity: Menu.Slider
 	public readonly Style: TextStyleMenu
@@ -55,11 +56,17 @@ export class MenuManager {
 		this.OpacityByCursor.IconPath = Menu.Icons.HoverArrow
 		this.Opacity = general.AddSlider("Opacity", 100, 40, 100)
 		this.Opacity.IconPath = Menu.Icons.Checkerboard
+		this.Animation = general.AddToggle(
+			"Animation",
+			true,
+			"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide"
+		)
+		this.Animation.IconPath = Menu.Icons.Animation
 
 		this.Style = new TextStyleMenu(this.baseNode)
-		this.SpellMenu = new SpellMenu(this.baseNode, this.Style)
-		this.ItemMenu = new ItemMenu(this.baseNode, this.Style)
-		this.ModifierMenu = new ModifierMenu(this.baseNode, this.Style)
+		this.SpellMenu = new SpellMenu(this.baseNode, this.Style, this.Animation)
+		this.ItemMenu = new ItemMenu(this.baseNode, this.Style, this.Animation)
+		this.ModifierMenu = new ModifierMenu(this.baseNode, this.Style, this.Animation)
 
 		const tabs = [
 			general,

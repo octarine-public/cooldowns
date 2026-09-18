@@ -1,12 +1,15 @@
 import { ItemDisplay, ModifierDisplay, SpellDisplay } from "../gui/types"
 
-function texture(name: string): string {
-	return (
-		AbilityData.GetAbilityByName(name)?.TexturePath ??
-		(name.startsWith("item_")
-			? `${PathData.ItemImagePath}/${name.slice(5)}_png.vtex_c`
-			: `${PathData.AbilityImagePath}/${name}_png.vtex_c`)
-	)
+/**
+ * The preview's own copy of an icon, shipped with the package. The host cuts a sized copy of a
+ * game texture from what the engine holds of it, and the engine streams a texture in only for
+ * what it shows itself, so a copy cut for the preview came out as a blot of the icon's average
+ * colour whenever the game had no use for the texture at the time. A file of the package's own
+ * is decoded whole.
+ */
+function art(name: string): string {
+	const file = name.startsWith("item_") ? name.slice(5) : name
+	return `${__OCT_PACKAGE_ROOT__}/scripts_files/cooldowns/preview/art/${file}.png`
 }
 
 class SampleSpell implements SpellDisplay {
@@ -26,7 +29,7 @@ class SampleSpell implements SpellDisplay {
 	) {}
 
 	public get TexturePath(): string {
-		return texture(this.name)
+		return art(this.name)
 	}
 	public IsManaEnough(): boolean {
 		return true
@@ -44,7 +47,7 @@ class SampleItem implements ItemDisplay {
 		public readonly CurrentCharges = 0
 	) {}
 	public get TexturePath(): string {
-		return texture(this.name)
+		return art(this.name)
 	}
 	public HasBehavior(): boolean {
 		return false
@@ -65,7 +68,7 @@ export class SampleModifier implements ModifierDisplay {
 		return `modifier_${this.name}`
 	}
 	public GetTexturePath(): string {
-		return texture(this.name)
+		return art(this.name)
 	}
 	public IsShield(): boolean {
 		return false

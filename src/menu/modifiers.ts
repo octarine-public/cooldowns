@@ -108,10 +108,11 @@ export class ModifierMenu extends BaseMenu {
 	private readonly modeImageNames = ["Square", "Circle"]
 	private readonly positionNames = ["Vertical", "Horizontal"]
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu) {
+	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
 		super({
 			node,
 			textStyle,
+			animation,
 			nodeName: "Modifiers",
 			texture: CooldownIcons.Modifiers
 		})

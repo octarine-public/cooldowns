@@ -63,19 +63,22 @@ export class SpellGUI extends BaseGUI {
 		}
 		const vecSize = this.size,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
-		for (let index = spells.length - 1; index > -1; index--) {
+		this.BeginMotion(menu)
+		for (let index = 0; index < spells.length; index++) {
 			const [spell, idx] = spells[index]
+			const cell = this.Seat(spell, index, spells.length)
+			if (cell.appear <= 0) {
+				continue
+			}
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
 				border,
-				index,
-				additionalPosition,
-				false,
-				spells.length
+				cell.slot,
+				additionalPosition
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell)
 
 			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 			const cooldown = spell.Cooldown,
@@ -101,6 +104,7 @@ export class SpellGUI extends BaseGUI {
 				this.minimilistic(
 					idx,
 					alpha,
+					cell.flash,
 					spell,
 					vecPos,
 					vecSize,
@@ -116,6 +120,7 @@ export class SpellGUI extends BaseGUI {
 			} else {
 				this.image(
 					alpha,
+					cell.flash,
 					texture,
 					vecPos,
 					vecSize,
@@ -162,10 +167,12 @@ export class SpellGUI extends BaseGUI {
 				this.Text(menu.TextStyle, cdText, position, TextFlags.Center)
 			}
 		}
+		this.EndMotion()
 	}
 	private minimilistic(
 		idx: number,
 		alpha: number,
+		flash: number,
 		spell: SpellDisplay,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -180,9 +187,9 @@ export class SpellGUI extends BaseGUI {
 	) {
 		const minimalistic = position.Clone(),
 			ignoreMinimalistic = this.ignoreMinimalistic(spell, idx),
-			outlinedColor = noMana
-				? BaseGUI.noManaOutlineColor.Clone().SetA(180)
-				: Color.Black.SetA(180)
+			outlinedColor = (
+				noMana ? BaseGUI.noManaOutlineColor.Clone() : Color.Black
+			).SetA(180 * this.fade)
 
 		if (cooldown === 0) {
 			minimalistic.Height /= 4
@@ -196,6 +203,16 @@ export class SpellGUI extends BaseGUI {
 			this.canvas.Rect(minimalistic.pos1, minimalistic.Size, {
 				color: outlinedColor
 			})
+			this.Ring(
+				this.canvas,
+				minimalistic.pos1,
+				minimalistic.Size,
+				1,
+				0,
+				false,
+				flash,
+				alpha
+			)
 			return
 		}
 		let isDisabled = false,
@@ -214,6 +231,7 @@ export class SpellGUI extends BaseGUI {
 		}
 		this.image(
 			alpha,
+			flash,
 			texture,
 			vecPos,
 			vecSize,
@@ -231,6 +249,7 @@ export class SpellGUI extends BaseGUI {
 	}
 	private image(
 		alpha: number,
+		flash: number,
 		texture: string,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -280,16 +299,25 @@ export class SpellGUI extends BaseGUI {
 		if (isUniqueDisabled && !isPassive) {
 			this.ImageMask(vecPos, vecSize, rounding, true)
 		}
-		if (cooldown === 0) {
-			return
+		if (cooldown !== 0) {
+			this.canvas.Rect(vecPos, vecSize, {
+				color: Color.Black.SetA(alpha * (100 / 255)),
+				radius:
+					rounding === 0
+						? Math.min(vecSize.x, vecSize.y) / 2
+						: Math.max(rounding / 2, 0)
+			})
 		}
-		this.canvas.Rect(vecPos, vecSize, {
-			color: Color.Black.SetA(alpha * (100 / 255)),
-			radius:
-				rounding === 0
-					? Math.min(vecSize.x, vecSize.y) / 2
-					: Math.max(rounding / 2, 0)
-		})
+		this.Ring(
+			this.canvas,
+			vecPos,
+			vecSize,
+			Math.round(border),
+			Math.max(rounding / 2, 0),
+			rounding === 0,
+			flash,
+			alpha
+		)
 	}
 	private squareLevel(
 		spell: SpellDisplay,

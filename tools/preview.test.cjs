@@ -12,6 +12,8 @@ class Vector2 {
 	CopyFrom(value) { this.x = value.x; this.y = value.y; return this }
 	Invalidate() { this.x = this.y = NaN }
 	Add(value) { return new Vector2(this.x + value.x, this.y + value.y) }
+	AddScalar(value) { return new Vector2(this.x + value, this.y + value) }
+	SetVector(x, y) { this.x = x; this.y = y; return this }
 	AddForThis(value) { return this.CopyFrom(this.Add(value)) }
 	AddScalarX(value) { this.x += value; return this }
 	AddScalarY(value) { this.y += value; return this }
@@ -62,7 +64,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	const document = { createElement: tag => ({ tagName: tag, ownerDocument: document, style: {}, children: [], appendChild(child) { this.children.push(child) } }) }
 	const makeElement = () => document.createElement("div")
 	const sdk = {
-		PreviewMotion: { value: true }, PreviewClock: () => now,
+		PreviewMotion: { value: true }, PreviewClock: () => now, DrawClock: () => now,
+		HudColors: { accent: new Color(94, 160, 255) },
 		DpToPx: value => value * ratio, ToLayoutUnits: value => value / ratio,
 		HostCursorPosition: () => [0, 0],
 		Localization: { Localize: text => text },
@@ -121,10 +124,12 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	// here is not an instance of the Map the script tests against
 	const makeMap = vm.runInContext("entries => new Map(entries)", context)
 	const kv = entries => makeMap(Object.entries(entries))
-
+	// The SDK canvas the preview draws its round modifiers on, keeping every call it takes.
+	const timers = { calls: [] }
+	for (const name of ["Circle", "Image", "Arc", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values]) }
 	const cache = new Map()
 	function load(name) {
-		if (name === "render") return { canvas: {}, surface: {} }
+		if (name === "render") return { canvas: {}, surface: {}, previewCanvas: timers }
 		if (cache.has(name)) return cache.get(name).exports
 		const base = path.join(__dirname, "..", name)
 		const filename = fs.existsSync(`${base}.ts`) ? `${base}.ts` : `${base}.tsx`
@@ -160,11 +165,12 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		get Position() { return new Vector2(this.PositionX.value * gameScale, this.PositionY.value * gameScale) }
 	})
 	const style = { Node: node("Style", root), Size: slider(100, 70, 150), FontFamily: "Roboto", FontWeight: 500, Color: { SelectedColor: Color.White }, Effect: { SelectedID: 2 }, EffectColor: { SelectedColor: Color.Black }, EffectOpacity: slider(100, 0, 100) }
+	const animation = { value: false }
 	const { BaseMenu } = load("src/menu/base")
-	const group = name => Object.assign(new BaseMenu({ node: root, nodeName: name, textStyle: style, defaultSize: 1, texture: name }), {
+	const group = name => Object.assign(new BaseMenu({ node: root, nodeName: name, textStyle: style, animation, defaultSize: 1, texture: name }), {
 		Hero: unit("Heroes"), SpiritBear: unit("Bear"), Courier: unit("Courier"), Roshan: unit("Roshan"), Familiar: unit("Familiars"), Pandas: unit("Pandas"), Creep: unit("Creeps")
 	})
-	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
+	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, Animation: animation, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
 	Object.assign(menu.SpellMenu, { IsMinimalistic: { value: false }, LevelColor: { SelectedColor: Color.Yellow }, ChargeColor: { SelectedColor: Color.Green } })
 	Object.assign(menu.ItemMenu, { SquareMode: { SelectedID: 0 } })
 	Object.assign(menu.ModifierMenu, { Remaining: { value: true }, ModeImage: { SelectedID: 0 }, ModePosition: { SelectedID: 1 } })
@@ -185,7 +191,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, gameFiles, kv,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, gameFiles, kv, timers,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -581,6 +587,8 @@ test("hero preview renders six distinct items and keeps all six when changing sh
 	r.tick(true)
 	assert.equal(sources().length, 6)
 	assert.equal(new Set(sources()).size, 6)
+	// The samples are drawn from the package's own art, not the game's textures.
+	assert.ok(sources().every(source => source.startsWith("cooldowns/scripts_files/cooldowns/preview/art/")))
 	r.menu.ItemMenu.SquareMode.SelectedID = 1
 	r.tick(true)
 	assert.equal(sources().length, 6)
@@ -884,4 +892,161 @@ test("the hero wears his default items and nothing else on the stage does", () =
 		r.preview.Unit.SelectedID = unit
 		assert.deepEqual([...r.preview.Wearables()], [])
 	}
+})
+test("round modifiers are timers on the menu canvas whose ring drains clockwise to twelve o'clock", () => {
+	const r = runtime()
+	r.menu.ModifierMenu.ModeImage.SelectedID = 1
+	r.tick(true)
+	const group = r.preview.Groups[2]
+	assert.ok(group.Canvas.Bounds.w > 0)
+	const calls = r.timers.calls
+	const images = calls.filter(([name]) => name === "Image")
+	const arcs = calls.filter(([name]) => name === "Arc")
+	const readings = calls.filter(([name]) => name === "TextIn").map(call => call[1])
+	assert.equal(images.length, 4)
+	assert.equal(arcs.length, 4)
+	// Each icon is a disc at the preview's frame plus its place on the stage, its reading over it.
+	for (const [, , at, extent, style] of images) {
+		assert.equal(style.circle, true)
+		assert.ok(at.x >= r.preview.Frame.x + group.Canvas.Bounds.x)
+		assert.ok(at.y >= r.preview.Frame.y + group.Canvas.Bounds.y)
+		assert.equal(extent.x, extent.y)
+	}
+	assert.deepEqual(readings.filter(text => text.endsWith(".0")).sort(), ["4.0", "5.0", "6.0", "7.0"])
+	// The ring lies on the rim, a twelfth of the icon wide, and ends at twelve o'clock: what is
+	// left of the modifier runs back from there, so its start comes round clockwise as time passes.
+	const size = images[0][3].x
+	const band = Math.max(Math.round(size * 0.08), 1)
+	for (const [, , radius, thickness, start, sweep] of arcs) {
+		assert.equal(thickness, band)
+		assert.equal(radius, (size - band) / 2)
+		assert.equal(start + sweep, -90)
+	}
+	assert.deepEqual(arcs.map(arc => arc[5]).sort((a, b) => a - b), [180, 225, 270, 315])
+	r.time(3)
+	calls.length = 0
+	r.tick(true)
+	const later = calls.filter(([name]) => name === "Arc")
+	assert.deepEqual(later.map(arc => arc[5]).sort((a, b) => a - b), [90, 135, 180, 225])
+	assert.ok(later.every(arc => arc[4] + arc[5] === -90))
+	// Nothing of it lands on the group's own surface but the room it takes, which frames the drag area.
+	assert.ok(r.roots[2].children.every(child => !child.shown))
+})
+
+test("square modifiers wear the ring's band as a frame inside the icon, draining clockwise from twelve o'clock", () => {
+	const r = runtime()
+	r.tick(true)
+	const shown = r.roots[2].children.filter(child => child.shown)
+	const icons = shown.filter(child => child.children.some(art => art.source)).map(child => ({ x: child.style.left, y: child.style.top, w: child.style.width, h: child.style.height }))
+	// A shape stands a pixel out from what it paints, for its antialiased edge.
+	const bands = shown.filter(child => child.style.decorator !== undefined).map(child => ({ x: child.style.left + 1, y: child.style.top + 1, w: child.style.width - 2, h: child.style.height - 2, shape: JSON.parse(child.style.decorator) }))
+	assert.equal(icons.length, 4)
+	assert.ok(bands.length >= 4)
+	const size = Math.min(icons[0].w, icons[0].h)
+	const band = Math.max(Math.round(size * 0.08), 1)
+	const within = (part, box) => part.x >= box.x && part.y >= box.y && part.x + part.w <= box.x + box.w && part.y + part.h <= box.y + box.h
+	for (const strip of bands) {
+		// A plain fill in the buff's or debuff's colour, as wide as the ring, and nothing around the icon.
+		assert.equal(strip.shape[2], 0)
+		assert.equal(strip.shape[7], 100)
+		assert.match(strip.shape[1], /^rgba\((255,0,0|0,255,0),/)
+		assert.equal(Math.min(strip.w, strip.h), band)
+		assert.ok(icons.some(icon => within(strip, icon)))
+	}
+	// The icons stand left to right in sample order. The last has half its time left, so its frame
+	// covers the left half alone: the other half drained clockwise from twelve o'clock.
+	icons.sort((a, b) => a.x - b.x)
+	const last = icons[3]
+	const lastBands = bands.filter(strip => within(strip, last))
+	assert.ok(lastBands.length >= 3)
+	assert.ok(lastBands.every(strip => strip.x + strip.w <= last.x + Math.round(last.w / 2)))
+	assert.ok(lastBands.some(strip => strip.x === last.x && strip.h > band))
+	// The first has most of its time left: its right side down from the corner, its bottom and its left are whole.
+	const first = icons[0]
+	const firstBands = bands.filter(strip => within(strip, first))
+	assert.ok(firstBands.some(strip => strip.x + strip.w === first.x + first.w && strip.h > band))
+	assert.ok(firstBands.some(strip => strip.y + strip.h === first.y + first.h && strip.w === first.w))
+})
+
+test("square frames never paint over themselves as the modifiers run down", () => {
+	const r = runtime()
+	const box = child => ({ x: child.style.left, y: child.style.top, w: child.style.width, h: child.style.height })
+	const within = (part, icon) => part.x >= icon.x && part.y >= icon.y && part.x + part.w <= icon.x + icon.w && part.y + part.h <= icon.y + icon.h
+	const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+	for (let now = 1; now <= 8; now++) {
+		r.time(now)
+		r.tick(true)
+		const shown = r.roots[2].children.filter(child => child.shown)
+		const icons = shown.filter(child => child.children.some(art => art.source)).map(box)
+		const bands = shown.filter(child => child.style.decorator !== undefined).map(child => {
+			const strip = box(child)
+			return { x: strip.x + 1, y: strip.y + 1, w: strip.w - 2, h: strip.h - 2 }
+		})
+		assert.equal(icons.length, 4)
+		assert.ok(bands.length >= 4)
+		for (const icon of icons) {
+			const own = bands.filter(strip => within(strip, icon))
+			for (let i = 0; i < own.length; i++) {
+				for (let j = i + 1; j < own.length; j++) {
+					assert.ok(!overlaps(own[i], own[j]), `a frame paints over itself at ${now}`)
+				}
+			}
+		}
+		assert.ok(bands.every(strip => icons.some(icon => within(strip, icon))))
+	}
+})
+
+test("with the animation on, a returning sample fades in wearing the accent ring while its neighbours glide", () => {
+	const r = runtime()
+	r.menu.Animation.value = true
+	const root = r.roots[2]
+	const icons = () => root.children.filter(child => child.shown && child.children.some(art => art.source))
+	const icon = name => icons().find(child => child.children.some(art => art.source.endsWith(`/${name}.png`)))
+	const opacity = child => Number(child.children[0].style["image-color"].split(",").pop().slice(0, -1))
+	const rung = () => root.children.some(child => child.shown && child.style.decorator !== undefined && child.style.decorator.includes("rgba(94,160,255"))
+	const items = () => r.roots[1].children.filter(child => child.shown && child.children.some(art => art.source)).length
+	// A strip opening cold cascades in over a few frames, and nothing of it rings.
+	r.time(1.5)
+	r.tick(true)
+	assert.equal(icons().length, 0)
+	r.time(1.7)
+	r.tick(true)
+	assert.equal(icons().length, 4)
+	assert.ok(opacity(icon("crystal_maiden_frostbite")) < 250)
+	assert.equal(rung(), false)
+	assert.equal(items(), 6)
+	// The stage takes the last modifier away for a while, and the rest close up over it.
+	r.time(2.5)
+	r.tick(true)
+	assert.equal(icons().length, 3)
+	assert.equal(icon("shivas_guard"), undefined)
+	r.time(2.8)
+	r.tick(true)
+	const closed = icon("crystal_maiden_frostbite").style.left
+	// It comes back as news: faded in and rung in, its neighbours part-way back to their lanes.
+	r.time(3.2)
+	r.tick(true)
+	r.time(3.25)
+	r.tick(true)
+	assert.equal(icons().length, 4)
+	assert.ok(opacity(icon("shivas_guard")) < 250)
+	assert.equal(rung(), true)
+	const gliding = icon("crystal_maiden_frostbite").style.left
+	r.time(4.5)
+	r.tick(true)
+	assert.ok(opacity(icon("shivas_guard")) > 254)
+	assert.equal(rung(), false)
+	const settled = icon("crystal_maiden_frostbite").style.left
+	assert.ok(settled < gliding && gliding < closed)
+	// The items cycle half a turn off the modifiers, so the two never leave together.
+	assert.equal(items(), 5)
+	// A stage held still stands every cell where it belongs, whole and unrung.
+	r.time(6.5)
+	r.sdk.PreviewMotion.value = false
+	r.tick(true)
+	assert.equal(icons().length, 4)
+	assert.equal(items(), 6)
+	assert.ok(opacity(icon("shivas_guard")) > 254)
+	assert.equal(rung(), false)
+	r.sdk.PreviewMotion.value = true
 })

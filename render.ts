@@ -10,7 +10,7 @@ export const surface = new HudCanvas()
 
 /**
  * The SDK's own canvas, for what is drawn the way teleport-esp draws its markers: a round
- * modifier is its circular timer, icon, ring and reading in one call. Its panel is registered
+ * modifier is a circular timer, icon, ring and reading each a call. Its panel is registered
  * on the first draw, after the overlay's below, so a timer stands over anything the overlay
  * paints at the same spot.
  */
@@ -18,8 +18,8 @@ export const canvas = new MenuSDK.Canvas("cooldowns")
 
 /**
  * The same for the preview: it stands with the menu, so its timers go out on the menu's layer,
- * at the preview's frame plus where the preview lays them out. Registered on the first draw,
- * after the preview card's own panels, so a timer stands over the stage.
+ * at the preview's frame plus where the preview lays them out. A surface on that layer stands
+ * over the menu's own panels, so a timer shows over the stage rather than under the card.
  */
 export const previewCanvas = new MenuSDK.Canvas(
 	"cooldowns-preview",

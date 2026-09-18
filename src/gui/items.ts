@@ -69,19 +69,22 @@ export class ItemGUI extends BaseGUI {
 			),
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
 
-		for (let index = items.length - 1; index > -1; index--) {
+		this.BeginMotion(menu)
+		for (let index = 0; index < items.length; index++) {
 			const item = items[index]
+			const cell = this.Seat(item, index, items.length)
+			if (cell.appear <= 0) {
+				continue
+			}
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
 				border,
-				index,
-				additionalPosition,
-				false,
-				items.length
+				cell.slot,
+				additionalPosition
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize),
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell),
 				cooldown = item.Cooldown,
 				charge = item.CurrentCharges
 
@@ -96,19 +99,31 @@ export class ItemGUI extends BaseGUI {
 			).SetA(alpha)
 
 			const rounding = this.GetRounding(menu, vecSize)
+			const radius = Math.max(rounding / 2, 0)
+			const width = border + +(rounding > 0)
 
 			this.canvas.Rect(vecPos, vecSize, {
 				color: Color.fromUint32(0),
 				borderColor: outlineColor,
-				borderWidth: border + +(rounding > 0),
-				radius: Math.max(rounding / 2, 0)
+				borderWidth: width,
+				radius
 			})
 
 			this.canvas.Image(item.TexturePath, vecPos, vecSize, {
 				color: Color.White.SetA(alpha),
-				radius: Math.max(rounding / 2, 0),
+				radius,
 				circle: rounding === 0
 			})
+			this.Ring(
+				this.canvas,
+				vecPos,
+				vecSize,
+				width,
+				radius,
+				rounding === 0,
+				cell.flash,
+				alpha
+			)
 
 			if (!charge && !cooldown) {
 				continue
@@ -144,5 +159,6 @@ export class ItemGUI extends BaseGUI {
 			}
 			this.Text(menu.TextStyle, cdText, textPosition, flags)
 		}
+		this.EndMotion()
 	}
 }

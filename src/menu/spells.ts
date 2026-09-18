@@ -25,10 +25,11 @@ export class SpellMenu extends BaseMenu {
 	public readonly Familiar: FamiliarSettingsMenu
 	public readonly Pandas: PandasSettingsMenu
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu) {
+	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
 		super({
 			node,
 			textStyle,
+			animation,
 			defaultSize: 1,
 			nodeName: "Spells",
 			texture: CooldownIcons.Spells

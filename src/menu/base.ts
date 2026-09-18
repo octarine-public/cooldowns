@@ -5,6 +5,7 @@ import { CreateTeamSelect } from "./team"
 interface IBaseBaseMenu {
 	node: Menu.Node
 	textStyle: TextStyleMenu
+	animation: Menu.Toggle
 	nodeName: string
 	defaultSize?: number
 	defaultState?: boolean
@@ -19,12 +20,15 @@ export class BaseMenu {
 	public readonly Size: Menu.Slider
 	public readonly Rounding: Menu.Slider
 	public readonly TeamState: Menu.MultiSelect
+	/** The script's one switch for its motion, on the General tab, read beside the element's own rows. */
+	public readonly Animation: Menu.Toggle
 
 	private readonly shared: TextStyleMenu
 	private style: Nullable<TextStyleMenu>
 
 	constructor(options: IBaseBaseMenu) {
 		this.shared = options.textStyle
+		this.Animation = options.animation
 		this.Tree = options.node.AddNode(
 			options.nodeName,
 			options.texture,

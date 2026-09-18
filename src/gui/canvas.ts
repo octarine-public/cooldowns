@@ -149,8 +149,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	 * by `sweep`, both in degrees with twelve o'clock at -90 - the SDK canvas's arc, laid here as
 	 * a chain of strips along the circle. The sdf circle's own sweep is no way to draw it: swept,
 	 * a circle with a border and no fill comes out of this host with the inside of its ring
-	 * painted solid black. In the game a round modifier is the SDK canvas's own timer instead;
-	 * this is the preview's ring.
+	 * painted solid black. A round modifier is the SDK canvas's own timer wherever there is one;
+	 * this is the ring of a surface without one.
 	 */
 	public Arc(
 		center: Vector2,

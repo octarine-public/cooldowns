@@ -4,8 +4,8 @@ import { BaseGUI, ModifierDisplay } from "./index"
 
 export class ModifierGUI extends BaseGUI {
 	private static readonly minSize = 18
-	/** The rim ring of a round icon: a twelfth of its diameter, and a pixel at least. */
-	private static readonly ringFraction = 0.08
+	/** The band on an icon's edge, ring or frame: a twelfth of its size, and a pixel at least. */
+	private static readonly bandFraction = 0.08
 	private readonly size = new Vector2()
 
 	public Update(
@@ -49,19 +49,23 @@ export class ModifierGUI extends BaseGUI {
 
 		const vertical = modePos === EPositionType.Vertical
 
-		for (let index = modifiers.length - 1; index > -1; index--) {
+		this.BeginMotion(menu)
+		for (let index = 0; index < modifiers.length; index++) {
 			const modifier = modifiers[index]
+			const cell = this.Seat(modifier, index, modifiers.length, vertical)
+			if (cell.appear <= 0) {
+				continue
+			}
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
 				border + 1,
-				index,
+				cell.slot,
 				additionalPosition,
-				vertical,
-				modifiers.length
+				vertical
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell)
 
 			const charge = modifier.StackCount >> 0,
 				cooldown = modifier.RemainingTime,
@@ -76,13 +80,14 @@ export class ModifierGUI extends BaseGUI {
 			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize)),
 				isShieldBuff = modifier.IsShield() && modifier.IsBuff()
 
-			const outlinedColor =
+			const outlinedColor = (
 				isShieldBuff ||
 				modifier.IsBuff() ||
 				modifier.IsChannel() ||
 				(modifier.ForceVisible && !modifier.IsEnemy(modifier.Caster))
 					? Color.Green
 					: Color.Red
+			).SetA(alpha)
 
 			const timers = this.timers
 			if (timers !== null && modeImage === EModeImage.Round) {
@@ -94,21 +99,30 @@ export class ModifierGUI extends BaseGUI {
 					ratio,
 					outlinedColor,
 					alpha,
+					cell.flash,
 					charge,
 					cooldown
 				)
 				continue
 			}
-			outlinedColor.SetA(alpha)
 
 			this.InnerFillImage(modifier.Name, modeImage, position, alpha)
 
 			this.canvas.Image(modifier.GetTexturePath(), vecPos, vecSize, {
 				color: Color.White.SetA(alpha),
-
 				circle: modeImage === EModeImage.Round
 			})
-			this.outline(alpha, ratio, position, modeImage, outlinedColor)
+			this.outline(ratio, position, modeImage, outlinedColor)
+			this.Ring(
+				this.canvas,
+				vecPos,
+				vecSize,
+				ModifierGUI.bandWidth(Math.min(vecSize.x, vecSize.y)),
+				0,
+				modeImage === EModeImage.Round,
+				cell.flash,
+				alpha
+			)
 
 			if (charge !== 0) {
 				this.Text(
@@ -135,56 +149,54 @@ export class ModifierGUI extends BaseGUI {
 
 			this.Text(menu.TextStyle, cdText, textPosition, flags, 2.75)
 		}
+		this.EndMotion()
 	}
+	/**
+	 * A horizontal strip is centred on the health bar with `border` either side of every cell,
+	 * so a lane is that pitch from the bar's middle; a vertical one hangs its cells under each
+	 * other from the bar, centred on it.
+	 */
 	protected GetPosition(
 		rec: Rectangle,
 		size: Vector2,
 		border: number,
-		index: number,
+		lane: number,
 		additional: Vector2,
-		vertical = false,
-		count = 1
+		vertical = false
 	) {
-		const width = vertical ? size.x : count * size.x + (count - 1) * border * 2
-		const pos1 = new Vector2(rec.x + (rec.Width - width) / 2, rec.y)
-		if (vertical) {
-			pos1.AddScalarY(index * (size.y + border * 2))
-		} else {
-			pos1.AddScalarX(index * (size.x + border * 2))
-		}
+		const pitch = border * 2
+		const pos1 = vertical
+			? new Vector2(
+					rec.x + (rec.Width - size.x) / 2,
+					rec.y + lane * (size.y + pitch)
+				)
+			: new Vector2(rec.x + rec.Width / 2 + border + lane * (size.x + pitch), rec.y)
 		return pos1.AddForThis(additional).RoundForThis()
 	}
+	/**
+	 * What is left of the modifier, on the icon's own edge and over its art: a ring on a round
+	 * icon, a frame on a square one, either ending at twelve o'clock with its start coming round
+	 * clockwise as the modifier runs out, the way the game's own buff icons drain.
+	 */
 	private outline(
-		alpha: number,
 		ratio: number,
 		position: Rectangle,
 		modeImage: EModeImage,
-		outlinedColor: Color
+		color: Color
 	) {
 		if (modeImage === EModeImage.Round) {
-			this.ring(ratio, position, outlinedColor)
-			return
+			this.ring(ratio, position, color)
+		} else {
+			this.frame(ratio, position, color)
 		}
-
-		const outlineBorder = 2
-		this.canvas.Rect(position.pos1, position.Size, {
-			color: Color.fromUint32(0),
-			borderColor: Color.Black.SetA(alpha),
-			borderWidth: outlineBorder
-		})
-		this.canvas.Rect(position.pos1, position.Size, {
-			color: Color.fromUint32(0),
-			borderColor: outlinedColor,
-			borderWidth: outlineBorder,
-			start: -90,
-			sweep: -ratio * 3.6
-		})
 	}
 	/**
-	 * A round modifier as the SDK canvas's circular timer, the marker teleport-esp draws at the
-	 * ends of a teleport: the icon cut to a disc, what is left of the modifier as a ring on its
-	 * rim in the buff's or debuff's colour, and the seconds left over the middle in the menu's
-	 * type. Stacks sit in the bottom right corner beside it. The whole of it fades with the row.
+	 * A round modifier on the SDK canvas, the way teleport-esp draws its markers: the icon cut
+	 * to a disc, what is left of the modifier as a ring on its rim in the buff's or debuff's
+	 * colour, and the seconds left over the middle in the menu's type. The ring ends at twelve
+	 * o'clock and its start comes round clockwise as the modifier runs out, the way the game's
+	 * own buff icons drain. Stacks sit in the bottom right corner beside it. The whole of it
+	 * fades with the row.
 	 */
 	private circleTimer(
 		timers: MenuSDK.Canvas,
@@ -194,6 +206,7 @@ export class ModifierGUI extends BaseGUI {
 		ratio: number,
 		color: Color,
 		alpha: number,
+		flash: number,
 		charge: number,
 		cooldown: number
 	) {
@@ -207,22 +220,34 @@ export class ModifierGUI extends BaseGUI {
 		if (ModifierGUI.isBacked(modifier.Name)) {
 			timers.Circle(at, extent, { color: Color.Black.SetA(alpha) })
 		}
-		const showTimer = menu.Remaining.value && cooldown > 0
-		timers.CircleTimer(at, size, {
-			texture: modifier.GetTexturePath(),
-			progress: Math.clamp(ratio, 0, 100) / 100,
-			color,
-			ringWidth: ModifierGUI.ringWidth(size),
-			text: showTimer ? cooldown.toFixed(cooldown <= 10 ? 1 : 0) : undefined,
-			textScale: ((size / 2.75 + 4) * scale) / size,
-			textColor: style.Color.SelectedColor,
-			weight: style.FontWeight,
-			opacity: Math.clamp(alpha / 255, 0, 1)
+		timers.Image(modifier.GetTexturePath(), at, extent, {
+			circle: true,
+			color: Color.White.SetA(alpha)
 		})
+		const band = ModifierGUI.bandWidth(size)
+		const sweep = ModifierGUI.sweep(ratio)
+		timers.Arc(
+			at.AddScalar(size / 2),
+			(size - band) / 2,
+			band,
+			-90 - sweep,
+			sweep,
+			color
+		)
+		this.Ring(timers, at, extent, band, 0, true, flash, alpha)
+		const box = new Rectangle(at, at.Add(extent))
+		if (menu.Remaining.value && cooldown > 0) {
+			timers.TextIn(cooldown.toFixed(cooldown <= 10 ? 1 : 0), box, {
+				size: Math.round((size / 2.75 + 4) * scale),
+				color: style.Color.SelectedColor.Clone().SetA(alpha),
+				family: style.FontFamily,
+				weight: style.FontWeight
+			})
+		}
 		if (charge !== 0) {
 			timers.TextIn(
 				charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
-				new Rectangle(at, at.Add(extent)),
+				box,
 				{
 					flags: TextFlags.Right | TextFlags.Bottom,
 					size: Math.round((size / 2 + 4) * scale),
@@ -233,9 +258,13 @@ export class ModifierGUI extends BaseGUI {
 			)
 		}
 	}
-	/** The rim ring's width for an icon that size: a twelfth of its diameter, and a pixel at least. */
-	private static ringWidth(size: number): number {
-		return Math.max(Math.round(size * ModifierGUI.ringFraction), 1)
+	/** The band's width for an icon that size: a twelfth of it, and a pixel at least. */
+	private static bandWidth(size: number): number {
+		return Math.max(Math.round(size * ModifierGUI.bandFraction), 1)
+	}
+	/** How far round the icon the band reaches for what is left of the modifier, in degrees. */
+	private static sweep(ratio: number): number {
+		return Math.clamp(ratio, 0, 100) * 3.6
 	}
 	/** Whether the icon's art is cut out and wants a black disc behind it. */
 	private static isBacked(modifierName: string): boolean {
@@ -246,24 +275,81 @@ export class ModifierGUI extends BaseGUI {
 		)
 	}
 	/**
-	 * The rim of a round icon in the preview, which has no SDK canvas: what is left of the
-	 * modifier, clockwise from twelve o'clock, laid on the icon's own edge and nothing else.
+	 * The rim of a round icon on a surface with no SDK canvas: the ring the timer draws, laid
+	 * on the icon's own edge and nothing else.
 	 */
-	private ring(ratio: number, position: Rectangle, outlinedColor: Color) {
-		const size = Math.min(position.Width, position.Height)
-		const thickness = ModifierGUI.ringWidth(size)
-		const radius = (size - thickness) / 2
-		if (!(radius > 0)) {
+	private ring(ratio: number, position: Rectangle, color: Color) {
+		const size = Math.min(position.Width, position.Height),
+			band = ModifierGUI.bandWidth(size),
+			radius = (size - band) / 2,
+			sweep = ModifierGUI.sweep(ratio)
+		if (!(radius > 0 && sweep > 0)) {
 			return
 		}
 		this.canvas.Arc(
 			position.pos1.Add(position.Size.DivideScalar(2)),
 			radius,
-			thickness,
-			-90,
-			(Math.clamp(ratio, 0, 100) / 100) * 360,
-			outlinedColor
+			band,
+			-90 - sweep,
+			sweep,
+			color
 		)
+	}
+	/**
+	 * The frame of a square icon, the ring's counterpart: a band as wide as the ring's on the
+	 * icon's own edge, over its art, from where the sweep starts clockwise round to twelve
+	 * o'clock. It is laid as plain rectangles, one for each side the sweep reaches, the corners
+	 * going with the top and bottom sides so nothing is painted twice - a band fading with the
+	 * row would show where it overlapped itself. Where the sweep starts the band is cut square
+	 * across its side rather than along the radius, a pixel or two on a band this thin.
+	 */
+	private frame(ratio: number, position: Rectangle, color: Color) {
+		const width = Math.round(position.Width),
+			height = Math.round(position.Height),
+			band = ModifierGUI.bandWidth(Math.min(width, height)),
+			sweep = ModifierGUI.sweep(ratio)
+		if (!(sweep > 0) || width <= band * 2 || height <= band * 2) {
+			return
+		}
+		const x0 = position.x,
+			y0 = position.y,
+			x1 = x0 + width,
+			y1 = y0 + height,
+			mid = Math.round(x0 + width / 2)
+		const angle = ((360 - sweep) * Math.PI) / 180,
+			dx = Math.sin(angle),
+			dy = -Math.cos(angle),
+			reach = Math.min(width / 2 / Math.abs(dx), height / 2 / Math.abs(dy)),
+			px = Math.round(x0 + width / 2 + dx * reach),
+			py = Math.round(y0 + height / 2 + dy * reach),
+			corner = Math.atan2(width, height)
+		const first =
+			angle < corner
+				? 0
+				: angle < Math.PI - corner
+					? 1
+					: angle < Math.PI + corner
+						? 2
+						: angle < 2 * Math.PI - corner
+							? 3
+							: 4
+		const runs: [number, number, number, number][] = [
+			[first === 0 ? px : mid, y0, x1, y0 + band],
+			[x1 - band, first === 1 ? py : y0 + band, x1, y1 - band],
+			[x0, y1 - band, first === 2 ? px : x1, y1],
+			[x0, y0 + band, x0 + band, first === 3 ? py : y1 - band],
+			[first === 4 ? px : x0, y0, mid, y0 + band]
+		]
+		for (let side = first; side < runs.length; side++) {
+			const [left, top, right, bottom] = runs[side]
+			if (right > left && bottom > top) {
+				this.canvas.Rect(
+					new Vector2(left, top),
+					new Vector2(right - left, bottom - top),
+					{ color }
+				)
+			}
+		}
 	}
 	private InnerFillImage(
 		modifierName: string,

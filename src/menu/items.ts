@@ -16,8 +16,14 @@ export class ItemMenu extends BaseMenu {
 	public readonly Courier: CourierSettingsMenu
 	public readonly SquareMode: Menu.Dropdown
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu) {
-		super({ node, textStyle, nodeName: "Items", texture: CooldownIcons.Items })
+	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
+		super({
+			node,
+			textStyle,
+			animation,
+			nodeName: "Items",
+			texture: CooldownIcons.Items
+		})
 		this.Tree.SortNodes = true
 		this.SquareMode = this.Tree.AddDropdown("Shape", ["Rectangle", "Square"])
 		this.SquareMode.IconPath = Menu.Icons.GridPick

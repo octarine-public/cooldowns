@@ -4,9 +4,7 @@
 	"Preview": "预览",
 	"Preview unit": "预览单位",
 	"Preview hero": "预览英雄",
-	"The hero the card is dressed for: his body, the items he is given and the abilities the sample strip is drawn from": "卡片所展示的英雄：他的模型、默认装扮，以及示例技能栏中的技能",
 	"Show wearables": "显示装扮",
-	"Stand the hero in the items the game gives him. Turned off, he stands in the body underneath them, which is what the game draws before a hero is dressed": "让英雄穿上游戏给他的默认装扮。关闭后只显示装扮下面的身体，也就是英雄未穿装扮时的样子",
 	"Preview team": "预览队伍",
 	"Show silence": "显示沉默",
 	"HP bar": "生命条",
@@ -32,5 +30,7 @@
 	"Effect color": "效果颜色",
 	"Text shade opacity": "效果不透明度",
 	"Scales cooldowns, charges and counters relative to their icon size": "根据图标大小缩放冷却时间、充能和计数文字",
-	"Cooldowns_v1": "Cooldowns"
+	"Cooldowns_v1": "Cooldowns",
+	"Animation": "动画",
+	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "新的技能、物品或效果平滑地出现在条上，\n而不是瞬间切换：格子淡入并亮起，\n相邻的格子随之滑动"
 }

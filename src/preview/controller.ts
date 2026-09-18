@@ -3,6 +3,7 @@ import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
+import { ItemDisplay } from "../gui/types"
 import { CooldownIcons } from "../menu/icons"
 import { MenuManager } from "../menu/index"
 import { PreviewDrag } from "./drag"
@@ -22,6 +23,13 @@ const wearHint =
 	" underneath them, which is what the game draws before a hero is dressed"
 /** The body alone, for a card showing a hero undressed; handed out rather than minted a frame. */
 const bare: readonly string[] = []
+
+/** How long the stage takes to drop a cell and bring it back, in seconds. */
+const CYCLE = 4
+/** The share of that cycle the cell spends away - long enough to read the strip without it. */
+const AWAY = 0.28
+/** How far the modifiers' cycle is pushed off the items', so the two do not leave together. */
+const OFFSET = 0.5
 
 export class PreviewController {
 	public readonly Menu: MenuManager
@@ -61,6 +69,7 @@ export class PreviewController {
 	private readonly spells: SpellGUI
 	private readonly items: ItemGUI
 	private readonly modifiers: ModifierGUI
+	private readonly visibleItems: ItemDisplay[] = []
 	private readonly visibleModifiers: SampleModifier[] = []
 	private scale = 1
 	/** The hero the card is dressed for: its body, its default items and its abilities. */
@@ -168,13 +177,20 @@ export class PreviewController {
 		this.spells = new SpellGUI(
 			spellGroup.Canvas,
 			spellGroup.Canvas,
-			() => this.cursor
+			() => this.cursor,
+			true
 		)
-		this.items = new ItemGUI(itemGroup.Canvas, itemGroup.Canvas, () => this.cursor)
+		this.items = new ItemGUI(
+			itemGroup.Canvas,
+			itemGroup.Canvas,
+			() => this.cursor,
+			true
+		)
 		this.modifiers = new ModifierGUI(
 			modifierGroup.Canvas,
 			modifierGroup.Canvas,
 			() => this.cursor,
+			true,
 			previewCanvas,
 			() => this.stage.SetVector(this.Frame.x, this.Frame.y)
 		)
@@ -342,6 +358,14 @@ export class PreviewController {
 		const alpha =
 			this.Menu.Opacity.value * 2.55 * (this.Menu.OpacityByCursor.value ? -1 : 1)
 		this.samples.Tick()
+		// the stage takes a cell away and brings it back, so the entrance the animation row is
+		// about is there to watch: the last item, and half a cycle later the last modifier
+		this.visibleItems.length = 0
+		const items = this.samples.Items
+		const shownItems = this.away(0) ? items.length - 1 : items.length
+		for (let index = 0; index < shownItems; index++) {
+			this.visibleItems.push(items[index])
+		}
 		const [spell, item, modifier] = this.Groups
 		const draw = visible && this.Menu.State.value
 		spell.Draw(
@@ -370,7 +394,7 @@ export class PreviewController {
 					this.Bar,
 					alpha,
 					this.Menu.ItemMenu,
-					this.samples.Items,
+					this.visibleItems,
 					settings.Position,
 					false,
 					false
@@ -381,6 +405,9 @@ export class PreviewController {
 			if (this.modifierEnabled(sample)) {
 				this.visibleModifiers.push(sample)
 			}
+		}
+		if (this.visibleModifiers.length > 1 && this.away(OFFSET)) {
+			this.visibleModifiers.pop()
 		}
 		modifier.Draw(
 			this.modifiers,
@@ -420,6 +447,15 @@ export class PreviewController {
 			)
 		}
 		this.Guides.Draw(visible ? this.Drag.Guides : [])
+	}
+
+	/** Whether the cell a group cycles is away this instant, on the stage's clock at `offset`. */
+	private away(offset: number): boolean {
+		return (
+			this.Menu.Animation.value &&
+			MenuSDK.PreviewMotion.value &&
+			(MenuSDK.PreviewClock() / CYCLE + offset) % 1 < AWAY
+		)
 	}
 
 	private modifierEnabled(sample: SampleModifier): boolean {
