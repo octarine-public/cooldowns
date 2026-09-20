@@ -97,6 +97,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		applyStyle(element, style) { Object.assign(element.style, style) }
 	}
 	const unitModels = new Map()
+	const abilityData = new Map()
+	const missingArt = new Set()
 	const gameFiles = new Map()
 	const icons = new Proxy({}, { get: (_, name) => String(name) })
 	const context = vm.createContext({
@@ -110,7 +112,11 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 			ContainsShop: () => false, ContainsMiniMap: () => false, ContainsScoreboard: () => false
 		},
 		InputManager: { CursorOnScreen: new Vector2() },
-		AbilityData: { GetAbilityByName: () => undefined },
+		AbilityData: { GetAbilityByName: name => abilityData.get(name) },
+		// the wrapper's own resolution: what the ability data says, else the spellicon named after it
+		ImageData: { GetSpellTexture: name => abilityData.get(name)?.TexturePath ?? (name === "" ? "" : `spells/${name}_png.vtex_c`) },
+		// which of those files the game actually ships; a test names the ones it does not
+		fexists: path => !missingArt.has(path),
 		// the host reads the game's own files; a test gives it whichever roster it is examining
 		parseKV: path => gameFiles.get(path) ?? new Map(),
 		// The unit data a joined server hands the script; empty until a test says otherwise.
@@ -191,7 +197,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, gameFiles, kv, timers,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, abilityData, missingArt, gameFiles, kv, timers,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -851,6 +857,25 @@ test("the hero picker offers the game's own roster and dresses the one it is set
 	assert.ok(!art.includes("generic_hidden"))
 	assert.ok(!art.includes("special_bonus"))
 	assert.ok(!art.includes("largo_"))
+})
+
+test("sample spells take their icons from the game's own ability data", () => {
+	const r = runtime()
+	// an ability whose icon is not the file its name spells: only the game knows, and it is asked
+	// through its data rather than through an ability on the field, of which the card has none
+	r.abilityData.set("largo_frogstomp", { TexturePath: "spells/largo_stomp_png.vtex_c" })
+	// and one the game ships no art for at all, which stands as its empty icon rather than a blank
+	r.missingArt.add("spells/largo_encore_png.vtex_c")
+	r.tick(true)
+	const art = r.roots[0].children
+		.filter(child => child.shown)
+		.flatMap(child => child.children.map(piece => piece.source).filter(Boolean))
+	assert.deepEqual(art, [
+		"spells/largo_catchy_lick_png.vtex_c",
+		"spells/largo_stomp_png.vtex_c",
+		"spells/largo_croak_of_genius_png.vtex_c",
+		"spells/empty_png.vtex_c"
+	])
 })
 
 test("the hero picker is the hero row's own, and is put away with it", () => {
