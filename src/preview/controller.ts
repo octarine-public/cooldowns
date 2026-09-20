@@ -10,7 +10,14 @@ import { PreviewDrag } from "./drag"
 import { PreviewGroup } from "./group"
 import { PreviewGuides } from "./guides"
 import { PreviewHealthBar } from "./healthbar"
-import { DefaultHero, Dressed, HeroIcon, HeroRoster, PreviewHero } from "./heroes"
+import {
+	BarAbilities,
+	DefaultHero,
+	Dressed,
+	HeroIcon,
+	HeroRoster,
+	PreviewHero
+} from "./heroes"
 import { EPreviewUnit, PreviewModel, PreviewWearables } from "./models"
 import { PreviewSamples, SampleModifier } from "./samples"
 import { PreviewSilence } from "./silence"
@@ -254,9 +261,8 @@ export class PreviewController {
 	public Dress(hero: PreviewHero): void {
 		this.hero = hero
 		this.HealthBar.Hero = hero.name
-		this.samples.SetAbilities(
-			hero.abilities.length > 0 ? hero.abilities : DefaultHero.abilities
-		)
+		const bar = BarAbilities(hero)
+		this.samples.SetAbilities(bar.length > 0 ? bar : DefaultHero.abilities)
 	}
 
 	public Open(node: Menu.Node): void {

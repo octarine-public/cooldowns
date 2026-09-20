@@ -98,6 +98,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	}
 	const unitModels = new Map()
 	const abilityData = new Map()
+	const drawableInnates = new Set()
+	const unitData = new Map()
 	const missingArt = new Set()
 	const gameFiles = new Map()
 	const icons = new Proxy({}, { get: (_, name) => String(name) })
@@ -112,7 +114,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 			ContainsShop: () => false, ContainsMiniMap: () => false, ContainsScoreboard: () => false
 		},
 		InputManager: { CursorOnScreen: new Vector2() },
-		AbilityData: { GetAbilityByName: name => abilityData.get(name) },
+		AbilityData: { GetAbilityByName: name => abilityData.get(name), ShouldBeDrawable: drawableInnates },
+		ABILITY_TYPES: { ABILITY_TYPE_ATTRIBUTES: 2 },
 		// the wrapper's own resolution: what the ability data says, else the spellicon named after it
 		ImageData: { GetSpellTexture: name => abilityData.get(name)?.TexturePath ?? (name === "" ? "" : `spells/${name}_png.vtex_c`) },
 		// which of those files the game actually ships; a test names the ones it does not
@@ -120,10 +123,10 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		// the host reads the game's own files; a test gives it whichever roster it is examining
 		parseKV: path => gameFiles.get(path) ?? new Map(),
 		// The unit data a joined server hands the script; empty until a test says otherwise.
-		UnitData: { GetUnitDataByName: name => unitModels.has(name) ? { ModelName: unitModels.get(name) } : undefined },
+		UnitData: { GetUnitDataByName: name => unitData.get(name) ?? (unitModels.has(name) ? { ModelName: unitModels.get(name) } : undefined) },
 		PathData: { ItemImagePath: "items", AbilityImagePath: "spells", HeroIconsPath: "heroes/icons" },
 		TextFlags: { Top: 1, Center: 2, Bottom: 4, Left: 8, Right: 16 },
-		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1 },
+		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1, DOTA_ABILITY_BEHAVIOR_INNATE_UI: 2 },
 		__OCT_PACKAGE_ROOT__: "cooldowns"
 	})
 	// KeyValues as the host hands them back, built INSIDE the script's realm: a map minted out
@@ -197,7 +200,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, abilityData, missingArt, gameFiles, kv, timers,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, abilityData, drawableInnates, unitData, missingArt, gameFiles, kv, timers,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -857,6 +860,82 @@ test("the hero picker offers the game's own roster and dresses the one it is set
 	assert.ok(!art.includes("generic_hidden"))
 	assert.ok(!art.includes("special_bonus"))
 	assert.ok(!art.includes("largo_"))
+})
+
+// A hero whose slots hold everything a bar does not show, in among the four that it does.
+function crowdedRoster({ gameFiles, kv }) {
+	gameFiles.set("scripts/npc/npc_heroes.txt", kv({
+		DOTAHeroes: kv({
+			npc_dota_hero_muerta: kv({
+				Model: "models/heroes/muerta/muerta.vmdl", Enabled: "1", workshop_guide_name: "Muerta",
+				Ability1: "muerta_the_calling",
+				Ability2: "muerta_dead_shot",
+				Ability3: "muerta_gunslinger",
+				Ability4: "muerta_calling_display",
+				Ability5: "muerta_pierce_the_veil",
+				Ability6: "attribute_bonus",
+				Ability7: "muerta_parting_shot",
+				Ability8: "special_bonus_unique_muerta",
+				Ability9: "muerta_hidden_brooch",
+				Ability10: "muerta_revenants_brooch",
+				Ability11: "muerta_never_reached"
+			})
+		})
+	}))
+}
+// what the game's data says about one, as much of it as the bar is decided by
+const ability = (values = {}) => ({ AbilityType: 0, IsInnate: false, HasBehavior: flag => flag === 2 && values.innateUI === true, ...values })
+
+test("innates, facet abilities and the attribute bonus are kept off the sample strip", () => {
+	const r = runtime(1, 1, crowdedRoster)
+	// the innate the game draws under the bar rather than on it, which ImageData would hand back
+	// the facet diamond for rather than any art of its own
+	r.abilityData.set("muerta_the_calling", ability({ IsInnate: true }))
+	// and the one that lives in the hero's panel, which says so in its behaviour
+	r.abilityData.set("muerta_calling_display", ability({ innateUI: true }))
+	r.abilityData.set("attribute_bonus", ability({ AbilityType: 2 }))
+	// a facet's ability is that facet's and not the plain hero's, and the card stands a hero
+	r.unitData.set("npc_dota_hero_muerta", { Abilities: new Map(), Facets: [{ Name: "gunslinger", Abilities: [{ AbilityName: "muerta_gunslinger" }] }] })
+	r.preview.Hero.Pick(0)
+	r.tick(true)
+	const art = r.roots[0].children.filter(child => child.shown)
+		.flatMap(child => child.children.map(piece => piece.source).filter(Boolean))
+	assert.deepEqual(art, [
+		"spells/muerta_dead_shot_png.vtex_c",
+		"spells/muerta_pierce_the_veil_png.vtex_c",
+		"spells/muerta_parting_shot_png.vtex_c",
+		"spells/muerta_revenants_brooch_png.vtex_c"
+	])
+})
+
+test("an innate that does belong on a bar is drawn once the game says so", () => {
+	const r = runtime(1, 1, crowdedRoster)
+	r.abilityData.set("muerta_the_calling", ability({ IsInnate: true }))
+	// the three innates that ARE on a bar put themselves into this set as they are built on the
+	// field; it is the one thing that excuses an innate here
+	r.drawableInnates.add("muerta_the_calling")
+	r.preview.Hero.Pick(0)
+	r.tick(true)
+	const art = r.roots[0].children.filter(child => child.shown)
+		.flatMap(child => child.children.map(piece => piece.source).filter(Boolean))
+	assert.equal(art[0], "spells/muerta_the_calling_png.vtex_c")
+})
+
+test("the hero's slots are the game's own list of them wherever it has read one", () => {
+	const r = runtime(1, 1, crowdedRoster)
+	// UnitData keeps these same slots with the talents and the hidden already dropped, so where
+	// it has been read it is the list, and the file we read ourselves is only the stand-in
+	r.unitData.set("npc_dota_hero_muerta", { Facets: [], Abilities: new Map([
+		["muerta_dead_shot", true], ["muerta_pierce_the_veil", true],
+		["muerta_parting_shot", true], ["muerta_revenants_brooch", true]
+	]) })
+	r.preview.Hero.Pick(0)
+	r.tick(true)
+	const art = r.roots[0].children.filter(child => child.shown)
+		.flatMap(child => child.children.map(piece => piece.source).filter(Boolean))
+	// muerta_the_calling leads the file's list and is nowhere in the game's
+	assert.equal(art[0], "spells/muerta_dead_shot_png.vtex_c")
+	assert.equal(art.length, 4)
 })
 
 test("sample spells take their icons from the game's own ability data", () => {
