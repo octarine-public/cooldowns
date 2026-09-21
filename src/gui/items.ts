@@ -50,6 +50,11 @@ export class ItemGUI extends BaseGUI {
 		)
 	}
 
+	/**
+	 * A cell as the game's own inventory slot draws its states: the icon washed blue while its
+	 * owner cannot pay for it, optionally shaded on cooldown, and its rim in the colour of what
+	 * is stopping it - the bevel's blue without mana, red on cooldown or muted.
+	 */
 	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
@@ -67,12 +72,14 @@ export class ItemGUI extends BaseGUI {
 				!!menu.SquareMode.SelectedID ? this.size.y : this.size.x,
 				this.size.y
 			),
-			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1),
+			vertical = menu.IsVertical
 
+		this.wash = this.NoManaWash(menu)
 		this.BeginMotion(menu)
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index]
-			const cell = this.Seat(item, index, items.length)
+			const cell = this.Seat(item, index, items.length, vertical)
 			if (cell.appear <= 0) {
 				continue
 			}
@@ -81,21 +88,27 @@ export class ItemGUI extends BaseGUI {
 				vecSize,
 				border,
 				cell.slot,
-				additionalPosition
+				additionalPosition,
+				vertical
 			)
 
 			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell),
 				cooldown = item.Cooldown,
-				charge = item.CurrentCharges
+				charge = item.DisplayCharges
 
 			const hasRootDisable = item.HasBehavior(
 				DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
 			)
 			const isUniqueDisabled = isTethered && hasRootDisable
+			const isMuted = isDisable || isUniqueDisabled || item.IsMuted
+			// the game washes an item its owner cannot pay for, unless the item is muted anyway
+			const noMana = !isMuted && !item.IsManaEnough()
 			const outlineColor = (
-				isDisable || isUniqueDisabled || item.IsMuted
-					? Color.Red
-					: ItemGUI.outlineColor.Clone()
+				noMana
+					? BaseGUI.noManaOutlineColor.Clone()
+					: isMuted || cooldown > 0
+						? BaseGUI.cooldownColor.Clone()
+						: ItemGUI.outlineColor.Clone()
 			).SetA(alpha)
 
 			const rounding = this.GetRounding(menu, vecSize)
@@ -111,9 +124,13 @@ export class ItemGUI extends BaseGUI {
 
 			this.canvas.Image(item.TexturePath, vecPos, vecSize, {
 				color: Color.White.SetA(alpha),
+				wash: noMana ? this.wash : undefined,
 				radius,
 				circle: rounding === 0
 			})
+			if (cooldown > 0 && menu.DimOnCooldown.value) {
+				this.Shade(vecPos, vecSize, rounding, alpha)
+			}
 			this.Ring(
 				this.canvas,
 				vecPos,

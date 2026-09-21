@@ -59,18 +59,22 @@ export class UnitData {
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
+		// a column of items stands clear of a column of spells hanging from the same bar
+		const spellsDrawn = spellState && this.spells.length > 0
 		if (itemState && this.items.length) {
 			this.itemGUI.Draw(
 				alpha,
 				itemMenu,
 				this.items,
-				this.GetAdditionalPosition(itemMenu),
+				this.GetAdditionalPosition(itemMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, itemMenu, spellsDrawn)
+				),
 				owner.IsMuted,
 				owner.IsTethered
 			)
 		}
 
-		if (spellState && this.spells.length) {
+		if (spellsDrawn) {
 			this.spellGUI.Draw(
 				alpha,
 				spellMenu,

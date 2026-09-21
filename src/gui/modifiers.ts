@@ -1,9 +1,10 @@
-import { EModeImage, EPositionType } from "../enum"
+import { EModeImage } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"
 import { BaseGUI, ModifierDisplay } from "./index"
 
 export class ModifierGUI extends BaseGUI {
 	private static readonly minSize = 18
+	private static readonly debuffColor = new Color(242, 82, 87)
 	/** The band on an icon's edge, ring or frame: a twelfth of its size, and a pixel at least. */
 	private static readonly bandFraction = 0.08
 	private readonly size = new Vector2()
@@ -44,28 +45,25 @@ export class ModifierGUI extends BaseGUI {
 		const vecSize = this.size,
 			additionalSize = menu.Size.value,
 			modeImage = menu.ModeImage.SelectedID,
-			modePos = menu.ModePosition.SelectedID,
 			border = GUIInfo.ScaleHeight(BaseGUI.border)
 
-		const vertical = modePos === EPositionType.Vertical
+		const vertical = menu.IsVertical
 
-		this.BeginMotion(menu)
 		for (let index = 0; index < modifiers.length; index++) {
 			const modifier = modifiers[index]
-			const cell = this.Seat(modifier, index, modifiers.length, vertical)
-			if (cell.appear <= 0) {
-				continue
-			}
+			// nothing of this strip moves: a modifier is drawn whole in its own lane the frame it
+			// lands and gone the frame it ends, with no entrance, no cascade and no glide
+			const lane = vertical ? index : index - modifiers.length / 2
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
 				border + 1,
-				cell.slot,
+				lane,
 				additionalPosition,
 				vertical
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell)
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
 
 			const charge = modifier.StackCount >> 0,
 				cooldown = modifier.RemainingTime,
@@ -85,9 +83,11 @@ export class ModifierGUI extends BaseGUI {
 				modifier.IsBuff() ||
 				modifier.IsChannel() ||
 				(modifier.ForceVisible && !modifier.IsEnemy(modifier.Caster))
-					? Color.Green
-					: Color.Red
-			).SetA(alpha)
+					? BaseGUI.buffColor
+					: ModifierGUI.debuffColor
+			)
+				.Clone()
+				.SetA(alpha)
 
 			const timers = this.timers
 			if (timers !== null && modeImage === EModeImage.Round) {
@@ -99,7 +99,6 @@ export class ModifierGUI extends BaseGUI {
 					ratio,
 					outlinedColor,
 					alpha,
-					cell.flash,
 					charge,
 					cooldown
 				)
@@ -113,23 +112,16 @@ export class ModifierGUI extends BaseGUI {
 				circle: modeImage === EModeImage.Round
 			})
 			this.outline(ratio, position, modeImage, outlinedColor)
-			this.Ring(
-				this.canvas,
-				vecPos,
-				vecSize,
-				ModifierGUI.bandWidth(Math.min(vecSize.x, vecSize.y)),
-				0,
-				modeImage === EModeImage.Round,
-				cell.flash,
-				alpha
-			)
 
 			if (charge !== 0) {
 				this.Text(
 					menu.TextStyle,
 					charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
 					position,
-					TextFlags.Right | TextFlags.Bottom
+					TextFlags.Right | TextFlags.Bottom,
+					2.75,
+					undefined,
+					additionalSize === 0 ? 100 : 70
 				)
 			}
 
@@ -147,9 +139,8 @@ export class ModifierGUI extends BaseGUI {
 				? position.Clone().Add(GUIInfo.ScaleVector(minOffset, minOffset))
 				: position
 
-			this.Text(menu.TextStyle, cdText, textPosition, flags, 2.75)
+			this.Text(menu.TextStyle, cdText, textPosition, flags)
 		}
-		this.EndMotion()
 	}
 	/**
 	 * A horizontal strip is centred on the health bar with `border` either side of every cell,
@@ -191,12 +182,8 @@ export class ModifierGUI extends BaseGUI {
 		}
 	}
 	/**
-	 * A round modifier on the SDK canvas, the way teleport-esp draws its markers: the icon cut
-	 * to a disc, what is left of the modifier as a ring on its rim in the buff's or debuff's
-	 * colour, and the seconds left over the middle in the menu's type. The ring ends at twelve
-	 * o'clock and its start comes round clockwise as the modifier runs out, the way the game's
-	 * own buff icons drain. Stacks sit in the bottom right corner beside it. The whole of it
-	 * fades with the row.
+	 * The teleport timer's circular portrait and soft outer shadow, with the modifier's
+	 * colour and remaining duration. Readings use the same sizing as item cooldowns and charges.
 	 */
 	private circleTimer(
 		timers: MenuSDK.Canvas,
@@ -206,7 +193,6 @@ export class ModifierGUI extends BaseGUI {
 		ratio: number,
 		color: Color,
 		alpha: number,
-		flash: number,
 		charge: number,
 		cooldown: number
 	) {
@@ -220,37 +206,40 @@ export class ModifierGUI extends BaseGUI {
 		if (ModifierGUI.isBacked(modifier.Name)) {
 			timers.Circle(at, extent, { color: Color.Black.SetA(alpha) })
 		}
-		timers.Image(modifier.GetTexturePath(), at, extent, {
-			circle: true,
-			color: Color.White.SetA(alpha)
-		})
 		const band = ModifierGUI.bandWidth(size)
-		const sweep = ModifierGUI.sweep(ratio)
-		timers.Arc(
-			at.AddScalar(size / 2),
-			(size - band) / 2,
-			band,
-			-90 - sweep,
-			sweep,
-			color
-		)
-		this.Ring(timers, at, extent, band, 0, true, flash, alpha)
+		timers.CircleTimer(at, size, {
+			texture: modifier.GetTexturePath(),
+			progress: ratio / 100,
+			color: color.Clone().SetA(255),
+			ringWidth: band,
+			shadow: Math.max(Math.round(size * 0.1), 2),
+			innerShadow: false,
+			opacity: alpha / 255
+		})
 		const box = new Rectangle(at, at.Add(extent))
 		if (menu.Remaining.value && cooldown > 0) {
-			timers.TextIn(cooldown.toFixed(cooldown <= 10 ? 1 : 0), box, {
-				size: Math.round((size / 2.75 + 4) * scale),
+			const noCharge = charge === 0
+			const textBox =
+				!noCharge && menu.Size.value >= 3
+					? box.Clone().Add(GUIInfo.ScaleVector(3, 3))
+					: box
+			timers.TextIn(cooldown.toFixed(cooldown <= 10 ? 1 : 0), textBox, {
+				flags: noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top,
+				size: Math.round((size / 2 + 4) * scale),
 				color: style.Color.SelectedColor.Clone().SetA(alpha),
 				family: style.FontFamily,
 				weight: style.FontWeight
 			})
 		}
 		if (charge !== 0) {
+			const chargeScale =
+				Math.max(style.Size.value, menu.Size.value === 0 ? 100 : 70) / 100
 			timers.TextIn(
 				charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
 				box,
 				{
 					flags: TextFlags.Right | TextFlags.Bottom,
-					size: Math.round((size / 2 + 4) * scale),
+					size: Math.round((size / 2.75 + 4) * chargeScale),
 					color: style.Color.SelectedColor.Clone().SetA(alpha),
 					family: style.FontFamily,
 					weight: style.FontWeight

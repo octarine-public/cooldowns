@@ -1,3 +1,4 @@
+import { BaseMenu } from "../menu/base"
 import { SpellMenu } from "../menu/spells"
 import { TextStyleMenu } from "../menu/style"
 import { BaseGUI, SpellDisplay } from "./index"
@@ -5,6 +6,18 @@ import { BaseGUI, SpellDisplay } from "./index"
 export class SpellGUI extends BaseGUI {
 	private static readonly minSize = 17
 	private readonly size = new Vector2()
+
+	/**
+	 * How far right a column of items stands to clear this strip hanging from the same bar as a
+	 * column: the spell cell and its gap while both strips are columns and this one is drawn at
+	 * all, nothing otherwise. Both hang from the bar's right end, and the spells stand nearest
+	 * it as they do under it in a row; two columns on one anchor would stand on each other.
+	 */
+	public ColumnShift(spells: SpellMenu, items: BaseMenu, drawn: boolean): number {
+		return drawn && spells.IsVertical && items.IsVertical
+			? this.size.x + GUIInfo.ScaleHeight(BaseGUI.border + 1)
+			: 0
+	}
 
 	public Update(
 		position: Nullable<Vector2>,
@@ -62,11 +75,13 @@ export class SpellGUI extends BaseGUI {
 			return
 		}
 		const vecSize = this.size,
-			border = GUIInfo.ScaleHeight(BaseGUI.border + 1)
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1),
+			vertical = menu.IsVertical
+		this.wash = this.NoManaWash(menu)
 		this.BeginMotion(menu)
 		for (let index = 0; index < spells.length; index++) {
 			const [spell, idx] = spells[index]
-			const cell = this.Seat(spell, index, spells.length)
+			const cell = this.Seat(spell, index, spells.length, vertical)
 			if (cell.appear <= 0) {
 				continue
 			}
@@ -75,7 +90,8 @@ export class SpellGUI extends BaseGUI {
 				vecSize,
 				border,
 				cell.slot,
-				additionalPosition
+				additionalPosition,
+				vertical
 			)
 
 			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell)
@@ -133,7 +149,8 @@ export class SpellGUI extends BaseGUI {
 					isDisabled,
 					noMana,
 					isAltCastState,
-					spell.IsPassive
+					spell.IsPassive,
+					spell.WashSource
 				)
 			}
 
@@ -244,9 +261,16 @@ export class SpellGUI extends BaseGUI {
 			isDisabled,
 			noMana,
 			isAltCastState,
-			spell.IsPassive
+			spell.IsPassive,
+			spell.WashSource
 		)
 	}
+	/**
+	 * A cell as the game's own ability button draws its states: the icon washed blue while its
+	 * owner cannot pay for it, grayed while it is unlearned, shaded while it is on cooldown, and
+	 * its rim in the colour of what is stopping it - the bevel's blue without mana, aqua for an
+	 * alternate cast, green through its cast point, red on cooldown or disabled.
+	 */
 	private image(
 		alpha: number,
 		flash: number,
@@ -262,23 +286,20 @@ export class SpellGUI extends BaseGUI {
 		isPassiveDisabled?: boolean,
 		noMana?: boolean,
 		isAltCastState?: boolean,
-		isPassive?: boolean
+		isPassive?: boolean,
+		washSource?: string
 	) {
-		let outlinedColor = Color.Black
-		const noManaColor = BaseGUI.noManaOutlineColor.Clone()
-		if (noMana) {
-			outlinedColor = noManaColor.Clone()
-		} else if (isAltCastState) {
-			outlinedColor = Color.Aqua
-		} else if (isInPhase) {
-			outlinedColor = Color.Green
-		} else if (
-			cooldown !== 0 ||
-			(isUniqueDisabled && !isPassive) ||
-			isPassiveDisabled
-		) {
-			outlinedColor = Color.Red
-		}
+		const outlinedColor = noMana
+			? BaseGUI.noManaOutlineColor.Clone()
+			: isAltCastState
+				? Color.Aqua
+				: isInPhase
+					? BaseGUI.buffColor.Clone()
+					: cooldown !== 0 ||
+						  (isUniqueDisabled && !isPassive) ||
+						  isPassiveDisabled
+						? BaseGUI.cooldownColor.Clone()
+						: Color.Black
 
 		this.canvas.Rect(vecPos, vecSize, {
 			color: Color.fromUint32(0),
@@ -288,7 +309,9 @@ export class SpellGUI extends BaseGUI {
 		})
 
 		this.canvas.Image(texture, vecPos, vecSize, {
-			color: (noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
+			color: Color.White.SetA(alpha),
+			wash: noMana ? this.wash : undefined,
+			washSource,
 			radius: Math.max(rounding / 2, 0),
 			circle: rounding === 0,
 			grayscale: grayScale
@@ -300,13 +323,7 @@ export class SpellGUI extends BaseGUI {
 			this.ImageMask(vecPos, vecSize, rounding, true)
 		}
 		if (cooldown !== 0) {
-			this.canvas.Rect(vecPos, vecSize, {
-				color: Color.Black.SetA(alpha * (100 / 255)),
-				radius:
-					rounding === 0
-						? Math.min(vecSize.x, vecSize.y) / 2
-						: Math.max(rounding / 2, 0)
-			})
+			this.Shade(vecPos, vecSize, rounding, alpha)
 		}
 		this.Ring(
 			this.canvas,

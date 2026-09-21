@@ -1,4 +1,4 @@
-import { EMenuType, EPositionType } from "../enum"
+import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
 import { CooldownIcons } from "./icons"
 import {
@@ -106,13 +106,18 @@ export class ModifierMenu extends BaseMenu {
 	public readonly Debuffs: DebuffSettingsMenu
 
 	private readonly modeImageNames = ["Square", "Circle"]
-	private readonly positionNames = ["Vertical", "Horizontal"]
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
+	constructor(
+		node: Menu.Node,
+		textStyle: TextStyleMenu,
+		animation: Menu.Toggle,
+		noMana: Menu.Slider
+	) {
 		super({
 			node,
 			textStyle,
 			animation,
+			noMana,
 			nodeName: "Modifiers",
 			texture: CooldownIcons.Modifiers
 		})
@@ -128,12 +133,7 @@ export class ModifierMenu extends BaseMenu {
 		this.Remaining.IconPath = Menu.Icons.ClockSeconds
 		this.ModeImage = this.Tree.AddDropdown("Mode images", this.modeImageNames, 1)
 		this.ModeImage.IconPath = Menu.Icons.GridPick
-		this.ModePosition = this.Tree.AddDropdown(
-			"Position",
-			this.positionNames,
-			EPositionType.Horizontal
-		)
-		this.ModePosition.IconPath = Menu.Icons.ArrowUpDown
+		this.ModePosition = this.AddPosition()
 		this.AddStyle()
 
 		this.Important = new ImportantSettingsMenu(this.Tree)

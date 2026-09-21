@@ -40,6 +40,7 @@
 	"Watchers": "Смотрители",
 	"Spells": "Способности",
 	"Items": "Предметы",
+	"Dim items on cooldown": "Затемнять предметы на перезарядке",
 	"Shape": "Форма",
 	"Creeps": "Крипы",
 	"Mode images": "Режим изображений",
@@ -79,5 +80,7 @@
 	"Scales abilities, items and modifiers\nnear the mouse": "Масштабирует способности, предметы и модификаторы\n рядом с мышкой",
 	"Opacity abilities, items and modifiers\nnear the mouse": "Прозрачность способностей, предметов и модификаторов\n рядом с мышкой",
 	"Animation": "Анимация",
-	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "Новая способность, предмет или бафф появляется\nна полоске плавно, а не мгновенно: ячейка\nпроявляется с подсветкой, а соседние сдвигаются"
+	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "Новая способность, предмет или бафф появляется\nна полоске плавно, а не мгновенно: ячейка\nпроявляется с подсветкой, а соседние сдвигаются",
+	"No mana brightness": "Яркость без маны",
+	"How bright an icon its owner cannot pay for is drawn:\n0 is the game's own dark wash, 100 keeps the icon\nas bright as it is": "Насколько яркой рисуется иконка, на которую\nне хватает маны: 0 — тёмная, как в игре,\n100 — иконка остаётся такой же яркой"
 }

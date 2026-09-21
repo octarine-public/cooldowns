@@ -7,6 +7,11 @@ const labels: Record<string, { file: string; width: number }> = {
 }
 
 export class PreviewSilence {
+	/**
+	 * The label and the duration track a dragged panel snaps to, in screen pixels; empty while
+	 * the reference is hidden, so nothing snaps to what is not on the stage.
+	 */
+	public readonly Anchors: MenuSDK.ScreenRect[] = []
 	private root: Nullable<HTMLElement>
 	private label: Nullable<HTMLElement>
 	private track: Nullable<HTMLElement>
@@ -37,6 +42,7 @@ export class PreviewSilence {
 			return
 		}
 		MenuSDK.WriteShown(root, visible)
+		this.Anchors.length = 0
 		if (!visible) {
 			return
 		}
@@ -44,16 +50,21 @@ export class PreviewSilence {
 		const art = labels[MenuSDK.Localization.SelectedUnitName] ?? labels.english
 		const labelWidth = Math.round((art.width / 2) * pixel)
 		const labelHeight = Math.round(15 * pixel)
+		const top = bar.y - Math.round(33 * pixel)
 		MenuSDK.WritePx(root, "left", bar.x)
-		MenuSDK.WritePx(root, "top", bar.y - Math.round(33 * pixel))
+		MenuSDK.WritePx(root, "top", top)
 		MenuSDK.WritePx(root, "width", bar.Width)
 		MenuSDK.WritePx(root, "height", Math.round(29 * pixel))
-		this.place(
-			label,
-			Math.round((bar.Width - labelWidth) / 2),
-			0,
-			labelWidth,
-			labelHeight
+		const labelLeft = Math.round((bar.Width - labelWidth) / 2)
+		this.place(label, labelLeft, 0, labelWidth, labelHeight)
+		this.Anchors.push(
+			{ x: bar.x + labelLeft, y: top, w: labelWidth, h: labelHeight },
+			{
+				x: bar.x - Math.round(pixel),
+				y: top + Math.round(22 * pixel),
+				w: Math.round(bar.Width + 2 * pixel),
+				h: Math.round(7 * pixel)
+			}
 		)
 		MenuSDK.WriteSizedArt(
 			label,

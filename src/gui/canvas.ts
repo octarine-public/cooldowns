@@ -1,4 +1,6 @@
-import { ETextEffect, GuiCanvas, StyledText, TextSurface } from "./types"
+import { OpenGrayFrame, WashCopy } from "./gray"
+import { OpenRoundedFrame, RoundedArt } from "./rounded"
+import { ETextEffect, GuiCanvas, HudImageStyle, StyledText, TextSurface } from "./types"
 
 /**
  * A pooled element and the strings last derived for it. They ride the slot, which is minted with
@@ -8,6 +10,10 @@ import { ETextEffect, GuiCanvas, StyledText, TextSurface } from "./types"
 interface Slot {
 	readonly element: HTMLElement
 	readonly art?: HTMLElement
+	/** The image a washed icon is shown in: a grayed copy of the art, coloured by its tint. */
+	readonly gray?: HTMLElement
+	/** The source that copy was last pointed at. */
+	graySource?: string
 	/** The shader fragment the element last carried, and the numbers it was built from. */
 	decorator?: string
 	radius?: number
@@ -60,6 +66,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	}
 
 	public Begin(): void {
+		OpenGrayFrame()
+		OpenRoundedFrame()
 		this.shapeCount =
 			this.stripCount =
 			this.imageCount =
@@ -219,7 +227,7 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		path: string,
 		position: Vector2,
 		size: Vector2,
-		style: MenuSDK.CanvasImageStyle = {}
+		style: HudImageStyle = {}
 	): void {
 		if (path === "" || size.x <= 0 || size.y <= 0) {
 			return
@@ -231,6 +239,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		const width = Math.max(Math.round(size.x), 1)
 		const height = Math.max(Math.round(size.y), 1)
 		const radius = style.circle ? Math.min(width, height) / 2 : (style.radius ?? 0)
+		const rounded =
+			radius > 0 ? RoundedArt(path, width, height, radius, style.wash) : undefined
 		this.place(
 			slot.element,
 			Math.round(position.x),
@@ -240,30 +250,63 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		)
 		MenuSDK.WriteStyle(slot.element, "overflow", "hidden")
 		MenuSDK.WriteStyle(slot.element, "clip", "always")
-		const mask = radius > 0 ? MenuSDK.ToLayoutUnits(radius) : 0
-		if (slot.decorator === undefined || slot.radius !== mask) {
-			slot.radius = mask
-			slot.decorator =
-				mask > 0
-					? (MenuSDK.SdfShape(mask, "#ffffffff").decorator ?? "none")
-					: "none"
-		}
-		MenuSDK.WriteStyle(slot.element, "mask-image", slot.decorator)
+		// Rounded copies already carry antialiased coverage. A second rounded clip would
+		// cut those partially transparent edge pixels back to a jagged stencil boundary.
+		MenuSDK.WriteStyle(slot.element, "mask-image", "none")
+		MenuSDK.WritePx(
+			slot.element,
+			"border-radius",
+			rounded !== undefined
+				? 0
+				: Math.max(0, Math.min(radius, Math.min(width, height) / 2))
+		)
 		const cover = HudCanvas.coverSize(path, width, height)
-		const artWidth = cover[0]
-		const artHeight = cover[1]
-		MenuSDK.WritePx(slot.art, "left", Math.round((width - artWidth) / 2))
-		MenuSDK.WritePx(slot.art, "top", Math.round((height - artHeight) / 2))
-		MenuSDK.WritePx(slot.art, "width", artWidth)
-		MenuSDK.WritePx(slot.art, "height", artHeight)
-		const tint = style.color ?? Color.WhiteReadonly
+		const artWidth = rounded !== undefined ? width : cover[0]
+		const artHeight = rounded !== undefined ? height : cover[1]
+		// a washed icon is a copy of the art grayed and graded in the wash, cut to the same box;
+		// while there is no copy yet, or none to be had, the art itself is tinted in the wash's
+		// top colour, which is the wash of a gray icon and a darkening of a coloured one
+		const wash = style.wash
+		const gray =
+			wash === undefined || rounded !== undefined
+				? undefined
+				: WashCopy(style.washSource ?? path, artWidth, artHeight, wash)
+		const shown =
+			gray !== undefined && slot.gray !== undefined && MenuSDK.HostImageReady(gray)
+				? slot.gray
+				: slot.art
+		const hidden = shown === slot.art ? slot.gray : slot.art
+		if (hidden !== undefined) {
+			MenuSDK.WriteShown(hidden, false)
+		}
+		MenuSDK.WriteShown(shown, true)
+		MenuSDK.WritePx(shown, "left", Math.round((width - artWidth) / 2))
+		MenuSDK.WritePx(shown, "top", Math.round((height - artHeight) / 2))
+		MenuSDK.WritePx(shown, "width", artWidth)
+		MenuSDK.WritePx(shown, "height", artHeight)
+		const color = style.color ?? Color.WhiteReadonly
+		const tint =
+			wash === undefined || shown === slot.gray || rounded !== undefined
+				? color
+				: wash.top.Clone().SetA(color.a)
 		if (slot.tintStyle === undefined || slot.tint !== tint.data32) {
 			slot.tint = tint.data32
 			slot.tintStyle = MenuSDK.CssColor(tint)
 		}
-		MenuSDK.WriteStyle(slot.art, "image-color", slot.tintStyle)
-		MenuSDK.WriteStyle(slot.art, "filter", style.grayscale ? "grayscale(1)" : "none")
-		MenuSDK.WriteSizedArt(slot.art, path, artWidth, artHeight)
+		MenuSDK.WriteStyle(shown, "image-color", slot.tintStyle)
+		MenuSDK.WriteStyle(
+			shown,
+			"filter",
+			style.grayscale && wash === undefined ? "grayscale(1)" : "none"
+		)
+		if (gray !== undefined && shown === slot.gray) {
+			if (slot.graySource !== gray) {
+				slot.graySource = gray
+				shown.setAttribute("src", gray)
+			}
+			return
+		}
+		MenuSDK.WriteSizedArt(slot.art, rounded ?? path, artWidth, artHeight)
 	}
 
 	/**
@@ -386,11 +429,20 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 			})
 			root.appendChild(element)
 			const art = image ? root.ownerDocument.createElement("img") : undefined
+			const gray = image ? root.ownerDocument.createElement("img") : undefined
 			if (art !== undefined) {
 				MenuSDK.applyStyle(art, { position: "absolute", pointerEvents: "none" })
 				element.appendChild(art)
 			}
-			slot = { element, art }
+			if (gray !== undefined) {
+				MenuSDK.applyStyle(gray, {
+					position: "absolute",
+					display: "none",
+					pointerEvents: "none"
+				})
+				element.appendChild(gray)
+			}
+			slot = { element, art, gray }
 			pool.push(slot)
 		}
 		return slot
