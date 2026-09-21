@@ -121,8 +121,12 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1 },
 		__OCT_PACKAGE_ROOT__: "cooldowns"
 	})
-	context.fexists = source => source.startsWith("cooldowns/") &&
-		fs.existsSync(path.join(__dirname, "..", source.slice("cooldowns/".length)))
+	// which files the game ships: the package's own are looked up on disk, and the game's are
+	// all there unless a test names the ones it does not
+	const missingArt = new Set()
+	context.fexists = source => source.startsWith("cooldowns/")
+		? fs.existsSync(path.join(__dirname, "..", source.slice("cooldowns/".length)))
+		: !missingArt.has(source)
 	// KeyValues as the host hands them back, built INSIDE the script's realm: a map minted out
 	// here is not an instance of the Map the script tests against
 	const makeMap = vm.runInContext("entries => new Map(entries)", context)
@@ -195,7 +199,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, gameFiles, kv, timers, context,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, missingArt, gameFiles, kv, timers, context,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -619,6 +623,9 @@ function iconTexture(format, pixels, width = 4, height = 4) {
 function previewImages(r) {
 	const minted = [], freed = [], reads = []
 	const files = new Map()
+	// a file handed to the host is one the game ships, as far as the loader can tell
+	const bundled = r.context.fexists
+	r.context.fexists = source => files.has(source) || bundled(source)
 	r.context.fread = source => {
 		reads.push(source)
 		return files.get(source)
@@ -736,6 +743,39 @@ test("empty metadata and transparent textures cannot become permanent blank icon
 	io.files.set("spells/new_spell_png.vtex_c", iconTexture(4, Buffer.alloc(64, 255)))
 	r.time(7)
 	assert.equal(io.art.PreviewArt("new_spell"), "octarine://preview/1")
+})
+
+test("a spell the game ships no art for stands as its empty icon, and the files are asked once", () => {
+	const r = runtime()
+	// an ability whose icon is not the file its name spells: only the game's data knows, and it
+	// is asked through that data rather than through an ability on the field, of which the card
+	// has none
+	r.context.AbilityData.GetAbilityByName = name => name === "largo_frogstomp"
+		? { TexturePath: "spells/largo_stomp_png.vtex_c" } : undefined
+	// and one the game ships no art for at all, which stands as its empty icon rather than as a
+	// path to nothing, drawn as a white box
+	r.missingArt.add("spells/largo_encore_png.vtex_c")
+	const asked = []
+	const shipped = r.context.fexists
+	r.context.fexists = source => {
+		asked.push(source)
+		return shipped(source)
+	}
+	r.tick(true)
+	const art = r.roots[0].children
+		.flatMap(child => child.children.map(piece => piece.source))
+		.filter(source => typeof source === "string" && source.startsWith("spells/"))
+	assert.deepEqual(art, [
+		"spells/largo_catchy_lick_png.vtex_c",
+		"spells/largo_stomp_png.vtex_c",
+		"spells/largo_croak_of_genius_png.vtex_c",
+		"spells/empty_png.vtex_c"
+	])
+	// an asset does not come and go while the game runs: each file is asked about once
+	const once = asked.length
+	r.tick(true)
+	r.tick(true)
+	assert.equal(asked.length, once)
 })
 
 test("a stuck generated image is released and retried, and switching heroes bounds the cache", () => {
@@ -1293,7 +1333,7 @@ test("square modifiers wear the ring's band as a frame inside the icon, draining
 		// A plain fill in the buff's or debuff's colour, as wide as the ring, and nothing around the icon.
 		assert.equal(strip.shape[2], 0)
 		assert.equal(strip.shape[7], 100)
-		assert.match(strip.shape[1], /^rgba\((242,82,87|56,190,124),/)
+		assert.match(strip.shape[1], /^rgba\((242,82,87|82,224,82),/)
 		assert.equal(Math.min(strip.w, strip.h), band)
 		assert.ok(icons.some(icon => within(strip, icon)))
 	}

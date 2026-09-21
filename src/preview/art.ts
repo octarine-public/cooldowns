@@ -12,6 +12,38 @@ const ROOT = `${__OCT_PACKAGE_ROOT__}/scripts_files/cooldowns/preview/art`
 const RETRY_MS = 5000
 const CACHE_LIMIT = 128
 const icons = new Map<string, Icon>()
+/** What the game draws in place of an icon it does not have, rather than a blank box. */
+const EMPTY_SPELL = `${PathData.AbilityImagePath}/empty_png.vtex_c`
+/**
+ * Whether the game ships a file, asked once per path: an asset does not come and go while the
+ * game is running, and the strip reads its icons every frame.
+ */
+const shipped = new Map<string, boolean>()
+
+function isShipped(path: string): boolean {
+	if (typeof fexists !== "function") {
+		return true
+	}
+	let exists = shipped.get(path)
+	if (exists === undefined) {
+		exists = fexists(path)
+		shipped.set(path, exists)
+	}
+	return exists
+}
+
+/**
+ * What stands for an icon none of `paths` holds: until a server has been joined the ability data
+ * is empty and a spell's texture is only the file it lives in by convention, which the game does
+ * not ship for every name. A path to nothing is drawn as a white box, so the game's own empty
+ * icon stands instead, and is not retried: a file the game does not have will not appear.
+ */
+function unshipped(name: string, paths: readonly string[]): string | undefined {
+	if (name.startsWith("item_") || paths.some(isShipped)) {
+		return undefined
+	}
+	return EMPTY_SPELL
+}
 
 /** Ability metadata includes texture aliases that do not match the ability's name. */
 export function PreviewTexture(name: string): string {
@@ -55,9 +87,7 @@ export function PreviewArt(name: string): string {
 	const paths = [`${ROOT}/${file}.png`, texture]
 	// Older hosts can still draw files, but must never receive an invented package path.
 	if (typeof fread !== "function" || typeof RegisterImageBlob !== "function") {
-		return (
-			paths.find(path => typeof fexists === "function" && fexists(path)) ?? texture
-		)
+		return paths.find(isShipped) ?? unshipped(name, paths) ?? texture
 	}
 	let source = ""
 	for (const path of paths) {
@@ -86,6 +116,12 @@ export function PreviewArt(name: string): string {
 		} catch {
 			// A missing or damaged candidate must not prevent trying the game's copy.
 			continue
+		}
+	}
+	if (source === "") {
+		const empty = unshipped(name, paths)
+		if (empty !== undefined) {
+			return empty
 		}
 	}
 	icon = {
