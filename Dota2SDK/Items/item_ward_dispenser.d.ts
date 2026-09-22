@@ -6,6 +6,7 @@ declare class item_ward_dispenser extends Item {
 	public get SentryCharges(): number
 	/** True while the dispenser is switched to place sentries. */
 	public get IsSentryActive(): boolean
+	/** The game's own dispenser art: both wards, the one placed next in front. */
 	public get TexturePath(): string
 	public get DisplayCharges(): number
 }

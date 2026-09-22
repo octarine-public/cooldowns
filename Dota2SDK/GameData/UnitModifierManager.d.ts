@@ -58,7 +58,8 @@ declare class UnitModifierManager {
 	public GetDayTimeVisionRange(baseVision: number, ignoreFixedVision?: boolean): number
 	public GetDamageBlock(damage: number, damageType: DAMAGE_TYPES, isRaw: boolean): number
 	public GetRawDamageBlock(rawDamage: number, damageType: DAMAGE_TYPES): number
-	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES): number
+	public GetAttackProjectileSpeed(baseSpeed: number): number
+	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES, damageValue?: ATTACK_DAMAGE_STRENGTH): number
 	public GetCritDamageBonus(target: Unit): number
 	public GetCritDamageBonusTarget(target: Unit): number
 	public GetIncomingRawAttackDamage(target: Unit): number

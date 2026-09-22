@@ -6,7 +6,7 @@ export interface PreviewHero {
 	readonly model: string
 	/**
 	 * Its default items, which are most of what makes a hero look like itself, or nothing while
-	 * they have not been read. Reading them costs what {@link WornBy} costs, so a hero is offered
+	 * they have not been read. Reading them costs the whole econ file, so a hero is offered
 	 * long before it is dressed; {@link Dressed} is what turns one into the other.
 	 */
 	readonly worn?: readonly string[]
@@ -17,7 +17,7 @@ export interface PreviewHero {
 /**
  * The hero the card shows until someone asks for another. His default items are written out here
  * rather than looked up: they are the only ones needed to open the page, and looking one hero's
- * up costs what {@link WornBy} costs.
+ * up costs the whole econ file.
  */
 export const DefaultHero: PreviewHero = {
 	name: "npc_dota_hero_largo",
@@ -51,8 +51,6 @@ const ABILITY_SLOTS = 6
 const ABILITY_TALENT = "special_bonus"
 
 let roster: Nullable<PreviewHero[]>
-/** Hero to its default items, filled by the one read of the econ file; see {@link WornBy}. */
-let worn: Nullable<Map<string, string[]>>
 
 /** One key of a KeyValues block as text; the host hands numbers back as numbers. */
 function text(map: RecursiveMap, key: string): string {
@@ -118,66 +116,6 @@ export function HeroRoster(): readonly PreviewHero[] {
 }
 
 /**
- * The default items a hero wears.
- *
- * They live in the econ file, keyed by the item and naming the heroes each belongs to, so the only
- * way to the four paths a hero wears is to read the lot — fifty megabytes of it. That is done once,
- * the first time a hero other than the one the page opens on is asked for, and what is kept is the
- * few hundred paths rather than the file: the map it was read into is dropped on the way out.
- */
-export function WornBy(hero: string): readonly string[] {
-	if (worn === undefined) {
-		worn = new Map()
-		if (typeof parseKV === "function") {
-			const items = parseKV("scripts/items/items_game.txt").get("items_game")
-			const list = items instanceof Map ? items.get("items") : undefined
-			if (list instanceof Map) {
-				for (const item of list.values()) {
-					collect(item)
-				}
-			}
-		}
-	}
-	return worn.get(hero) ?? []
-}
-
-/**
- * What marks a slot as belonging to a PERSONA rather than to the hero.
- *
- * A persona is a second hero wearing the first one's name — Wei for Anti-Mage, the two Terrorblades
- * — and the game ships its set as default items of the same hero, slotted `..._persona_1`. Worn
- * along with the ordinary set, the card shows a hero carrying two of everything, and the half that
- * belongs to a body he is not wearing is skinned to a skeleton he does not have: it stands wherever
- * it was authored, which is a blade hanging in the air beside him.
- */
-const PERSONA_SLOT = "persona"
-
-/** Files one default item under every hero the game equips it on. */
-function collect(item: RecursiveMapValue): void {
-	if (!(item instanceof Map) || text(item, "prefab") !== "default_item") {
-		return
-	}
-	const model = text(item, "model_player")
-	const heroes = item.get("used_by_heroes")
-	if (model === "" || !(heroes instanceof Map)) {
-		return
-	}
-	if (text(item, "item_slot").includes(PERSONA_SLOT)) {
-		return
-	}
-	for (const [hero, on] of heroes) {
-		if (on !== "1" && on !== 1) {
-			continue
-		}
-		const list = worn!.get(hero) ?? []
-		if (!list.includes(model)) {
-			list.push(model)
-		}
-		worn!.set(hero, list)
-	}
-}
-
-/**
  * The hero with the items the game equips him with, read the first time he is actually shown.
  *
  * A hero is offered in the picker long before he stands on the stage, and the offer costs the
@@ -185,7 +123,9 @@ function collect(item: RecursiveMapValue): void {
  * of undressed heroes and this is what dresses the one that is picked.
  */
 export function Dressed(hero: PreviewHero): PreviewHero {
-	return hero.worn !== undefined ? hero : { ...hero, worn: WornBy(hero.name) }
+	return hero.worn !== undefined
+		? hero
+		: { ...hero, worn: WearableData.DefaultWearables(hero.name) }
 }
 
 /** The face the game draws for a hero, for the row that picks him. */
