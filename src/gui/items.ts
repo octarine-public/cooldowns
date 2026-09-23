@@ -1,3 +1,4 @@
+import { BaseMenu } from "../menu/base"
 import { ItemMenu } from "../menu/items"
 import { BaseGUI, ItemDisplay } from "./index"
 
@@ -6,6 +7,19 @@ export class ItemGUI extends BaseGUI {
 	private static readonly outlineColor = Color.Black
 
 	private readonly size = new Vector2()
+
+	/**
+	 * How far right a column of modifiers stands to clear this strip hanging from the same bar
+	 * as a column: the item cell and its gap while both strips are columns and this one is drawn
+	 * at all, nothing otherwise.
+	 */
+	public ColumnShift(items: ItemMenu, other: BaseMenu, drawn: boolean): number {
+		if (!(drawn && items.IsVertical && other.IsVertical)) {
+			return 0
+		}
+		const width = items.SquareMode.SelectedID ? this.size.y : this.size.x
+		return width + GUIInfo.ScaleHeight(BaseGUI.border + 1)
+	}
 
 	public Update(
 		position: Nullable<Vector2>,

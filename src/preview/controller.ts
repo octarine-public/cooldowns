@@ -378,6 +378,7 @@ export class PreviewController {
 				false
 			)
 		)
+		const itemsDrawn = draw && this.IsEnabled(item) && this.visibleItems.length > 0
 		item.Draw(
 			this.items,
 			this.Bar,
@@ -420,7 +421,18 @@ export class PreviewController {
 					alpha,
 					this.Menu.ModifierMenu,
 					this.visibleModifiers,
-					settings.Position
+					settings.Position.AddScalarX(
+						this.spells.ColumnShift(
+							this.Menu.SpellMenu,
+							this.Menu.ModifierMenu,
+							spellsDrawn
+						) +
+							this.items.ColumnShift(
+								this.Menu.ItemMenu,
+								this.Menu.ModifierMenu,
+								itemsDrawn
+							)
+					)
 				)
 		)
 		this.HealthBar.Draw(visible, this.Bar, this.Team.SelectedID, hero)

@@ -59,9 +59,11 @@ export class UnitData {
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
-		// a column of items stands clear of a column of spells hanging from the same bar
+		// a column of items stands clear of a column of spells hanging from the same bar, and a
+		// column of modifiers clear of both
 		const spellsDrawn = spellState && this.spells.length > 0
-		if (itemState && this.items.length) {
+		const itemsDrawn = itemState && this.items.length > 0
+		if (itemsDrawn) {
 			this.itemGUI.Draw(
 				alpha,
 				itemMenu,
@@ -90,7 +92,10 @@ export class UnitData {
 				alpha,
 				modifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(modifierMenu)
+				this.GetAdditionalPosition(modifierMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, modifierMenu, spellsDrawn) +
+						this.itemGUI.ColumnShift(itemMenu, modifierMenu, itemsDrawn)
+				)
 			)
 		}
 	}

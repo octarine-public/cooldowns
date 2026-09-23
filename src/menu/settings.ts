@@ -189,8 +189,8 @@ export class RoshanSettingsMenu extends BaseSettingsMenu {
 				[EMenuType.Modifier]: 4
 			},
 			defaultY: {
-				[EMenuType.Item]: -33,
-				[EMenuType.Spell]: -6,
+				[EMenuType.Item]: -39,
+				[EMenuType.Spell]: -14,
 				[EMenuType.Modifier]: 15
 			}
 		})

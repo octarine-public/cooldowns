@@ -144,8 +144,10 @@ export class ModifierGUI extends BaseGUI {
 	}
 	/**
 	 * A horizontal strip is centred on the health bar with `border` either side of every cell,
-	 * so a lane is that pitch from the bar's middle; a vertical one hangs its cells under each
-	 * other from the bar, centred on it.
+	 * so a lane is that pitch from the bar's middle; a vertical one stands beside the bar's right
+	 * end, as the spell and item columns do, its cells under each other from the bar's top. A
+	 * column is laid from the bar's end rather than its middle so one offset clears every bar:
+	 * Roshan's is twice a hero's, and a column pushed clear of a hero's stood on his.
 	 */
 	protected GetPosition(
 		rec: Rectangle,
@@ -157,10 +159,7 @@ export class ModifierGUI extends BaseGUI {
 	) {
 		const pitch = border * 2
 		const pos1 = vertical
-			? new Vector2(
-					rec.x + (rec.Width - size.x) / 2,
-					rec.y + lane * (size.y + pitch)
-				)
+			? new Vector2(rec.x + rec.Width + pitch, rec.y + lane * (size.y + pitch))
 			: new Vector2(rec.x + rec.Width / 2 + border + lane * (size.x + pitch), rec.y)
 		return pos1.AddForThis(additional).RoundForThis()
 	}

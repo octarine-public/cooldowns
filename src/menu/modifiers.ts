@@ -98,6 +98,7 @@ export class ModifierMenu extends BaseMenu {
 			animation,
 			noMana,
 			nodeName: "Modifiers",
+			defaultSize: 1,
 			texture: CooldownIcons.Modifiers
 		})
 		this.Tree.SortNodes = false
