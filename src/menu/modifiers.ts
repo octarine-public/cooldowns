@@ -15,36 +15,19 @@ import { CreateTeamSelect } from "./team"
 export class BaseModifierMenu {
 	public readonly State: Menu.Toggle
 	public readonly TeamState: Menu.MultiSelect
-	public readonly DisableByTme: Menu.Slider
 
 	public readonly Tree: Menu.Node
 
-	constructor(
-		node: Menu.Node,
-		nodeName: string,
-		defaultStateTime = 5,
-		icon: string,
-		tooltip?: string
-	) {
+	constructor(node: Menu.Node, nodeName: string, icon: string, tooltip?: string) {
 		this.Tree = node.AddSettings(nodeName, icon, tooltip)
 		this.State = this.Tree.AddToggle("State", true)
 		this.Tree.HeaderControl = this.State
 		this.TeamState = CreateTeamSelect(this.Tree)
-		this.DisableByTme = this.Tree.AddSlider(
-			"Disable by time",
-			defaultStateTime,
-			5,
-			120,
-			0,
-			"Time in minutes"
-		)
-		this.DisableByTme.IconPath = Menu.Icons.Hourglass
 	}
 
 	public MenuChanged(callback: () => void) {
 		this.State.OnValue(() => callback())
 		this.TeamState.OnValue(() => callback())
-		this.DisableByTme.OnValue(() => callback())
 	}
 }
 
@@ -52,7 +35,7 @@ class AurasSettingsMenu extends BaseModifierMenu {
 	public readonly Globally: Menu.Toggle
 
 	constructor(node: Menu.Node) {
-		super(node, "Auras", 10, CooldownIcons.Auras)
+		super(node, "Auras", CooldownIcons.Auras)
 		this.Globally = this.Tree.AddToggle("Globally")
 		this.Globally.IconPath = Menu.Icons.Globe
 	}
@@ -64,12 +47,12 @@ class AurasSettingsMenu extends BaseModifierMenu {
 }
 class BuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Buffs", 20, CooldownIcons.Buffs)
+		super(node, "Buffs", CooldownIcons.Buffs)
 	}
 }
 class DebuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Debuffs", 20, CooldownIcons.Debuffs)
+		super(node, "Debuffs", CooldownIcons.Debuffs)
 	}
 }
 
@@ -78,13 +61,9 @@ class ImportantSettingsMenu extends BaseModifierMenu {
 		super(
 			node,
 			"Important",
-			120,
 			CooldownIcons.Important,
 			"Important modifiers (stun, silence, shields, etc.)"
 		)
-		this.DisableByTme.IsHidden = true
-		this.DisableByTme.max = 9999
-		this.DisableByTme.value = 9999
 	}
 }
 

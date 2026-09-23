@@ -283,11 +283,7 @@ export class UnitData {
 		return !this.isDisabledModifier(menu.Debuffs)
 	}
 	private isDisabledModifier(menu: BaseModifierMenu) {
-		return (
-			!menu.State.value ||
-			!IsTeamSelected(this.Owner, menu.TeamState) ||
-			GameState.RawGameTime / 60 >= menu.DisableByTme.value
-		)
+		return !menu.State.value || !IsTeamSelected(this.Owner, menu.TeamState)
 	}
 	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		const position = start ?? end
