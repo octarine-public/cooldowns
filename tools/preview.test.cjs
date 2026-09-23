@@ -99,6 +99,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	}
 	const unitModels = new Map()
 	const gameFiles = new Map()
+	const wearables = new Map()
 	const icons = new Proxy({}, { get: (_, name) => String(name) })
 	const context = vm.createContext({
 		React: { Fragment: "fragment", createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() }) },
@@ -116,6 +117,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		parseKV: path => gameFiles.get(path) ?? new Map(),
 		// The unit data a joined server hands the script; empty until a test says otherwise.
 		UnitData: { GetUnitDataByName: name => unitModels.has(name) ? { ModelName: unitModels.get(name) } : undefined },
+		// the SDK reads the econ file; a test names the default items it hands back
+		WearableData: { DefaultWearables: hero => wearables.get(hero) ?? [] },
 		PathData: { ItemImagePath: "items", AbilityImagePath: "spells", HeroIconsPath: "heroes/icons" },
 		TextFlags: { Top: 1, Center: 2, Bottom: 4, Left: 8, Right: 16 },
 		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1 },
@@ -187,7 +190,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	menu.ItemMenu.Hero.PositionY.value = -32
 	menu.ModifierMenu.Hero.PositionY.value = 19
 	const { PreviewController } = load("src/preview/controller")
-	seed?.({ gameFiles, kv })
+	seed?.({ gameFiles, kv, wearables })
 	const preview = new PreviewController(menu)
 	Object.assign(preview.Frame, { x: 40, y: 60, w: 300 * gameScale, h: 450 * gameScale })
 	const roots = preview.Groups.map(group => { const element = makeElement(); group.Canvas.Ref(element); group.AreaRef(makeElement()); return element })
@@ -1146,7 +1149,7 @@ test("the stage stands the unit the picker names, and the creep of the side it i
 test("the hero picker offers the game's own roster and dresses the one it is set to", () => {
 	// the roster is read as the menu is built, so the files are there before it: the option that
 	// was picked last time has to be in the list for the setting to come back to it
-	const r = runtime(1, 1, ({ gameFiles, kv }) => {
+	const r = runtime(1, 1, ({ gameFiles, kv, wearables }) => {
 		// npc_heroes.txt is a list of #base includes; the host follows them, so one read is the roster
 		gameFiles.set(
 			"scripts/npc/npc_heroes.txt",
@@ -1181,33 +1184,7 @@ test("the hero picker offers the game's own roster and dresses the one it is set
 				})
 			})
 		)
-		gameFiles.set(
-			"scripts/items/items_game.txt",
-			kv({
-				items_game: kv({
-					items: kv({
-						1: kv({
-							prefab: "default_item",
-							model_player: "models/heroes/axe/axe_weapon.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						}),
-						// a cosmetic somebody bought is not part of how the hero looks
-						2: kv({
-							prefab: "wearable_item",
-							model_player: "models/items/axe/carnival.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						}),
-						// nor is the set of a persona, which is a different body wearing his name
-						3: kv({
-							prefab: "default_item",
-							item_slot: "weapon_persona_1",
-							model_player: "models/heroes/axe_persona/axe_persona_weapon.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						})
-					})
-				})
-			})
-		)
+		wearables.set("npc_dota_hero_axe", ["models/heroes/axe/axe_weapon.vmdl"])
 	})
 	// every hero the game lets you pick, by the name it writes down, each carrying its own face
 	assert.deepEqual([...r.preview.Hero.values], ["Axe", "Largo"])
