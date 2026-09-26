@@ -78,10 +78,10 @@ export class ModifierManager {
 	}
 	private isDisabled(menu: BaseModifierMenu, modifier: Modifier) {
 		const owner = modifier.Parent
-		if (owner === undefined || !IsTeamSelected(owner, menu.TeamState)) {
-			return true
-		}
-		const time = GameState.RawGameTime / 60
-		return !menu.State.value || time >= menu.DisableByTme.value
+		return (
+			owner === undefined ||
+			!IsTeamSelected(owner, menu.TeamState) ||
+			!menu.State.value
+		)
 	}
 }

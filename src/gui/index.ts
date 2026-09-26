@@ -4,6 +4,7 @@ import { TextStyleMenu } from "../menu/style"
 import { easeOut, ISlotMotion, SlotMotion } from "./motion"
 import { DrawStyledText } from "./text"
 import {
+	ArtWash,
 	GuiCanvas,
 	ItemDisplay,
 	ModifierDisplay,
@@ -21,18 +22,43 @@ const RING_TINT = 90
 const RING_EDGE = 235
 /** How much of the ring's life it holds full strength for before it starts to go. */
 const RING_HOLD = 1.5
+/** How dark the plate over a cell on cooldown is, out of 255. */
+const SHADE = 100
 
 /** What a ring is struck on: the strip's own surface, or the SDK canvas a round timer stands on. */
 type RingCanvas = Pick<MenuSDK.Canvas, "Rect" | "Circle">
 
 export abstract class BaseGUI {
 	protected static readonly border = 2
-	protected static readonly noManaOutlineColor = new Color(77, 131, 247)
+	/**
+	 * The rim of a cell whose spell or item cannot be used: on cooldown, disabled, muted. A
+	 * softer red than the pure one, which on a rim this thin over a dark map reads as an alarm
+	 * rather than a state.
+	 */
+	protected static readonly cooldownColor = new Color(229, 72, 77)
+	protected static readonly buffColor = new Color(82, 224, 82)
+	/** The rim of a cell its owner cannot pay for: what the game washes the icon's bevel in then. */
+	protected static readonly noManaOutlineColor = new Color(96, 149, 253)
+	/**
+	 * What the game washes an icon its owner cannot pay for in, #1569be, at the seven tenths its
+	 * contrast rule leaves it at on screen: the blacks of the icon stay black there and its
+	 * brightest come out at seven tenths of the wash. A cell here is a third the size of the
+	 * game's button, and an icon that dark at that size is a blot, so this is only the dark end
+	 * of the wash the brightness row runs; the light end is the same blue at the icon's own
+	 * brightness, a mid gray coming out as the bevel's blue and a white as a pale one.
+	 */
+	private static readonly washDeep = new Color(15, 74, 133)
+	private static readonly washLightMid = new Color(96, 149, 253)
+	private static readonly washLightTop = new Color(200, 222, 255)
+	/** The wash at every brightness the row has stood at, minted once each. */
+	private static readonly washes = new Map<number, ArtWash>()
 
 	protected readonly position = new Rectangle()
 	protected readonly positionEnd = new Rectangle()
 	/** How far the cell being drawn is into its entrance, as the fade on everything it draws. */
 	protected fade = 1
+	/** The wash the strip being drawn colours an icon its owner cannot pay for in. */
+	protected wash: Nullable<ArtWash>
 	/** The entrances and the reflow of this strip's cells, kept between frames. */
 	private readonly motion = new SlotMotion()
 
@@ -173,6 +199,47 @@ export abstract class BaseGUI {
 			target.Rect(position, size, style)
 		}
 	}
+	/**
+	 * The dark plate over the face of a cell whose spell or item is on cooldown, the game's own
+	 * overlay without its sweep: a round cell takes a disc, a square one its own corners.
+	 */
+	protected Shade(
+		position: Vector2,
+		size: Vector2,
+		rounding: number,
+		alpha: number
+	): void {
+		this.canvas.Rect(position, size, {
+			color: Color.Black.SetA(alpha * (SHADE / 255)),
+			radius:
+				rounding === 0 ? Math.min(size.x, size.y) / 2 : Math.max(rounding / 2, 0)
+		})
+	}
+	/**
+	 * The wash an icon its owner cannot pay for is drawn in, at the brightness the row is set
+	 * to: the game's own multiply at nought, graded up to the recolour at a hundred.
+	 */
+	protected NoManaWash(menu: BaseMenu): ArtWash {
+		const value = Math.clamp(Math.round(menu.NoMana.value), 0, 100)
+		let wash = BaseGUI.washes.get(value)
+		if (wash === undefined) {
+			const share = value / 100
+			wash = {
+				mid: BaseGUI.between(BaseGUI.washDeep, 0.5, BaseGUI.washLightMid, share),
+				top: BaseGUI.between(BaseGUI.washDeep, 1, BaseGUI.washLightTop, share)
+			}
+			BaseGUI.washes.set(value, wash)
+		}
+		return wash
+	}
+	/** `from` scaled by `scale`, taken `share` of the way to `to`. */
+	private static between(from: Color, scale: number, to: Color, share: number): Color {
+		return new Color(
+			Math.round(from.r * scale * (1 - share) + to.r * share),
+			Math.round(from.g * scale * (1 - share) + to.g * share),
+			Math.round(from.b * scale * (1 - share) + to.b * share)
+		)
+	}
 	protected Text(
 		style: TextStyleMenu,
 		text: string,
@@ -194,9 +261,10 @@ export abstract class BaseGUI {
 		)
 	}
 	/**
-	 * Where the cell in `lane` starts. A horizontal strip is centred on the health bar, so a lane
-	 * is counted from the bar's middle and is a fraction of one while the strip is reflowing; a
-	 * vertical strip hangs from its top and counts from there.
+	 * Where the cell in `lane` starts. A horizontal strip is a row over the health bar centred
+	 * on it, so a lane is counted from the bar's middle and is a fraction of one while the strip
+	 * is reflowing; a vertical strip is a column hanging from the bar's top at its right end,
+	 * and counts down from there.
 	 */
 	protected GetPosition(
 		rec: Rectangle,
@@ -206,15 +274,16 @@ export abstract class BaseGUI {
 		additionalPosition: Vector2,
 		vertical = false
 	) {
-		const posX = rec.x + (rec.Width + border) / 2
-		const posY = rec.y - size.y - border * 2
-		const center = new Vector2(posX, posY)
-		if (vertical) {
-			center.AddScalarY(lane * (size.y + border))
-		} else {
-			center.AddScalarX(lane * (size.x + border))
-		}
-		return center.AddForThis(additionalPosition).RoundForThis()
+		const start = vertical
+			? new Vector2(
+					rec.x + rec.Width + border * 2,
+					rec.y + lane * (size.y + border)
+				)
+			: new Vector2(
+					rec.x + (rec.Width + border) / 2 + lane * (size.x + border),
+					rec.y - size.y - border * 2
+				)
+		return start.AddForThis(additionalPosition).RoundForThis()
 	}
 	protected GetRounding(menu: BaseMenu, size: Vector2): number {
 		const rnd = (menu.Rounding.value / 10) * Math.min(size.x, size.y)

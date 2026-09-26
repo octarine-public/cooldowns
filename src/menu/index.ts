@@ -13,6 +13,7 @@ export class MenuManager {
 	public readonly Animation: Menu.Toggle
 
 	public readonly Opacity: Menu.Slider
+	public readonly NoMana: Menu.Slider
 	public readonly Style: TextStyleMenu
 
 	public readonly ItemMenu: ItemMenu
@@ -56,6 +57,16 @@ export class MenuManager {
 		this.OpacityByCursor.IconPath = Menu.Icons.HoverArrow
 		this.Opacity = general.AddSlider("Opacity", 100, 40, 100)
 		this.Opacity.IconPath = Menu.Icons.Checkerboard
+		this.NoMana = general.AddSlider(
+			"No mana brightness",
+			80,
+			0,
+			100,
+			0,
+			"How bright an icon its owner cannot pay for is drawn:\n0 is the game's own dark wash, 100 keeps the icon\nas bright as it is"
+		)
+		this.NoMana.Suffix = "%"
+		this.NoMana.IconPath = Menu.Icons.Lighting
 		this.Animation = general.AddToggle(
 			"Animation",
 			true,
@@ -64,9 +75,24 @@ export class MenuManager {
 		this.Animation.IconPath = Menu.Icons.Animation
 
 		this.Style = new TextStyleMenu(this.baseNode)
-		this.SpellMenu = new SpellMenu(this.baseNode, this.Style, this.Animation)
-		this.ItemMenu = new ItemMenu(this.baseNode, this.Style, this.Animation)
-		this.ModifierMenu = new ModifierMenu(this.baseNode, this.Style, this.Animation)
+		this.SpellMenu = new SpellMenu(
+			this.baseNode,
+			this.Style,
+			this.Animation,
+			this.NoMana
+		)
+		this.ItemMenu = new ItemMenu(
+			this.baseNode,
+			this.Style,
+			this.Animation,
+			this.NoMana
+		)
+		this.ModifierMenu = new ModifierMenu(
+			this.baseNode,
+			this.Style,
+			this.Animation,
+			this.NoMana
+		)
 
 		const tabs = [
 			general,

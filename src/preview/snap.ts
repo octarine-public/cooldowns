@@ -128,7 +128,7 @@ export function SnapPreview(
 	stage: MenuSDK.ScreenRect,
 	targets: readonly MenuSDK.ScreenRect[],
 	limits: PreviewLimits,
-	threshold = MenuSDK.DpToPx(6)
+	threshold = MenuSDK.DpToPx(4)
 ) {
 	const visible = targets.filter(
 		target =>

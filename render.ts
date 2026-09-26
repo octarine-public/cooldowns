@@ -10,9 +10,9 @@ export const surface = new HudCanvas()
 
 /**
  * The SDK's own canvas, for what is drawn the way teleport-esp draws its markers: a round
- * modifier is a circular timer, icon, ring and reading each a call. Its panel is registered
- * on the first draw, after the overlay's below, so a timer stands over anything the overlay
- * paints at the same spot.
+ * modifier uses the same circular timer component, with readings sized like item text. Its
+ * panel is registered on the first draw, after the overlay's below, so a timer stands over
+ * anything the overlay paints at the same spot.
  */
 export const canvas = new MenuSDK.Canvas("cooldowns")
 

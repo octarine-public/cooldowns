@@ -26,6 +26,12 @@ function levelDrop(sizePx: number): number {
 
 export class PreviewHealthBar {
 	public readonly Bounds: MenuSDK.ScreenRect = { x: 0, y: 0, w: 0, h: 0 }
+	/**
+	 * The parts of the bar a dragged panel snaps to, in screen pixels: the health bar itself,
+	 * the health and mana bars together, the backing behind them and, for a hero, the portrait
+	 * and the level box. Laid out with the bar, so a drag reads them before they are drawn.
+	 */
+	public readonly Anchors: MenuSDK.ScreenRect[] = []
 	/** The hero whose portrait sits in the bar, by unit name. */
 	public Hero = "npc_dota_hero_largo"
 	private root: Nullable<HTMLElement>
@@ -66,6 +72,34 @@ export class PreviewHealthBar {
 		})
 		this.Bounds.w -= this.Bounds.x
 		this.Bounds.h -= this.Bounds.y
+		const rect = (x: number, y: number, w: number, h: number): MenuSDK.ScreenRect => {
+			const left = Math.round(x)
+			const top = Math.round(y)
+			return {
+				x: left,
+				y: top,
+				w: Math.round(x + w) - left,
+				h: Math.round(y + h) - top
+			}
+		}
+		this.Anchors.length = 0
+		this.Anchors.push(
+			rect(bar.x, bar.y, bar.Width, bar.Height),
+			// the health bar with the mana bar under it: 1px between and 4px of mana
+			rect(bar.x, bar.y, bar.Width, bar.Height + pixel * 5),
+			{ ...this.Bounds }
+		)
+		if (hero) {
+			this.Anchors.push(
+				rect(bar.x - pixel * 28, bar.y - pixel * 6, pixel * 26, pixel * 26),
+				rect(
+					bar.pos2.x + pixel * 2,
+					bar.y - pixel,
+					pixel * 17,
+					bar.Height + pixel * 8
+				)
+			)
+		}
 	}
 
 	public Draw(visible: boolean, bar: Rectangle, team: ETeamState, hero: boolean): void {

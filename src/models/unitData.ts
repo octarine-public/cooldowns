@@ -59,18 +59,22 @@ export class UnitData {
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
-		if (itemState && this.items.length) {
+		const spellsDrawn = spellState && this.spells.length > 0
+		const itemsDrawn = itemState && this.items.length > 0
+		if (itemsDrawn) {
 			this.itemGUI.Draw(
 				alpha,
 				itemMenu,
 				this.items,
-				this.GetAdditionalPosition(itemMenu),
+				this.GetAdditionalPosition(itemMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, itemMenu, spellsDrawn)
+				),
 				owner.IsMuted,
 				owner.IsTethered
 			)
 		}
 
-		if (spellState && this.spells.length) {
+		if (spellsDrawn) {
 			this.spellGUI.Draw(
 				alpha,
 				spellMenu,
@@ -86,7 +90,10 @@ export class UnitData {
 				alpha,
 				modifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(modifierMenu)
+				this.GetAdditionalPosition(modifierMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, modifierMenu, spellsDrawn) +
+						this.itemGUI.ColumnShift(itemMenu, modifierMenu, itemsDrawn)
+				)
 			)
 		}
 	}
@@ -279,11 +286,7 @@ export class UnitData {
 		return !this.isDisabledModifier(menu.Debuffs)
 	}
 	private isDisabledModifier(menu: BaseModifierMenu) {
-		return (
-			!menu.State.value ||
-			!IsTeamSelected(this.Owner, menu.TeamState) ||
-			GameState.RawGameTime / 60 >= menu.DisableByTme.value
-		)
+		return !menu.State.value || !IsTeamSelected(this.Owner, menu.TeamState)
 	}
 	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		const position = start ?? end

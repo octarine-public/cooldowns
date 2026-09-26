@@ -170,16 +170,14 @@ export class PreviewController {
 					modifier.Familiar,
 					modifier.Pandas
 				],
-				() => this.Unit.SelectedID,
-				[
-					modifier.Important.Tree,
-					modifier.Buffs.Tree,
-					modifier.Debuffs.Tree,
-					modifier.Auras.Tree
-				]
+				() => this.Unit.SelectedID
 			)
 		]
-		this.Drag = new PreviewDrag(this.Frame, () => this.Groups, this.Bar)
+		this.Drag = new PreviewDrag(
+			this.Frame,
+			() => this.Groups,
+			() => [...this.HealthBar.Anchors, ...this.Silence.Anchors]
+		)
 		const [spellGroup, itemGroup, modifierGroup] = this.Groups
 		this.spells = new SpellGUI(
 			spellGroup.Canvas,
@@ -374,22 +372,19 @@ export class PreviewController {
 		}
 		const [spell, item, modifier] = this.Groups
 		const draw = visible && this.Menu.State.value
-		spell.Draw(
-			this.spells,
-			this.Bar,
-			this.scale,
-			draw && this.IsEnabled(spell),
-			settings =>
-				this.spells.DrawAt(
-					this.Bar,
-					alpha,
-					this.Menu.SpellMenu,
-					this.samples.Spells,
-					settings.Position,
-					false,
-					false
-				)
+		const spellsDrawn = draw && this.IsEnabled(spell)
+		spell.Draw(this.spells, this.Bar, this.scale, spellsDrawn, settings =>
+			this.spells.DrawAt(
+				this.Bar,
+				alpha,
+				this.Menu.SpellMenu,
+				this.samples.Spells,
+				settings.Position,
+				false,
+				false
+			)
 		)
+		const itemsDrawn = draw && this.IsEnabled(item) && this.visibleItems.length > 0
 		item.Draw(
 			this.items,
 			this.Bar,
@@ -401,7 +396,13 @@ export class PreviewController {
 					alpha,
 					this.Menu.ItemMenu,
 					this.visibleItems,
-					settings.Position,
+					settings.Position.AddScalarX(
+						this.spells.ColumnShift(
+							this.Menu.SpellMenu,
+							this.Menu.ItemMenu,
+							spellsDrawn
+						)
+					),
 					false,
 					false
 				)
@@ -426,7 +427,18 @@ export class PreviewController {
 					alpha,
 					this.Menu.ModifierMenu,
 					this.visibleModifiers,
-					settings.Position
+					settings.Position.AddScalarX(
+						this.spells.ColumnShift(
+							this.Menu.SpellMenu,
+							this.Menu.ModifierMenu,
+							spellsDrawn
+						) +
+							this.items.ColumnShift(
+								this.Menu.ItemMenu,
+								this.Menu.ModifierMenu,
+								itemsDrawn
+							)
+					)
 				)
 		)
 		this.HealthBar.Draw(visible, this.Bar, this.Team.SelectedID, hero)

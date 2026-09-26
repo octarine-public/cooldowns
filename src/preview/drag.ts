@@ -15,7 +15,8 @@ export class PreviewDrag {
 	constructor(
 		private readonly stage: MenuSDK.ScreenRect,
 		private readonly groups: () => readonly PreviewGroup[],
-		private readonly bar: Rectangle
+		/** The HUD the panels are arranged around: the health bar's parts and the silence reference. */
+		private readonly hud: () => readonly MenuSDK.ScreenRect[]
 	) {}
 
 	public get Active(): boolean {
@@ -49,13 +50,13 @@ export class PreviewDrag {
 		}
 	}
 
+	/**
+	 * Opens the element's own card beside the stage, row for row as the menu page draws it: every
+	 * unit and every category stays a settings row whose gear opens its offsets, rather than being
+	 * unfolded into the panel one under another.
+	 */
 	public Configure(group: PreviewGroup): void {
-		MenuSDK.OpenGroupedSettings(group.Menu.Tree, this.stage, () => {
-			const settings = group.Settings
-			return settings === undefined
-				? [group.Menu.Tree, ...group.Sections]
-				: [group.Menu.Tree, settings.Tree, ...group.Sections]
-		})
+		MenuSDK.OpenElementSettings(group.Menu.Tree, this.stage)
 	}
 
 	public Begin(group: PreviewGroup, event: Event): void {
@@ -85,7 +86,7 @@ export class PreviewDrag {
 				maxY: bounds.y + (maxY - originY) * scaleY
 			},
 			() => [
-				this.barBounds(),
+				...this.hud(),
 				...this.groups()
 					.filter(peer => peer !== group)
 					.map(peer => peer.Canvas.Bounds)
@@ -207,15 +208,6 @@ export class PreviewDrag {
 			}
 		)
 		event.stopPropagation()
-	}
-
-	private barBounds(): MenuSDK.ScreenRect {
-		return {
-			x: this.bar.x,
-			y: this.bar.y,
-			w: this.bar.Width,
-			h: this.bar.Height
-		}
 	}
 
 	private valid(bounds: MenuSDK.ScreenRect): boolean {

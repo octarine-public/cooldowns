@@ -40,6 +40,7 @@
 	"Watchers": "观察者",
 	"Spells": "技能",
 	"Items": "物品",
+	"Dim items on cooldown": "冷却时调暗物品图标",
 	"Shape": "形状",
 	"Creeps": "小兵",
 	"Mode images": "图像模式",
@@ -69,15 +70,15 @@
 	"Debuffs": "负面状态",
 	"Buffs": "增益状态",
 	"Globally": "全局",
-	"Time in minutes": "时间（分钟）",
 	"Show remaining time": "显示剩余时间",
 	"Opacity on hover": "悬停时的不透明度",
-	"Disable by time": "按时间禁用",
 	"Important": "重要",
 	"Important modifiers (stun, silence, shields, etc.)": "重要状态（晕眩、沉默、护盾等）",
 	"Displays cooldowns for spells and items": "显示技能和物品的\n冷却时间",
 	"Scales abilities, items and modifiers\nnear the mouse": "缩放鼠标附近的\n技能、物品和状态",
 	"Opacity abilities, items and modifiers\nnear the mouse": "鼠标附近技能、物品和状态\n的不透明度",
 	"Animation": "动画",
-	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "新的技能、物品或效果平滑地出现在条上，\n而不是瞬间切换：格子淡入并亮起，\n相邻的格子随之滑动"
+	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "新的技能、物品或效果平滑地出现在条上，\n而不是瞬间切换：格子淡入并亮起，\n相邻的格子随之滑动",
+	"No mana brightness": "缺蓝时的亮度",
+	"How bright an icon its owner cannot pay for is drawn:\n0 is the game's own dark wash, 100 keeps the icon\nas bright as it is": "法力不足时图标的亮度：\n0 为游戏原本的暗色，100 保持图标原有亮度"
 }

@@ -127,6 +127,8 @@ declare class Unit extends Entity {
 	public readonly Buffs: Modifier[]
 	public readonly Inventory: Inventory
 	public readonly ModifierManager: UnitModifierManager
+	/** Position history, velocity and the ability version of this unit; updated once per tick. */
+	public readonly Prediction: UnitPrediction
 	public readonly Spells_: number[]
 	public readonly Spells: Nullable<Ability>[]
 	public readonly TotalItems_: number[]
@@ -148,6 +150,10 @@ declare class Unit extends Entity {
 	public get ReplicatingOtherHeroModel(): Nullable<Unit>
 	public get AttackDamageClassType(): AttackDamageType
 	public get AttackDamageAverage(): number
+	/**
+	 * How fast this unit's attack projectile flies, the bonuses its modifiers add counted in.
+	 * A field on the way can still slow it down or hurry it: that is `ProjectileSpeedFactor`.
+	 */
 	public get AttackProjectileSpeed(): number
 	public get BaseAttackTime(): number
 	public get BaseAttackRange(): number
@@ -164,6 +170,11 @@ declare class Unit extends Entity {
 	public get DayVisionRange(): number
 	public get LastDamageTime(): number
 	public get MoveSpeed(): number
+	/**
+	 * Velocity over the last server tick in units per second, derived from networked positions;
+	 * zero while the unit is unseen or has just jumped.
+	 */
+	public get Velocity(): Vector3
 	public get MagicalDamageResist(): number
 	/** @deprecated Use MoveSpeed */
 	public get Speed(): number
@@ -240,6 +251,11 @@ declare class Unit extends Entity {
 	public get HasIntellect(): boolean
 	public get HasNoHealthBar(): boolean
 	public get HasNoCollision(): boolean
+	/**
+	 * Whether ground units have to walk around this one: false for flyers, for units without
+	 * collision, and for dummies such as the announcer.
+	 */
+	public get BlocksPathing(): boolean
 	public get IsBlind(): boolean
 	public get IsTrueSightImmune(): boolean
 	public get IsInFadeTime(): boolean
@@ -260,6 +276,7 @@ declare class Unit extends Entity {
 	public get ManaPercentDecimal(): number
 	public get MinimapIcon(): string
 	public get MinimapIconSize(): number
+	/** The networked unit states plus the ones expected after the local player's own casts (`ExpectState`). */
 	public get UnitStateMask(): bigint
 	public get UnitState(): modifierstate[]
 	public get IsGhost(): boolean
@@ -294,6 +311,26 @@ declare class Unit extends Entity {
 	public get HeroFacet(): string
 	public get IsConvertManaCostToHPCost(): boolean
 	public get IsAvoidTotalDamage(): boolean
+	/** Where the unit is heading on its own account: the point of its last move order. */
+	protected get MovementDestination(): Nullable<Vector3>
+	/** Game time the unit can move again; `now` while nothing holds it. */
+	public get ImmobileUntil(): number
+	/** Game time the unit can be hit again; the moment itself already counts. */
+	public get InvulnerableUntil(): number
+	/** Game time magic damage lands on the unit again. */
+	public get SpellImmuneUntil(): number
+	/** Game time debuffs stick to the unit again: what Black King Bar and its kin grant. */
+	public get DebuffImmuneUntil(): number
+	/**
+	 * The threats that reach this unit within `PredictionTuning.ThreatHorizon` along its
+	 * predicted path and can affect it when they land, earliest first.
+	 */
+	public get Threats(): Threat[]
+	/**
+	 * Game time the next attack animation can begin: after the backswing of the last attack, or
+	 * after the attack in progress lands and its backswing runs.
+	 */
+	public get NextAttackTime(): number
 	public AttackDamageType(target: Unit): DAMAGE_TYPES
 	/**
 	 * @description example: panorama/images/heroes/npc_dota_hero_windrunner_png.vtex_c
@@ -311,6 +348,12 @@ declare class Unit extends Entity {
 	public GetPredictiveArmorModifier(target: Unit): number
 	public GetPiercingArmorModifier(target: Unit): number
 	public GetPhysicalDamageResist(predictiveArmor?: number): number
+	/**
+	 * The unit's own attack damage, before its modifiers. A swing rolls anywhere between the
+	 * minimum and the maximum, so the minimum is the only number a decision that has to hold -
+	 * a last hit, a deny, a kill - can be taken on, and it is what this and every damage method
+	 * here answer when no roll is named.
+	 */
 	public GetAttackDamageBase(damageValue?: ATTACK_DAMAGE_STRENGTH): number
 	public GetAttackDamageBonus(baseDamage?: number, target?: Unit): number
 	public GetEffectiveIncomingDamage(target: Unit, damageType: DAMAGE_TYPES, rawDamage?: number): number
@@ -325,13 +368,30 @@ declare class Unit extends Entity {
 	public HealthBarPosition(useHpBarOffset?: boolean, overridePosition?: Vector3): Nullable<Vector2>
 	public GetAttackRange(target?: Entity, additional?: number, includeHull?: boolean): number
 	public GetDamageBlock(damage: number, damageType: DAMAGE_TYPES, isRaw?: boolean): number
-	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES): number
+	/**
+	 * The physical damage the unit's shields take off a blow before anything else. A melee hero
+	 * blocks the game mode's innate amount on a share of the blows only, so `damageValue` decides
+	 * how much of it counts: all of it for the minimum roll, its chance for the average, none for
+	 * the maximum.
+	 */
+	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES, damageValue?: ATTACK_DAMAGE_STRENGTH): number
 	public GetEffectiveDamageResist(target: Unit, ignoreMagicAttack?: boolean, predictiveArmor?: number): number
 	public GetIncomingAttackDamage(target: Unit, isRaw: boolean): number
 	public GetRawAttackDamage(target: Unit, damageValueType?: ATTACK_DAMAGE_STRENGTH, critMulDamage?: number): number
 	public GetAttackDamageTypeResist(target: Unit, damageType: DAMAGE_TYPES, rawDamageBase: number): number
 	public GetAttackDamagePure(target: Unit, rawDamageBase: number): number
 	public GetAttackDamageMagic(target: Unit, rawDamageBase: number): number
+	/**
+	 * The damage one attack of this unit takes off `target`: the roll `damageValue` names, the
+	 * bonuses its modifiers add, the block the target's shields hold back and the target's armor,
+	 * resistances and amplifications. The roll is the minimum by default, which is what a last
+	 * hit is decided on; the maximum is the other end of the same swing, never what it deals.
+	 * @example
+	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
+	 * if (creep.HealthAt(landsAt, hero) <= hero.GetAttackDamage(creep)) {
+	 * 	hero.AttackTarget(creep)
+	 * }
+	 */
 	public GetAttackDamage(target: Unit, damageValue?: ATTACK_DAMAGE_STRENGTH, overrideRawDamage?: number, damageType?: DAMAGE_TYPES, predictedArmor?: number, canDamageBlockMelee?: boolean): number
 	public GetDamageAmplification(source: Unit, damageType: DAMAGE_TYPES, predictiveArmor?: number, ignoreMagicResist?: boolean, ignoreMagicAttack?: boolean, rawDamage?: number): number
 	public GetDamageSpellEmpower(target: Unit): number
@@ -383,6 +443,11 @@ declare class Unit extends Entity {
 	/** @deprecated */
 	public TurnTime(angle: number, currentTurnRate?: boolean): number
 	public TurnRate(currentTurnRate?: boolean): number
+	/**
+	 * Seconds the unit needs to turn `angle` radians from its heading: to face a path only as
+	 * far as walking needs when `movement`, all the way otherwise.
+	 */
+	public TurnTimeForAngle(angle: number, movement: boolean): number
 	public TurnTimeNew(target: Vector3, movement: boolean, directionalMovement?: boolean, currentTurnRate?: boolean): number
 	public IsInside(vec: Vector3, radius: number): boolean
 	public IsManaEnough(abil: Ability): boolean
@@ -392,6 +457,157 @@ declare class Unit extends Entity {
 	public GetAnimation(activity?: GameActivity, sequenceNum?: number, findBestMatch?: boolean): Nullable<AnimationData>
 	public GetAttachmentPosition(name: string, activity?: GameActivity, sequenceNum?: number, time?: number, pos?: Vector3, ang?: QAngle, scale?: number): Vector3
 	public ExtendUntilWall(start: Vector3, direction: Vector3, distance: number): Vector3
+	/**
+	 * The share of its speed a projectile this unit fires keeps at `position`: Faceless Void's
+	 * Distortion Field takes its share off an enemy attack projectile inside it, his Time Zone
+	 * slows an enemy projectile and hurries his own. 1 where no field reaches the point, which
+	 * is the usual answer.
+	 */
+	public ProjectileSpeedFactor(position: Vector3, isAttack: boolean): number
+	/**
+	 * Seconds a projectile of `source` flying at `speed` from `from` needs to reach this unit
+	 * at `to`, its own position by default. The game moves a projectile once a tick and lands it
+	 * on the first tick from which the rest of the way fits into one more step, so the flight is
+	 * a whole number of ticks and one step shorter than the bare distance reads. A field that
+	 * changes the projectile's speed counts over the chord it cuts out of the way, and holds the
+	 * answer at `Infinity` when it leaves no speed at all.
+	 * @example
+	 * const flight = creep.ProjectileFlightTime(hero, hero.Position, hero.AttackProjectileSpeed)
+	 */
+	public ProjectileFlightTime(source: Unit, from: Vector3, speed: number, isAttack?: boolean, to?: Vector3): number
+	/**
+	 * Seconds a projectile of `source` at `speed`, launched at `from` in `after` seconds, needs
+	 * to reach this unit while it keeps moving: the flight is solved against where this unit
+	 * will be when the projectile arrives, since a projectile follows its target - one walking
+	 * in is reached sooner than the shot was aimed and one walking away later.
+	 * `ProjectileFlightTime` answers the same for a point that does not move.
+	 * @example
+	 * const flight = creep.ProjectileArrivalTime(hero, hero.Position, hero.AttackProjectileSpeed)
+	 */
+	public ProjectileArrivalTime(source: Unit, from: Vector3, speed: number, isAttack?: boolean, after?: number): number
+	/**
+	 * Where this unit is expected to be `delay` seconds from now: exact for a known motion or an
+	 * own move order, walked along the heading around obstacles otherwise.
+	 * @example
+	 * const ahead = enemy.PredictPosition(0.6)
+	 * if (ahead.Confidence >= EMovementConfidence.Straight) { ... }
+	 */
+	public PredictPosition(delay: number, options?: IMovementOptions, out?: MovementPrediction): MovementPrediction
+	/** The route this unit is expected to walk over `duration` seconds, a point every `step` seconds. */
+	public PredictPath(duration: number, step?: number, options?: IMovementOptions): Path
+	/** Every cell this unit can reach within `delay` seconds, the turn it must make first included. */
+	public PredictRegion(delay: number): ReachableRegion
+	/**
+	 * The route this unit would walk to `to`, with its own hull, flight and collision state.
+	 * @example
+	 * const path = hero.FindPath(InputManager.CursorOnWorld)
+	 */
+	public FindPath(to: Vector3, options?: IPathOptions): Nullable<Path>
+	/**
+	 * Seconds of walking along the route to `to` at the current move speed; `Infinity` without a
+	 * route.
+	 */
+	public TimeToReach(to: Vector3, options?: IPathOptions): number
+	/**
+	 * Records that this unit is expected to hold `state` until the game time `until`, as right
+	 * after a disable was cast at it; `UnitStateMask` counts it until the server confirms it or
+	 * the time passes.
+	 * @example
+	 * target.ExpectState(modifierstate.MODIFIER_STATE_STUNNED, GameState.RawGameTime + stun.GetAppliedDuration(target))
+	 */
+	public ExpectState(state: modifierstate, until: number): void
+	/**
+	 * Game time the unit stops being in `state`: the later of the expected state and the
+	 * modifiers observed to bring the networked one; `now` when it is not in the state,
+	 * `Infinity` when nothing with a duration explains it.
+	 */
+	public StateUntil(state: modifierstate): number
+	/** Whether a targeted spell landing at the game time `time` meets a Linken's Sphere or a Lotus Orb. */
+	public SpellBlockAt(time: number): boolean
+	/**
+	 * Health at the game time `time`: the regeneration until then added, the blows on their way
+	 * that land by then taken off, never past the maximum and never below zero. The blows of
+	 * `except` are left out: the unit asking about its own attack does not count it twice.
+	 * Those blows count at the roll `incoming`, the lowest by default, which reads the health
+	 * high while several are on their way; a last hit racing other units wants the average.
+	 * @example
+	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
+	 * const left = creep.HealthAt(landsAt, hero, ATTACK_DAMAGE_STRENGTH.DAMAGE_AVG)
+	 * if (left > 0 && left <= hero.GetAttackDamage(creep)) {
+	 * 	hero.AttackTarget(creep)
+	 * }
+	 */
+	public HealthAt(time: number, except?: Unit, incoming?: ATTACK_DAMAGE_STRENGTH): number
+	/**
+	 * Whether something keeps the unit alive through `damageType` landing at the game time
+	 * `time`: Shallow Grave, Borrowed Time, False Promise, a ready Reincarnation or Aeon Disk,
+	 * Ghost Scepter against physical damage.
+	 */
+	public PreventsDeathAt(time: number, damageType: DAMAGE_TYPES): boolean
+	/**
+	 * Whether `damage` of `damageType` landing at the game time `time` brings the unit down on
+	 * top of the blows already on their way, with nothing keeping it alive then. Those blows
+	 * count at the roll `incoming`, the lowest by default.
+	 */
+	public IsKillableAt(time: number, damage: number, damageType?: DAMAGE_TYPES, attacker?: Unit, incoming?: ATTACK_DAMAGE_STRENGTH): boolean
+	/**
+	 * Plays `abilities` on this unit in order and tells whether they kill it: each cast waits
+	 * for the one before it, lands by its own timeline, spends its mana from the budget of its
+	 * owner by `ManaAt`, takes the shields and barriers once, and the health regenerates until
+	 * every blow lands. An ability on cooldown, out of mana or unable to affect the target by
+	 * then is left out of `Used`.
+	 * @example
+	 * const kill = enemy.SimulateKill([laguna, dragonSlave], { WithAttack: true })
+	 * if (kill.Killable) {
+	 * 	laguna.UseAbility(enemy)
+	 * }
+	 */
+	public SimulateKill(abilities: readonly Ability[], options?: IKillSimulationOptions): IKillSimulation
+	/**
+	 * Whether `response`, cast on this unit now, is done before `threat` lands: a blink, a
+	 * Black King Bar or a cyclone answers a threat only when its cast point and activation fit
+	 * before the impact.
+	 */
+	public CanResolve(threat: Threat, response: Ability): boolean
+	/**
+	 * The closest spot this unit can walk to before the earliest of `threats` lands that no
+	 * threat in the store covers, with the moment the walk has to start; `undefined` when
+	 * there is none in time, or when every threat is bound to this unit and walking answers
+	 * none of them. The
+	 * cells the grid holds as blocked never come up, so the answer does not run into trees or
+	 * cliffs. A spot ahead beats one behind by the time the turn would take, and among spots
+	 * equally near the one needing the smallest turn wins. A spot is taken with half a grid
+	 * cell to spare beyond the threat's edge, the resolution spots are placed at, so a shape
+	 * laid again a tick later does not put it back inside; when no such spot is reachable in
+	 * time, one just past the edge is.
+	 * @example
+	 * const escape = hero.Escape()
+	 * if (escape !== undefined && escape.Due) {
+	 * 	hero.MoveTo(escape.Position)
+	 * }
+	 */
+	public Escape(threats?: readonly Threat[]): Nullable<Escape>
+	/** Mana at the game time `time` by the current regeneration, at most the maximum. */
+	public ManaAt(time: number): number
+	/**
+	 * Game time the unit can move without losing an attack: the attack point of the animation
+	 * it is in, `now` while idle or in backswing.
+	 */
+	public get CanMoveAfterAttackAt(): number
+	/** Seconds the cast point or channel in progress keeps the unit from starting another cast. */
+	public get CastBusyTime(): number
+	/**
+	 * Seconds until this unit's next attack on `target` lands, the way an attack order would
+	 * play out: the attack in progress or the backswing left to wait, input lag for the local
+	 * player's units, walking into range along the grid, turning, the next attack point and, for
+	 * a ranged unit with `includeProjectile`, the projectile's flight to where the target will
+	 * be when it arrives: the projectile follows the target, so a target walking in is reached
+	 * sooner than the shot was aimed and one walking away later, and the flight is solved for
+	 * that rather than aimed at where the target stands when the arrow leaves.
+	 * @example
+	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
+	 */
+	public GetAttackLandingTime(target: Unit, includeProjectile?: boolean): number
 	public GetPredictionPosition(delay?: number, useUntilWall?: boolean, forceMovement?: boolean): Vector3
 	public ChangeFieldsByEvents(): void
 	public UseSmartAbility(ability: Ability, target?: Vector3 | Entity, checkAutoCast?: boolean, checkToggled?: boolean, queue?: boolean, showEffects?: boolean): void

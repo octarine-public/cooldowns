@@ -16,6 +16,7 @@ export class SpellMenu extends BaseMenu {
 	public readonly IsMinimalistic: Menu.Toggle
 	public readonly LevelColor: Menu.ColorPicker
 	public readonly ChargeColor: Menu.ColorPicker
+	public readonly ModePosition: Menu.Dropdown
 
 	public readonly Hero: HeroSettingsMenu
 	public readonly Creep: CreepSettingsMenu
@@ -25,11 +26,17 @@ export class SpellMenu extends BaseMenu {
 	public readonly Familiar: FamiliarSettingsMenu
 	public readonly Pandas: PandasSettingsMenu
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
+	constructor(
+		node: Menu.Node,
+		textStyle: TextStyleMenu,
+		animation: Menu.Toggle,
+		noMana: Menu.Slider
+	) {
 		super({
 			node,
 			textStyle,
 			animation,
+			noMana,
 			defaultSize: 1,
 			nodeName: "Spells",
 			texture: CooldownIcons.Spells
@@ -42,6 +49,7 @@ export class SpellMenu extends BaseMenu {
 		this.LevelColor.IconPath = Menu.Icons.Palette
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
 		this.ChargeColor.IconPath = Menu.Icons.Zap
+		this.ModePosition = this.AddPosition()
 		this.AddStyle()
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Spell)
@@ -63,6 +71,7 @@ export class SpellMenu extends BaseMenu {
 		this.State.OnValue(() => callback())
 		this.Rounding.OnValue(() => callback())
 		this.TeamState.OnValue(() => callback())
+		this.ModePosition.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
 		this.Creep.MenuChanged(callback)

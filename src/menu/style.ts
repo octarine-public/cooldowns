@@ -35,7 +35,7 @@ export class TextStyleMenu {
 		this.Font.IconPath = Menu.Icons.Type
 		this.Size = node.AddSlider(
 			"Text size",
-			80,
+			90,
 			70,
 			150,
 			0,

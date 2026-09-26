@@ -20,8 +20,7 @@ export class PreviewGroup {
 		public readonly Icon: string,
 		public readonly Menu: BaseMenu,
 		private readonly units: readonly (BaseSettingsMenu | undefined)[],
-		private readonly unit: () => number,
-		public readonly Sections: readonly Menu.Node[] = []
+		private readonly unit: () => number
 	) {}
 
 	public get Settings(): Nullable<BaseSettingsMenu> {

@@ -87,6 +87,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		HexOf: color => color,
 		SdfShape: (...values) => ({ decorator: JSON.stringify(values) }),
 		ImageSize: () => new Vector2(64, 64),
+		HostImageReady: () => true,
 		WriteSizedArt(element, source) { element.source = source },
 		ReleaseSizedArt() { released++ },
 		WritePx(element, name, value) { element.style[name] = value },
@@ -100,8 +101,8 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	const abilityData = new Map()
 	const drawableInnates = new Set()
 	const unitData = new Map()
-	const missingArt = new Set()
 	const gameFiles = new Map()
+	const wearables = new Map()
 	const icons = new Proxy({}, { get: (_, name) => String(name) })
 	const context = vm.createContext({
 		React: { Fragment: "fragment", createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() }) },
@@ -116,26 +117,30 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		InputManager: { CursorOnScreen: new Vector2() },
 		AbilityData: { GetAbilityByName: name => abilityData.get(name), ShouldBeDrawable: drawableInnates },
 		ABILITY_TYPES: { ABILITY_TYPE_ATTRIBUTES: 2 },
-		// the wrapper's own resolution: what the ability data says, else the spellicon named after it
-		ImageData: { GetSpellTexture: name => abilityData.get(name)?.TexturePath ?? (name === "" ? "" : `spells/${name}_png.vtex_c`) },
-		// which of those files the game actually ships; a test names the ones it does not
-		fexists: path => !missingArt.has(path),
 		// the host reads the game's own files; a test gives it whichever roster it is examining
 		parseKV: path => gameFiles.get(path) ?? new Map(),
 		// The unit data a joined server hands the script; empty until a test says otherwise.
 		UnitData: { GetUnitDataByName: name => unitData.get(name) ?? (unitModels.has(name) ? { ModelName: unitModels.get(name) } : undefined) },
+		// the SDK reads the econ file; a test names the default items it hands back
+		WearableData: { DefaultWearables: hero => wearables.get(hero) ?? [] },
 		PathData: { ItemImagePath: "items", AbilityImagePath: "spells", HeroIconsPath: "heroes/icons" },
 		TextFlags: { Top: 1, Center: 2, Bottom: 4, Left: 8, Right: 16 },
 		DOTA_ABILITY_BEHAVIOR: { DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES: 1, DOTA_ABILITY_BEHAVIOR_INNATE_UI: 2 },
 		__OCT_PACKAGE_ROOT__: "cooldowns"
 	})
+	// which files the game ships: the package's own are looked up on disk, and the game's are
+	// all there unless a test names the ones it does not
+	const missingArt = new Set()
+	context.fexists = source => source.startsWith("cooldowns/")
+		? fs.existsSync(path.join(__dirname, "..", source.slice("cooldowns/".length)))
+		: !missingArt.has(source)
 	// KeyValues as the host hands them back, built INSIDE the script's realm: a map minted out
 	// here is not an instance of the Map the script tests against
 	const makeMap = vm.runInContext("entries => new Map(entries)", context)
 	const kv = entries => makeMap(Object.entries(entries))
 	// The SDK canvas the preview draws its round modifiers on, keeping every call it takes.
 	const timers = { calls: [] }
-	for (const name of ["Circle", "Image", "Arc", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values]) }
+	for (const name of ["Circle", "Image", "Arc", "CircleTimer", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values]) }
 	const cache = new Map()
 	function load(name) {
 		if (name === "render") return { canvas: {}, surface: {}, previewCanvas: timers }
@@ -175,20 +180,21 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	})
 	const style = { Node: node("Style", root), Size: slider(100, 70, 150), FontFamily: "Roboto", FontWeight: 500, Color: { SelectedColor: Color.White }, Effect: { SelectedID: 2 }, EffectColor: { SelectedColor: Color.Black }, EffectOpacity: slider(100, 0, 100) }
 	const animation = { value: false }
+	const noMana = slider(80, 0, 100)
 	const { BaseMenu } = load("src/menu/base")
-	const group = name => Object.assign(new BaseMenu({ node: root, nodeName: name, textStyle: style, animation, defaultSize: 1, texture: name }), {
+	const group = name => Object.assign(new BaseMenu({ node: root, nodeName: name, textStyle: style, animation, noMana, defaultSize: 1, texture: name }), {
 		Hero: unit("Heroes"), SpiritBear: unit("Bear"), Courier: unit("Courier"), Roshan: unit("Roshan"), Familiar: unit("Familiars"), Pandas: unit("Pandas"), Creep: unit("Creeps")
 	})
-	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, Animation: animation, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
+	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, Animation: animation, NoMana: noMana, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
 	Object.assign(menu.SpellMenu, { IsMinimalistic: { value: false }, LevelColor: { SelectedColor: Color.Yellow }, ChargeColor: { SelectedColor: Color.Green } })
-	Object.assign(menu.ItemMenu, { SquareMode: { SelectedID: 0 } })
+	Object.assign(menu.ItemMenu, { SquareMode: { SelectedID: 0 }, DimOnCooldown: { value: false } })
 	Object.assign(menu.ModifierMenu, { Remaining: { value: true }, ModeImage: { SelectedID: 0 }, ModePosition: { SelectedID: 1 } })
 	for (const key of ["Important", "Buffs", "Debuffs", "Auras"]) menu.ModifierMenu[key] = { Tree: node(key), State: { value: true }, TeamState: team() }
 	menu.SpellMenu.Hero.PositionY.value = -6
 	menu.ItemMenu.Hero.PositionY.value = -32
 	menu.ModifierMenu.Hero.PositionY.value = 19
 	const { PreviewController } = load("src/preview/controller")
-	seed?.({ gameFiles, kv })
+	seed?.({ gameFiles, kv, wearables })
 	const preview = new PreviewController(menu)
 	Object.assign(preview.Frame, { x: 40, y: 60, w: 300 * gameScale, h: 450 * gameScale })
 	const roots = preview.Groups.map(group => { const element = makeElement(); group.Canvas.Ref(element); group.AreaRef(makeElement()); return element })
@@ -200,7 +206,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	preview.Guides.Ref(guidesRoot)
 	const tick = visible => preview.Tick(visible, preview.Frame.w, preview.Frame.h)
 	const event = data => ({ data, stopPropagation() {} })
-	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, abilityData, drawableInnates, unitData, missingArt, gameFiles, kv, timers,
+	return { preview, menu, sdk, input, roots, guidesRoot, silenceRoot, makeElement, tick, event, load, unitModels, abilityData, drawableInnates, unitData, missingArt, gameFiles, kv, timers, context,
 		move: (x, y) => move(x, y), release: () => sdk.EndDrag(),
 		opened: () => opened, released: () => released,
 		page: value => { activePage = value }, time: value => { now = value }
@@ -279,8 +285,8 @@ test("drag translates screen pixels and crosses preview edges within saved offse
 	r.preview.Drag.Begin(group, r.event({ button: 0, screenX: 200, screenY: 230 }))
 	assert.equal(r.sdk.PreviewMotion.value, false)
 	// Move away from alignment targets to verify the underlying pixel conversion.
-	r.move(115, 205)
-	assert.equal(group.Settings.PositionX.value, origin + 20)
+	r.move(135, 205)
+	assert.equal(group.Settings.PositionX.value, origin + 47)
 	assert.equal(group.Settings.PositionY.value, 114)
 	r.move(10000, 10000)
 	r.tick(true)
@@ -557,11 +563,12 @@ test("unit and team changes edit the right settings and preserve other teams", (
 	assert.equal(r.preview.Groups[2].Settings, undefined)
 })
 
-test("modifier popup includes category and unit settings and filters samples live", () => {
+test("modifier popup opens the element's own card and filters samples live", () => {
 	const r = runtime()
 	const group = r.preview.Groups[2]
 	r.preview.Drag.Configure(group)
-	assert.equal(r.opened().sections().length, 6)
+	assert.equal(r.opened().node, r.menu.ModifierMenu.Tree)
+	assert.equal(r.opened().sections, undefined)
 	r.tick(true)
 	const width = group.Canvas.Bounds.w
 	r.menu.ModifierMenu.Buffs.State.value = false
@@ -603,13 +610,386 @@ test("hero preview renders six distinct items and keeps all six when changing sh
 	assert.equal(sources().length, 6)
 })
 
+// A Source 2 resource with a DATA header and the full mip after the resource blocks.
+function iconTexture(format, pixels, width = 4, height = 4) {
+	const bytes = Buffer.alloc(68 + pixels.length)
+	bytes.writeUInt32LE(68, 0)
+	bytes.writeUInt32LE(8, 8)
+	bytes.writeUInt32LE(1, 12)
+	bytes.write("DATA", 16)
+	bytes.writeUInt32LE(8, 20)
+	bytes.writeUInt32LE(40, 24)
+	bytes.writeUInt16LE(width, 48)
+	bytes.writeUInt16LE(height, 50)
+	bytes[54] = format
+	bytes[55] = 1
+	pixels.copy(bytes, 68)
+	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+}
+
+function previewImages(r) {
+	const minted = [], freed = [], reads = []
+	const files = new Map()
+	// a file handed to the host is one the game ships, as far as the loader can tell
+	const bundled = r.context.fexists
+	r.context.fexists = source => files.has(source) || bundled(source)
+	r.context.fread = source => {
+		reads.push(source)
+		return files.get(source)
+	}
+	r.context.RegisterImageBlob = bytes => {
+		minted.push(Buffer.from(bytes))
+		return `octarine://preview/${minted.length}`
+	}
+	r.context.FreeImageBlob = source => freed.push(source)
+	return { files, minted, freed, reads, art: r.load("src/preview/art") }
+}
+
+test("every bundled preview PNG decodes with its original colours and alpha", () => {
+	const r = runtime()
+	const { DecodePngGray } = r.load("src/gui/png")
+	const directory = path.join(__dirname, "../scripts_files/cooldowns/preview/art")
+	for (const name of fs.readdirSync(directory)) {
+		if (!name.endsWith(".png")) continue
+		const bytes = fs.readFileSync(path.join(directory, name))
+		const image = DecodePngGray(bytes, 0, bytes.length, true)
+		assert.ok(image?.rgba, name)
+		assert.equal(image.width, bytes.readUInt32BE(16), name)
+		assert.equal(image.height, bytes.readUInt32BE(20), name)
+		assert.ok(image.rgba.some((channel, index) => index % 4 === 3 && channel > 0), name)
+		const colours = new Set(Array.from({ length: image.width * image.height }, (_, pixel) =>
+			image.rgba.slice(pixel * 4, pixel * 4 + 3).join(",")))
+		assert.ok(colours.size > 1, `${name} must not be a flat tile`)
+	}
+})
+
+test("full-colour texture decoding preserves DXT colours and alpha without changing gray-only decoding", () => {
+	const r = runtime()
+	const { DecodeTexture, EncodeRgbaPng } = r.load("src/gui/gray")
+	const pixels = Buffer.alloc(16)
+	pixels[0] = 127
+	pixels.writeUInt16LE(0xf800, 8) // All texels select the first, red endpoint.
+	const texture = iconTexture(2, pixels)
+	const image = DecodeTexture(texture, true)
+	assert.deepEqual([...image.rgba.slice(0, 4)], [255, 0, 0, 127])
+	assert.ok(image.luma.every(value => value === 54))
+	assert.equal(DecodeTexture(texture).rgba, undefined)
+	const png = Buffer.from(EncodeRgbaPng(image.width, image.height, image.rgba))
+	const length = png.readUInt32BE(33)
+	const raw = require("node:zlib").inflateSync(png.subarray(41, 41 + length))
+	assert.deepEqual([...raw.subarray(1, 5)], [255, 0, 0, 127])
+	assert.equal(raw.length, (1 + 4 * 4) * 4)
+})
+
+test("preview decodes unbundled hero art from the full mip and respects texture aliases", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	r.context.AbilityData.GetAbilityByName = name => name === "hero_spell"
+		? { TexturePath: "spells/renamed_spell_png.vtex_c" } : undefined
+	const pixels = Buffer.alloc(64)
+	for (let at = 0; at < pixels.length; at += 4) pixels.set([25, 80, 190, 255], at)
+	io.files.set("spells/renamed_spell_png.vtex_c", iconTexture(4, pixels))
+	assert.equal(io.art.PreviewArt("hero_spell"), "octarine://preview/1")
+	assert.equal(io.art.PreviewTexture("hero_spell"), "spells/renamed_spell_png.vtex_c")
+	const { DecodePngGray } = r.load("src/gui/png")
+	const png = io.minted[0]
+	assert.deepEqual([...DecodePngGray(png, 0, png.length, true).rgba.slice(0, 4)], [25, 80, 190, 255])
+	const reads = io.reads.length
+	assert.equal(io.art.PreviewArt("hero_spell"), "octarine://preview/1")
+	assert.equal(io.reads.length, reads)
+})
+
+test("new PNG-backed hero textures are decoded without depending on a bundled ability file", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	const png = fs.readFileSync(path.join(__dirname, "../scripts_files/cooldowns/preview/art/void_spirit_aether_remnant.png"))
+	const width = png.readUInt32BE(16), height = png.readUInt32BE(20)
+	io.files.set("spells/largo_catchy_lick_png.vtex_c", iconTexture(16, png, width, height))
+	assert.equal(io.art.PreviewArt("largo_catchy_lick"), "octarine://preview/1")
+	const { DecodePngGray } = r.load("src/gui/png")
+	const original = DecodePngGray(png, 0, png.length, true)
+	assert.deepEqual([...DecodePngGray(io.minted[0], 0, io.minted[0].length, true).rgba], [...original.rgba])
+})
+
+test("item art waits for decoding, then replaces the placeholder without another read or registration", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	const png = fs.readFileSync(path.join(__dirname, "../scripts_files/cooldowns/preview/art/blink.png"))
+	io.files.set("cooldowns/scripts_files/cooldowns/preview/art/blink.png", png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength))
+	r.sdk.HostImageReady = () => false
+	assert.match(io.art.PreviewArt("item_blink"), /\/missing\.png$/)
+	assert.match(io.art.PreviewArt("item_blink"), /\/missing\.png$/)
+	assert.equal(io.reads.length, 1)
+	r.sdk.HostImageReady = () => true
+	assert.equal(io.art.PreviewArt("item_blink"), "octarine://preview/1")
+	assert.equal(io.minted.length, 1)
+	assert.equal(io.freed.length, 0)
+})
+
+test("missing or damaged art retries later and cannot poison the icon cache", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	io.files.set("cooldowns/scripts_files/cooldowns/preview/art/blink.png", new ArrayBuffer(12))
+	assert.match(io.art.PreviewArt("item_blink"), /\/missing\.png$/)
+	const reads = io.reads.length
+	assert.match(io.art.PreviewArt("item_blink"), /\/missing\.png$/)
+	assert.equal(io.reads.length, reads)
+	io.files.set("items/blink_png.vtex_c", iconTexture(4, Buffer.alloc(64, 255)))
+	r.time(7)
+	assert.equal(io.art.PreviewArt("item_blink"), "octarine://preview/1")
+})
+
+test("empty metadata and transparent textures cannot become permanent blank icons", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	r.context.AbilityData.GetAbilityByName = () => ({ TexturePath: "spells/empty_png.vtex_c" })
+	assert.equal(io.art.PreviewTexture("new_spell"), "spells/new_spell_png.vtex_c")
+	io.files.set("spells/new_spell_png.vtex_c", iconTexture(4, Buffer.alloc(64)))
+	assert.match(io.art.PreviewArt("new_spell"), /\/missing\.png$/)
+	assert.equal(io.minted.length, 0)
+	io.files.set("spells/new_spell_png.vtex_c", iconTexture(4, Buffer.alloc(64, 255)))
+	r.time(7)
+	assert.equal(io.art.PreviewArt("new_spell"), "octarine://preview/1")
+})
+
+test("a spell the game ships no art for stands as its empty icon, and the files are asked once", () => {
+	const r = runtime()
+	// an ability whose icon is not the file its name spells: only the game's data knows, and it
+	// is asked through that data rather than through an ability on the field, of which the card
+	// has none
+	r.context.AbilityData.GetAbilityByName = name => name === "largo_frogstomp"
+		? { TexturePath: "spells/largo_stomp_png.vtex_c" } : undefined
+	// and one the game ships no art for at all, which stands as its empty icon rather than as a
+	// path to nothing, drawn as a white box
+	r.missingArt.add("spells/largo_encore_png.vtex_c")
+	const asked = []
+	const shipped = r.context.fexists
+	r.context.fexists = source => {
+		asked.push(source)
+		return shipped(source)
+	}
+	r.tick(true)
+	const art = r.roots[0].children
+		.flatMap(child => child.children.map(piece => piece.source))
+		.filter(source => typeof source === "string" && source.startsWith("spells/"))
+	assert.deepEqual(art, [
+		"spells/largo_catchy_lick_png.vtex_c",
+		"spells/largo_stomp_png.vtex_c",
+		"spells/largo_croak_of_genius_png.vtex_c",
+		"spells/empty_png.vtex_c"
+	])
+	// an asset does not come and go while the game runs: each file is asked about once
+	const once = asked.length
+	r.tick(true)
+	r.tick(true)
+	assert.equal(asked.length, once)
+})
+
+test("a stuck generated image is released and retried, and switching heroes bounds the cache", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	const texture = iconTexture(4, Buffer.alloc(64, 255))
+	r.context.fread = source => source.endsWith(".vtex_c") ? texture : undefined
+	r.sdk.HostImageReady = () => false
+	assert.match(io.art.PreviewArt("first"), /\/missing\.png$/)
+	r.time(7)
+	r.sdk.HostImageReady = source => source !== "octarine://preview/1"
+	assert.equal(io.art.PreviewArt("first"), "octarine://preview/2")
+	assert.deepEqual(io.freed, ["octarine://preview/1"])
+	for (let index = 0; index < 140; index++) io.art.PreviewArt(`hero_${index}`)
+	assert.equal(io.minted.length - io.freed.length, 128)
+})
+
+test("gray art is not put on an image element before the host has decoded it", () => {
+	const r = runtime()
+	const { HudCanvas } = r.load("src/gui/canvas")
+	r.load("src/gui/gray").WashCopy = () => "octarine://pending-wash"
+	const canvas = new HudCanvas()
+	const root = r.makeElement()
+	canvas.Ref(root)
+	root.ownerDocument.createElement = tag => ({ tagName: tag, ownerDocument: root.ownerDocument, style: {}, children: [],
+		appendChild(child) { this.children.push(child) }, setAttribute(name, value) { this[name] = value } })
+	const draw = () => {
+		canvas.Begin()
+		canvas.Image("original.png", new Vector2(), new Vector2(20, 20), { wash: { mid: Color.White, top: Color.White } })
+		canvas.End()
+	}
+	r.sdk.HostImageReady = () => false
+	draw()
+	const [art, gray] = root.children[0].children
+	assert.equal(art.shown, true)
+	assert.equal(gray.shown, false)
+	assert.equal(gray.src, undefined)
+	r.sdk.HostImageReady = () => true
+	draw()
+	assert.equal(art.shown, false)
+	assert.equal(gray.shown, true)
+	assert.equal(gray.src, "octarine://pending-wash")
+})
+
+test("hosts without image blobs keep the geometry clip without a composited shader mask", () => {
+	const r = runtime(2)
+	const { HudCanvas } = r.load("src/gui/canvas")
+	const canvas = new HudCanvas()
+	const root = r.makeElement()
+	canvas.Ref(root)
+	r.sdk.ImageSize = () => new Vector2(88, 64)
+	const draw = (position, size, style) => {
+		canvas.Begin()
+		canvas.Image("blink.png", position, size, style)
+		canvas.End()
+	}
+	draw(new Vector2(12, 20), new Vector2(44, 32), { radius: 12 })
+	const box = root.children[0], art = box.children[0]
+	assert.equal(box.style["mask-image"], "none")
+	assert.equal(box.style["border-radius"], 12)
+	assert.equal(box.style.overflow, "hidden")
+	assert.equal(box.style.clip, "always")
+	assert.equal(art.source, "blink.png")
+	assert.equal(art.shown, true)
+	// Switching shape and moving the same slot keeps the image and crops its centre.
+	draw(new Vector2(25, 34), new Vector2(32, 32), { circle: true })
+	assert.equal(root.children[0], box)
+	assert.equal(box.style["mask-image"], "none")
+	assert.equal(box.style["border-radius"], 16)
+	assert.equal(art.style.left, -6)
+	assert.equal(art.style.width, 44)
+	assert.equal(art.shown, true)
+	draw(new Vector2(25, 34), new Vector2(44, 32), { radius: 0 })
+	assert.equal(box.style["border-radius"], 0)
+	assert.equal(art.style.left, 0)
+	assert.equal(art.source, "blink.png")
+})
+
+test("rounded alpha is smooth and symmetric at icon sizes while square pixels stay unchanged", () => {
+	const r = runtime()
+	const { RoundedPixels } = r.load("src/gui/rounded")
+	for (const [width, height, radius] of [[20, 20, 10], [44, 32, 15.5], [17, 17, 4.25]]) {
+		const rgba = new Uint8Array(width * height * 4).fill(255)
+		const image = { width, height, rgba }
+		const rounded = RoundedPixels(image, width, height, radius)
+		const alpha = (x, y) => rounded[(y * width + x) * 4 + 3]
+		assert.equal(alpha(0, 0), 0)
+		assert.equal(alpha(Math.floor(width / 2), Math.floor(height / 2)), 255)
+		assert.ok(rounded.some((value, index) => index % 4 === 3 && value > 0 && value < 255))
+		for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+			assert.equal(alpha(x, y), alpha(width - 1 - x, y))
+			assert.equal(alpha(x, y), alpha(x, height - 1 - y))
+		}
+		assert.deepEqual([...RoundedPixels(image, width, height, 0)], [...rgba])
+	}
+})
+
+test("rounded copies centre-crop items and filter transparency without dark or coloured fringes", () => {
+	const r = runtime()
+	const { RoundedPixels } = r.load("src/gui/rounded")
+	const rgba = new Uint8Array(8 * 4 * 4)
+	for (let y = 0; y < 4; y++) for (let x = 0; x < 8; x++) rgba.set([x * 30, 60, 90, 255], (y * 8 + x) * 4)
+	const cropped = RoundedPixels({ width: 8, height: 4, rgba }, 4, 4, 0)
+	assert.deepEqual([cropped[0], cropped[4], cropped[8], cropped[12]], [60, 90, 120, 150])
+	const transparent = { width: 2, height: 1, rgba: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 0]) }
+	// Same aspect ratio so the whole source participates in one output pixel's area.
+	const wide = { width: 2, height: 2, rgba: new Uint8Array([...transparent.rgba, ...transparent.rgba]) }
+	assert.deepEqual([...RoundedPixels(wide, 1, 1, 0)], [255, 0, 0, 128])
+})
+
+test("preview renders ready antialiased pixels without cutting them again, including the mana wash", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	const png = fs.readFileSync(path.join(__dirname, "../scripts_files/cooldowns/preview/art/blink.png"))
+	io.files.set("cooldowns/scripts_files/cooldowns/preview/art/blink.png", png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength))
+	const original = io.art.PreviewArt("item_blink")
+	const { HudCanvas } = r.load("src/gui/canvas")
+	const { DecodePngGray } = r.load("src/gui/png")
+	const canvas = new HudCanvas(), root = r.makeElement()
+	canvas.Ref(root)
+	const draw = wash => {
+		canvas.Begin()
+		canvas.Image(original, new Vector2(50, 80), new Vector2(32, 32), { radius: 12, wash })
+		canvas.End()
+	}
+	r.sdk.HostImageReady = source => source === original
+	draw()
+	const box = root.children[0], art = box.children[0]
+	assert.equal(art.source, original)
+	assert.equal(art.shown, true)
+	r.sdk.HostImageReady = () => true
+	draw()
+	assert.equal(io.minted.length, 2)
+	assert.equal(art.source, "octarine://preview/2")
+	assert.equal(box.style["mask-image"], "none")
+	assert.equal(box.style["border-radius"], 0)
+	assert.equal(art.style.left, 0)
+	assert.equal(art.style.width, 32)
+	const decoded = DecodePngGray(io.minted[1], 0, io.minted[1].length, true)
+	assert.ok(decoded.alpha.some(a => a > 0 && a < 255))
+	const wash = { mid: new Color(96, 149, 253), top: new Color(200, 222, 255) }
+	draw(wash)
+	assert.equal(art.source, "octarine://preview/3")
+	assert.equal(box.style["border-radius"], 0)
+	assert.equal(art.style["image-color"], "rgba(255,255,255,255)")
+	const washed = DecodePngGray(io.minted[2], 0, io.minted[2].length, true)
+	assert.deepEqual([...washed.alpha], [...decoded.alpha])
+	assert.notDeepEqual([...washed.rgba], [...decoded.rgba])
+	for (let frame = 0; frame < 60; frame++) draw(wash)
+	assert.equal(io.minted.length, 3)
+	assert.equal(io.reads.length, 1)
+})
+
+test("rounded copies retry failed uploads, follow size and radius changes, and release with the original", () => {
+	const r = runtime()
+	const io = previewImages(r)
+	const rounded = r.load("src/gui/rounded")
+	const path = "octarine://original"
+	rounded.RememberArtPixels(path, { width: 4, height: 4, rgba: new Uint8Array(64).fill(255) })
+	const register = r.context.RegisterImageBlob
+	r.context.RegisterImageBlob = () => ""
+	assert.equal(rounded.RoundedArt(path, 20, 20, 10), undefined)
+	r.context.RegisterImageBlob = register
+	rounded.OpenRoundedFrame()
+	assert.equal(rounded.RoundedArt(path, 20, 20, 10), undefined)
+	r.time(7)
+	assert.equal(rounded.RoundedArt(path, 20, 20, 10), "octarine://preview/1")
+	assert.equal(rounded.RoundedArt(path, 20, 20, 10), "octarine://preview/1")
+	assert.equal(rounded.RoundedArt(path, 20, 20, 5), "octarine://preview/2")
+	// Work on another size is deferred to the next frame, retaining the visible original.
+	assert.equal(rounded.RoundedArt(path, 32, 32, 5), undefined)
+	rounded.OpenRoundedFrame()
+	assert.equal(rounded.RoundedArt(path, 32, 32, 5), "octarine://preview/3")
+	rounded.ForgetArtPixels(path)
+	assert.deepEqual(io.freed, ["octarine://preview/1", "octarine://preview/2", "octarine://preview/3"])
+})
+
+test("preview redraws keep loaded item and spell images outside the mask compositor", () => {
+	const r = runtime()
+	r.menu.Animation.value = true
+	r.menu.ItemMenu.Rounding.value = r.menu.SpellMenu.Rounding.value = 10
+	r.menu.ItemMenu.DimOnCooldown.value = true
+	let checked = 0
+	// Cross cooldown changes, item removal/reentry, movement and the square-item toggle.
+	for (let frame = 0; frame < 480; frame++) {
+		r.time(1 + frame / 30)
+		r.menu.ItemMenu.SquareMode.SelectedID = frame < 240 ? 0 : 1
+		r.tick(true)
+		for (const root of r.roots.slice(0, 2)) {
+			for (const box of root.children.filter(child => child.shown && child.children.some(art => art.source))) {
+				assert.equal(box.style["mask-image"], "none")
+				assert.ok(box.style["border-radius"] > 0)
+				assert.ok(box.children.some(art => art.shown && art.source))
+				checked++
+			}
+		}
+	}
+	assert.ok(checked > 4000)
+})
+
 test("snapping finds stage centres, peer centres and edges, with a DPI-scaled threshold", () => {
 	const r = runtime(2)
 	const { SnapPreview } = r.load("src/preview/snap")
 	const stage = { x: 40, y: 60, w: 500, h: 500 }
 	const limits = { minX: 0, maxX: 450, minY: 0, maxY: 460 }
 	const snap = (bounds, peers = []) => SnapPreview(bounds, stage, peers, limits)
-	const centered = snap({ x: 215, y: 240, w: 50, h: 40 })
+	const centered = snap({ x: 218, y: 237, w: 50, h: 40 })
 	assert.equal(centered.x, 225)
 	assert.equal(centered.y, 230)
 	assert.ok(centered.guides.some(line => line.x1 === 250 && line.x2 === 250))
@@ -663,7 +1043,7 @@ test("dragging snaps a row to the HP bar and releases the guides and outline", (
 	const count = r.guidesRoot.children.length
 	r.tick(true)
 	assert.equal(r.guidesRoot.children.length, count)
-	r.move(115, 205)
+	r.move(135, 205)
 	r.tick(true)
 	assert.equal(r.preview.Drag.Guides.length, 0)
 	assert.ok(r.guidesRoot.children.every(line => !line.shown))
@@ -773,7 +1153,7 @@ test("the stage stands the unit the picker names, and the creep of the side it i
 test("the hero picker offers the game's own roster and dresses the one it is set to", () => {
 	// the roster is read as the menu is built, so the files are there before it: the option that
 	// was picked last time has to be in the list for the setting to come back to it
-	const r = runtime(1, 1, ({ gameFiles, kv }) => {
+	const r = runtime(1, 1, ({ gameFiles, kv, wearables }) => {
 		// npc_heroes.txt is a list of #base includes; the host follows them, so one read is the roster
 		gameFiles.set(
 			"scripts/npc/npc_heroes.txt",
@@ -808,33 +1188,7 @@ test("the hero picker offers the game's own roster and dresses the one it is set
 				})
 			})
 		)
-		gameFiles.set(
-			"scripts/items/items_game.txt",
-			kv({
-				items_game: kv({
-					items: kv({
-						1: kv({
-							prefab: "default_item",
-							model_player: "models/heroes/axe/axe_weapon.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						}),
-						// a cosmetic somebody bought is not part of how the hero looks
-						2: kv({
-							prefab: "wearable_item",
-							model_player: "models/items/axe/carnival.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						}),
-						// nor is the set of a persona, which is a different body wearing his name
-						3: kv({
-							prefab: "default_item",
-							item_slot: "weapon_persona_1",
-							model_player: "models/heroes/axe_persona/axe_persona_weapon.vmdl",
-							used_by_heroes: kv({ npc_dota_hero_axe: "1" })
-						})
-					})
-				})
-			})
-		)
+		wearables.set("npc_dota_hero_axe", ["models/heroes/axe/axe_weapon.vmdl"])
 	})
 	// every hero the game lets you pick, by the name it writes down, each carrying its own face
 	assert.deepEqual([...r.preview.Hero.values], ["Axe", "Largo"])
@@ -938,25 +1292,6 @@ test("the hero's slots are the game's own list of them wherever it has read one"
 	assert.equal(art.length, 4)
 })
 
-test("sample spells take their icons from the game's own ability data", () => {
-	const r = runtime()
-	// an ability whose icon is not the file its name spells: only the game knows, and it is asked
-	// through its data rather than through an ability on the field, of which the card has none
-	r.abilityData.set("largo_frogstomp", { TexturePath: "spells/largo_stomp_png.vtex_c" })
-	// and one the game ships no art for at all, which stands as its empty icon rather than a blank
-	r.missingArt.add("spells/largo_encore_png.vtex_c")
-	r.tick(true)
-	const art = r.roots[0].children
-		.filter(child => child.shown)
-		.flatMap(child => child.children.map(piece => piece.source).filter(Boolean))
-	assert.deepEqual(art, [
-		"spells/largo_catchy_lick_png.vtex_c",
-		"spells/largo_stomp_png.vtex_c",
-		"spells/largo_croak_of_genius_png.vtex_c",
-		"spells/empty_png.vtex_c"
-	])
-})
-
 test("the hero picker is the hero row's own, and is put away with it", () => {
 	const r = runtime()
 	assert.equal(r.preview.Hero.IsVisible, true)
@@ -997,42 +1332,44 @@ test("the hero wears his default items and nothing else on the stage does", () =
 		assert.deepEqual([...r.preview.Wearables()], [])
 	}
 })
-test("round modifiers are timers on the menu canvas whose ring drains clockwise to twelve o'clock", () => {
+test("round modifiers use the teleport timer with shadows and item-sized readings", () => {
 	const r = runtime()
 	r.menu.ModifierMenu.ModeImage.SelectedID = 1
 	r.tick(true)
 	const group = r.preview.Groups[2]
 	assert.ok(group.Canvas.Bounds.w > 0)
 	const calls = r.timers.calls
-	const images = calls.filter(([name]) => name === "Image")
-	const arcs = calls.filter(([name]) => name === "Arc")
+	const timers = calls.filter(([name]) => name === "CircleTimer")
 	const readings = calls.filter(([name]) => name === "TextIn").map(call => call[1])
-	assert.equal(images.length, 4)
-	assert.equal(arcs.length, 4)
+	assert.equal(timers.length, 4)
 	// Each icon is a disc at the preview's frame plus its place on the stage, its reading over it.
-	for (const [, , at, extent, style] of images) {
-		assert.equal(style.circle, true)
+	for (const [, at, size, style] of timers) {
+		assert.ok(style.texture)
 		assert.ok(at.x >= r.preview.Frame.x + group.Canvas.Bounds.x)
 		assert.ok(at.y >= r.preview.Frame.y + group.Canvas.Bounds.y)
-		assert.equal(extent.x, extent.y)
+		assert.equal(style.shadow, Math.max(Math.round(size * 0.1), 2))
+		assert.equal(style.innerShadow, false)
+		assert.equal(style.ringWidth, Math.max(Math.round(size * 0.08), 1))
+		assert.ok(style.opacity > 0 && style.opacity <= 1)
+		assert.equal(style.color.a, 255)
 	}
 	assert.deepEqual(readings.filter(text => text.endsWith(".0")).sort(), ["4.0", "5.0", "6.0", "7.0"])
-	// The ring lies on the rim, a twelfth of the icon wide, and ends at twelve o'clock: what is
-	// left of the modifier runs back from there, so its start comes round clockwise as time passes.
-	const size = images[0][3].x
-	const band = Math.max(Math.round(size * 0.08), 1)
-	for (const [, , radius, thickness, start, sweep] of arcs) {
-		assert.equal(thickness, band)
-		assert.equal(radius, (size - band) / 2)
-		assert.equal(start + sweep, -90)
+	const size = timers[0][2]
+	const textStyle = r.menu.ModifierMenu.TextStyle
+	for (const [, text, , style] of calls.filter(([name]) => name === "TextIn")) {
+		const cooldown = text.includes(".")
+		const minimum = !cooldown && r.menu.ModifierMenu.Size.value === 0 ? 100 : 70
+		const scale = Math.max(textStyle.Size.value, minimum) / 100
+		assert.equal(style.size, Math.round((size / (cooldown ? 2 : 2.75) + 4) * scale))
+		assert.equal(style.weight, textStyle.FontWeight)
+		assert.equal(style.family, textStyle.FontFamily)
 	}
-	assert.deepEqual(arcs.map(arc => arc[5]).sort((a, b) => a - b), [180, 225, 270, 315])
+	assert.deepEqual(timers.map(timer => timer[3].progress).sort((a, b) => a - b), [0.5, 0.625, 0.75, 0.875])
 	r.time(3)
 	calls.length = 0
 	r.tick(true)
-	const later = calls.filter(([name]) => name === "Arc")
-	assert.deepEqual(later.map(arc => arc[5]).sort((a, b) => a - b), [90, 135, 180, 225])
-	assert.ok(later.every(arc => arc[4] + arc[5] === -90))
+	const later = calls.filter(([name]) => name === "CircleTimer")
+	assert.deepEqual(later.map(timer => timer[3].progress).sort((a, b) => a - b), [0.25, 0.375, 0.5, 0.625])
 	// Nothing of it lands on the group's own surface but the room it takes, which frames the drag area.
 	assert.ok(r.roots[2].children.every(child => !child.shown))
 })
@@ -1053,7 +1390,7 @@ test("square modifiers wear the ring's band as a frame inside the icon, draining
 		// A plain fill in the buff's or debuff's colour, as wide as the ring, and nothing around the icon.
 		assert.equal(strip.shape[2], 0)
 		assert.equal(strip.shape[7], 100)
-		assert.match(strip.shape[1], /^rgba\((255,0,0|0,255,0),/)
+		assert.match(strip.shape[1], /^rgba\((242,82,87|82,224,82),/)
 		assert.equal(Math.min(strip.w, strip.h), band)
 		assert.ok(icons.some(icon => within(strip, icon)))
 	}
@@ -1100,50 +1437,56 @@ test("square frames never paint over themselves as the modifiers run down", () =
 	}
 })
 
-test("with the animation on, a returning sample fades in wearing the accent ring while its neighbours glide", () => {
+test("with the animation on, an item returning fades in and is rung in while the modifiers stand still", () => {
 	const r = runtime()
 	r.menu.Animation.value = true
 	const root = r.roots[2]
 	const icons = () => root.children.filter(child => child.shown && child.children.some(art => art.source))
-	const icon = name => icons().find(child => child.children.some(art => art.source.endsWith(`/${name}.png`)))
+	const icon = name => icons().find(child => child.children.some(art => art.source?.endsWith(`/${name}.png`)))
 	const opacity = child => Number(child.children[0].style["image-color"].split(",").pop().slice(0, -1))
-	const rung = () => root.children.some(child => child.shown && child.style.decorator !== undefined && child.style.decorator.includes("rgba(94,160,255"))
+	const ringing = node => node.children.some(child => child.shown && child.style.decorator !== undefined && child.style.decorator.includes("rgba(94,160,255"))
+	// The modifier strip has no motion at all: a cell is whole in its own lane the frame it
+	// lands, and the row closes up the frame one ends. Only the item strip animates.
+	const rung = () => ringing(root)
+	const itemRung = () => ringing(r.roots[1])
 	const items = () => r.roots[1].children.filter(child => child.shown && child.children.some(art => art.source)).length
-	// A strip opening cold cascades in over a few frames, and nothing of it rings.
+	// A strip opening cold stands whole at once, at full opacity and unrung, while the items cascade.
 	r.time(1.5)
 	r.tick(true)
-	assert.equal(icons().length, 0)
+	assert.equal(icons().length, 4)
+	assert.ok(opacity(icon("crystal_maiden_frostbite")) > 254)
+	assert.equal(rung(), false)
 	r.time(1.7)
 	r.tick(true)
-	assert.equal(icons().length, 4)
-	assert.ok(opacity(icon("crystal_maiden_frostbite")) < 250)
-	assert.equal(rung(), false)
 	assert.equal(items(), 6)
-	// The stage takes the last modifier away for a while, and the rest close up over it.
+	// The stage takes the last modifier away for a while, and the rest close up over it at once.
 	r.time(2.5)
 	r.tick(true)
 	assert.equal(icons().length, 3)
 	assert.equal(icon("shivas_guard"), undefined)
-	r.time(2.8)
-	r.tick(true)
 	const closed = icon("crystal_maiden_frostbite").style.left
-	// It comes back as news: faded in and rung in, its neighbours part-way back to their lanes.
+	// It is back whole the frame it lands, and its neighbours are already in their lanes.
 	r.time(3.2)
 	r.tick(true)
-	r.time(3.25)
-	r.tick(true)
 	assert.equal(icons().length, 4)
-	assert.ok(opacity(icon("shivas_guard")) < 250)
-	assert.equal(rung(), true)
-	const gliding = icon("crystal_maiden_frostbite").style.left
-	r.time(4.5)
-	r.tick(true)
 	assert.ok(opacity(icon("shivas_guard")) > 254)
 	assert.equal(rung(), false)
 	const settled = icon("crystal_maiden_frostbite").style.left
-	assert.ok(settled < gliding && gliding < closed)
+	assert.ok(settled < closed)
+	r.time(4.5)
+	r.tick(true)
+	assert.equal(icon("crystal_maiden_frostbite").style.left, settled)
 	// The items cycle half a turn off the modifiers, so the two never leave together.
 	assert.equal(items(), 5)
+	assert.equal(itemRung(), false)
+	// An item returning is news, and wears the accent ring the modifiers no longer do.
+	r.time(5.2)
+	r.tick(true)
+	r.time(5.25)
+	r.tick(true)
+	assert.equal(items(), 6)
+	assert.equal(itemRung(), true)
+	assert.equal(rung(), false)
 	// A stage held still stands every cell where it belongs, whole and unrung.
 	r.time(6.5)
 	r.sdk.PreviewMotion.value = false

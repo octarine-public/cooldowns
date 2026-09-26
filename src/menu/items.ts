@@ -15,18 +15,29 @@ export class ItemMenu extends BaseMenu {
 	public readonly SpiritBear: BearSettingsMenu
 	public readonly Courier: CourierSettingsMenu
 	public readonly SquareMode: Menu.Dropdown
+	public readonly ModePosition: Menu.Dropdown
+	public readonly DimOnCooldown: Menu.Toggle
 
-	constructor(node: Menu.Node, textStyle: TextStyleMenu, animation: Menu.Toggle) {
+	constructor(
+		node: Menu.Node,
+		textStyle: TextStyleMenu,
+		animation: Menu.Toggle,
+		noMana: Menu.Slider
+	) {
 		super({
 			node,
 			textStyle,
 			animation,
+			noMana,
 			nodeName: "Items",
 			texture: CooldownIcons.Items
 		})
 		this.Tree.SortNodes = true
 		this.SquareMode = this.Tree.AddDropdown("Shape", ["Rectangle", "Square"])
 		this.SquareMode.IconPath = Menu.Icons.GridPick
+		this.ModePosition = this.AddPosition()
+		this.DimOnCooldown = this.Tree.AddToggle("Dim items on cooldown", false)
+		this.DimOnCooldown.IconPath = Menu.Icons.Lighting
 		this.AddStyle()
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Item)
@@ -41,6 +52,7 @@ export class ItemMenu extends BaseMenu {
 		this.Rounding.OnValue(() => callback())
 		this.TeamState.OnValue(() => callback())
 		this.SquareMode.OnValue(() => callback())
+		this.ModePosition.OnValue(() => callback())
 
 		this.SpiritBear.MenuChanged(callback)
 		this.Hero.MenuChanged(callback)
