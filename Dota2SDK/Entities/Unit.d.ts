@@ -150,10 +150,6 @@ declare class Unit extends Entity {
 	public get ReplicatingOtherHeroModel(): Nullable<Unit>
 	public get AttackDamageClassType(): AttackDamageType
 	public get AttackDamageAverage(): number
-	/**
-	 * How fast this unit's attack projectile flies, the bonuses its modifiers add counted in.
-	 * A field on the way can still slow it down or hurry it: that is `ProjectileSpeedFactor`.
-	 */
 	public get AttackProjectileSpeed(): number
 	public get BaseAttackTime(): number
 	public get BaseAttackRange(): number
@@ -348,12 +344,6 @@ declare class Unit extends Entity {
 	public GetPredictiveArmorModifier(target: Unit): number
 	public GetPiercingArmorModifier(target: Unit): number
 	public GetPhysicalDamageResist(predictiveArmor?: number): number
-	/**
-	 * The unit's own attack damage, before its modifiers. A swing rolls anywhere between the
-	 * minimum and the maximum, so the minimum is the only number a decision that has to hold -
-	 * a last hit, a deny, a kill - can be taken on, and it is what this and every damage method
-	 * here answer when no roll is named.
-	 */
 	public GetAttackDamageBase(damageValue?: ATTACK_DAMAGE_STRENGTH): number
 	public GetAttackDamageBonus(baseDamage?: number, target?: Unit): number
 	public GetEffectiveIncomingDamage(target: Unit, damageType: DAMAGE_TYPES, rawDamage?: number): number
@@ -368,30 +358,13 @@ declare class Unit extends Entity {
 	public HealthBarPosition(useHpBarOffset?: boolean, overridePosition?: Vector3): Nullable<Vector2>
 	public GetAttackRange(target?: Entity, additional?: number, includeHull?: boolean): number
 	public GetDamageBlock(damage: number, damageType: DAMAGE_TYPES, isRaw?: boolean): number
-	/**
-	 * The physical damage the unit's shields take off a blow before anything else. A melee hero
-	 * blocks the game mode's innate amount on a share of the blows only, so `damageValue` decides
-	 * how much of it counts: all of it for the minimum roll, its chance for the average, none for
-	 * the maximum.
-	 */
-	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES, damageValue?: ATTACK_DAMAGE_STRENGTH): number
+	public GetPassiveDamageBlock(damageType: DAMAGE_TYPES): number
 	public GetEffectiveDamageResist(target: Unit, ignoreMagicAttack?: boolean, predictiveArmor?: number): number
 	public GetIncomingAttackDamage(target: Unit, isRaw: boolean): number
 	public GetRawAttackDamage(target: Unit, damageValueType?: ATTACK_DAMAGE_STRENGTH, critMulDamage?: number): number
 	public GetAttackDamageTypeResist(target: Unit, damageType: DAMAGE_TYPES, rawDamageBase: number): number
 	public GetAttackDamagePure(target: Unit, rawDamageBase: number): number
 	public GetAttackDamageMagic(target: Unit, rawDamageBase: number): number
-	/**
-	 * The damage one attack of this unit takes off `target`: the roll `damageValue` names, the
-	 * bonuses its modifiers add, the block the target's shields hold back and the target's armor,
-	 * resistances and amplifications. The roll is the minimum by default, which is what a last
-	 * hit is decided on; the maximum is the other end of the same swing, never what it deals.
-	 * @example
-	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
-	 * if (creep.HealthAt(landsAt, hero) <= hero.GetAttackDamage(creep)) {
-	 * 	hero.AttackTarget(creep)
-	 * }
-	 */
 	public GetAttackDamage(target: Unit, damageValue?: ATTACK_DAMAGE_STRENGTH, overrideRawDamage?: number, damageType?: DAMAGE_TYPES, predictedArmor?: number, canDamageBlockMelee?: boolean): number
 	public GetDamageAmplification(source: Unit, damageType: DAMAGE_TYPES, predictiveArmor?: number, ignoreMagicResist?: boolean, ignoreMagicAttack?: boolean, rawDamage?: number): number
 	public GetDamageSpellEmpower(target: Unit): number
@@ -458,34 +431,6 @@ declare class Unit extends Entity {
 	public GetAttachmentPosition(name: string, activity?: GameActivity, sequenceNum?: number, time?: number, pos?: Vector3, ang?: QAngle, scale?: number): Vector3
 	public ExtendUntilWall(start: Vector3, direction: Vector3, distance: number): Vector3
 	/**
-	 * The share of its speed a projectile this unit fires keeps at `position`: Faceless Void's
-	 * Distortion Field takes its share off an enemy attack projectile inside it, his Time Zone
-	 * slows an enemy projectile and hurries his own. 1 where no field reaches the point, which
-	 * is the usual answer.
-	 */
-	public ProjectileSpeedFactor(position: Vector3, isAttack: boolean): number
-	/**
-	 * Seconds a projectile of `source` flying at `speed` from `from` needs to reach this unit
-	 * at `to`, its own position by default. The game moves a projectile once a tick and lands it
-	 * on the first tick from which the rest of the way fits into one more step, so the flight is
-	 * a whole number of ticks and one step shorter than the bare distance reads. A field that
-	 * changes the projectile's speed counts over the chord it cuts out of the way, and holds the
-	 * answer at `Infinity` when it leaves no speed at all.
-	 * @example
-	 * const flight = creep.ProjectileFlightTime(hero, hero.Position, hero.AttackProjectileSpeed)
-	 */
-	public ProjectileFlightTime(source: Unit, from: Vector3, speed: number, isAttack?: boolean, to?: Vector3): number
-	/**
-	 * Seconds a projectile of `source` at `speed`, launched at `from` in `after` seconds, needs
-	 * to reach this unit while it keeps moving: the flight is solved against where this unit
-	 * will be when the projectile arrives, since a projectile follows its target - one walking
-	 * in is reached sooner than the shot was aimed and one walking away later.
-	 * `ProjectileFlightTime` answers the same for a point that does not move.
-	 * @example
-	 * const flight = creep.ProjectileArrivalTime(hero, hero.Position, hero.AttackProjectileSpeed)
-	 */
-	public ProjectileArrivalTime(source: Unit, from: Vector3, speed: number, isAttack?: boolean, after?: number): number
-	/**
 	 * Where this unit is expected to be `delay` seconds from now: exact for a known motion or an
 	 * own move order, walked along the heading around obstacles otherwise.
 	 * @example
@@ -528,16 +473,13 @@ declare class Unit extends Entity {
 	 * Health at the game time `time`: the regeneration until then added, the blows on their way
 	 * that land by then taken off, never past the maximum and never below zero. The blows of
 	 * `except` are left out: the unit asking about its own attack does not count it twice.
-	 * Those blows count at the roll `incoming`, the lowest by default, which reads the health
-	 * high while several are on their way; a last hit racing other units wants the average.
 	 * @example
 	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
-	 * const left = creep.HealthAt(landsAt, hero, ATTACK_DAMAGE_STRENGTH.DAMAGE_AVG)
-	 * if (left > 0 && left <= hero.GetAttackDamage(creep)) {
+	 * if (creep.HealthAt(landsAt) <= hero.GetAttackDamage(creep)) {
 	 * 	hero.AttackTarget(creep)
 	 * }
 	 */
-	public HealthAt(time: number, except?: Unit, incoming?: ATTACK_DAMAGE_STRENGTH): number
+	public HealthAt(time: number, except?: Unit): number
 	/**
 	 * Whether something keeps the unit alive through `damageType` landing at the game time
 	 * `time`: Shallow Grave, Borrowed Time, False Promise, a ready Reincarnation or Aeon Disk,
@@ -546,10 +488,9 @@ declare class Unit extends Entity {
 	public PreventsDeathAt(time: number, damageType: DAMAGE_TYPES): boolean
 	/**
 	 * Whether `damage` of `damageType` landing at the game time `time` brings the unit down on
-	 * top of the blows already on their way, with nothing keeping it alive then. Those blows
-	 * count at the roll `incoming`, the lowest by default.
+	 * top of the blows already on their way, with nothing keeping it alive then.
 	 */
-	public IsKillableAt(time: number, damage: number, damageType?: DAMAGE_TYPES, attacker?: Unit, incoming?: ATTACK_DAMAGE_STRENGTH): boolean
+	public IsKillableAt(time: number, damage: number, damageType?: DAMAGE_TYPES, attacker?: Unit): boolean
 	/**
 	 * Plays `abilities` on this unit in order and tells whether they kill it: each cast waits
 	 * for the one before it, lands by its own timeline, spends its mana from the budget of its
@@ -600,10 +541,7 @@ declare class Unit extends Entity {
 	 * Seconds until this unit's next attack on `target` lands, the way an attack order would
 	 * play out: the attack in progress or the backswing left to wait, input lag for the local
 	 * player's units, walking into range along the grid, turning, the next attack point and, for
-	 * a ranged unit with `includeProjectile`, the projectile's flight to where the target will
-	 * be when it arrives: the projectile follows the target, so a target walking in is reached
-	 * sooner than the shot was aimed and one walking away later, and the flight is solved for
-	 * that rather than aimed at where the target stands when the arrow leaves.
+	 * a ranged unit with `includeProjectile`, the projectile's flight to where the target will be.
 	 * @example
 	 * const landsAt = GameState.RawGameTime + hero.GetAttackLandingTime(creep)
 	 */

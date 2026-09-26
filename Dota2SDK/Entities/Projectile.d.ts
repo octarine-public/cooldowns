@@ -48,4 +48,6 @@ declare class TrackingProjectile extends Projectile {
 	public Update(targetEntity: Nullable<Unit | FakeUnit>, speed: number, path: string, particleSystemHandle: bigint, dodgeable: boolean, isAttack: boolean, expireTime: number, launchTick: number, targetLoc: Vector3): void
 	/** @internal */
 	public UpdateProjectileSpeed(): void
+	protected ModifierDistortionAura(source: Unit): number
+	protected ModifierTimeZoneAura(source: Unit): number
 }

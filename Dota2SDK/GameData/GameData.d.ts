@@ -18,10 +18,6 @@ declare namespace GameData {
 	function SetMagicResistPerIntellectInternal(value: number): void
 	let MeleeDamageBlockAmount: number
 	function SetMeleeDamageBlockAmountInternal(value: number): void
-	let MeleeDamageBlockPerLevel: number
-	function SetMeleeDamageBlockPerLevelInternal(value: number): void
-	let MeleeDamageBlockChance: number
-	function SetMeleeDamageBlockChanceInternal(value: number): void
 	class CMoveSpeedData {
 		/**
 		 * @readonly

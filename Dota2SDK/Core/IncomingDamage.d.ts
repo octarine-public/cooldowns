@@ -3,30 +3,21 @@
 declare class IncomingDamageEntry {
 	/** Index of the unit dealing the damage: the attacker of the `entity_hurt` event that settles it. */
 	public readonly Source: number
-	/** Damage the blow lands at its lowest roll, the target's armor, resistances and blocks already taken off. */
+	/** Damage expected to land, already reduced by the target's armor, resistances and blocks. */
 	public Damage: number
 	/** Game time the damage lands. */
 	public LandsAt: number
 	/** Whether a projectile carries it; a swing without one lands at its attack point. */
 	public HasProjectile: boolean
-	/** The same blow at its highest roll; equal to `Damage` for anything that does not roll. */
-	public MaxDamage: number
 	constructor(
 	/** Index of the unit dealing the damage: the attacker of the `entity_hurt` event that settles it. */
 	Source: number, 
-	/** Damage the blow lands at its lowest roll, the target's armor, resistances and blocks already taken off. */
+	/** Damage expected to land, already reduced by the target's armor, resistances and blocks. */
 	Damage: number, 
 	/** Game time the damage lands. */
 	LandsAt: number, 
 	/** Whether a projectile carries it; a swing without one lands at its attack point. */
-	HasProjectile: boolean, 
-	/** The same blow at its highest roll; equal to `Damage` for anything that does not roll. */
-	MaxDamage?: number)
-	/**
-	 * What the blow lands at the roll `strength`: the lowest by default, which is the only
-	 * number a decision of one's own has to hold against.
-	 */
-	public At(strength?: ATTACK_DAMAGE_STRENGTH): number
+	HasProjectile: boolean)
 }
 /**
  * The blows on their way to one unit: attack swings past their start, attack and spell
@@ -36,17 +27,10 @@ declare class IncomingDamageEntry {
  */
 declare class IncomingDamage {
 	public readonly Entries: IncomingDamageEntry[]
-	/**
-	 * Damage landing by the game time `time`, the blows of the source `except` left out: the
-	 * asker's own. Every blow counts at the roll `strength`, the lowest by default; the average
-	 * is what tells whether someone else's blows bring the target down first.
-	 */
-	public Before(time: number, except?: number, strength?: ATTACK_DAMAGE_STRENGTH): number
-	/**
-	 * Registers a blow at its lowest and highest roll; a swing from the same source still
-	 * waiting for its projectile is replaced.
-	 */
-	public Add(source: number, damage: number, landsAt: number, hasProjectile: boolean, maxDamage?: number): IncomingDamageEntry
+	/** Damage landing by the game time `time`, the blows of the source `except` left out: the asker's own. */
+	public Before(time: number, except?: number): number
+	/** Registers a blow; a swing from the same source still waiting for its projectile is replaced. */
+	public Add(source: number, damage: number, landsAt: number, hasProjectile: boolean): IncomingDamageEntry
 	/** The blow from `source` that has no projectile yet: the swing a projectile is about to leave. */
 	public Pending(source: number): Nullable<IncomingDamageEntry>
 	/** Drops the swing from `source` that never reached its attack point. */
