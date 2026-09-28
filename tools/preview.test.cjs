@@ -1252,27 +1252,40 @@ test("the hero wears his default items and nothing else on the stage does", () =
 		assert.deepEqual([...r.preview.Wearables()], [])
 	}
 })
-test("round modifiers use the teleport timer with shadows and item-sized readings", () => {
+test("round modifiers are bare discs of art with the game's rings and item-sized readings", () => {
 	const r = runtime()
 	r.menu.ModifierMenu.ModeImage.SelectedID = 1
 	r.tick(true)
 	const group = r.preview.Groups[2]
 	assert.ok(group.Canvas.Bounds.w > 0)
 	const calls = r.timers.calls
-	const timers = calls.filter(([name]) => name === "CircleTimer")
+	// Nothing blurs round them: no timer, no halo, only the art cut to a disc.
+	assert.equal(calls.filter(([name]) => name === "CircleTimer").length, 0)
+	const timers = calls.filter(([name]) => name === "Image").map(([, texture, at, extent, style]) => [texture, at, extent.x, style])
 	const readings = calls.filter(([name]) => name === "TextIn").map(call => call[1])
 	assert.equal(timers.length, 4)
 	// Each icon is a disc at the preview's frame plus its place on the stage, its reading over it.
-	for (const [, at, size, style] of timers) {
-		assert.ok(style.texture)
+	for (const [texture, at, , style] of timers) {
+		assert.ok(texture)
 		assert.ok(at.x >= r.preview.Frame.x + group.Canvas.Bounds.x)
 		assert.ok(at.y >= r.preview.Frame.y + group.Canvas.Bounds.y)
-		assert.equal(style.shadow, Math.max(Math.round(size * 0.1), 2))
-		assert.equal(style.innerShadow, false)
-		assert.equal(style.ringWidth, Math.max(Math.round(size * 0.08), 1))
-		assert.ok(style.opacity > 0 && style.opacity <= 1)
-		assert.equal(style.color.a, 255)
+		assert.equal(style.circle, true)
+		assert.ok(style.color.a > 0 && style.color.a <= 255)
 	}
+	// Each ring is on its icon's rim, ending at twelve o'clock and reaching back round
+	// counter-clockwise, the way the game's buff icons drain.
+	const rings = () => calls.filter(([name]) => name === "Arc")
+	assert.equal(rings().length, 4)
+	for (const [, center, radius, thickness, start, sweep, color] of rings()) {
+		const timer = timers.find(([, at, size]) => at.x + size / 2 === center.x && at.y + size / 2 === center.y)
+		assert.ok(timer)
+		const [, , size, style] = timer
+		assert.equal(thickness, Math.max(Math.round(size * 0.08), 1))
+		assert.equal(radius, (size - thickness) / 2)
+		assert.equal(start + sweep, -90)
+		assert.equal(Math.round(color.a), Math.round(style.color.a))
+	}
+	const progress = () => rings().map(ring => Math.round((ring[5] / 360) * 1000) / 1000).sort((a, b) => a - b)
 	assert.deepEqual(readings.filter(text => text.endsWith(".0")).sort(), ["4.0", "5.0", "6.0", "7.0"])
 	const size = timers[0][2]
 	const textStyle = r.menu.ModifierMenu.TextStyle
@@ -1284,12 +1297,11 @@ test("round modifiers use the teleport timer with shadows and item-sized reading
 		assert.equal(style.weight, textStyle.FontWeight)
 		assert.equal(style.family, textStyle.FontFamily)
 	}
-	assert.deepEqual(timers.map(timer => timer[3].progress).sort((a, b) => a - b), [0.5, 0.625, 0.75, 0.875])
+	assert.deepEqual(progress(), [0.5, 0.625, 0.75, 0.875])
 	r.time(3)
 	calls.length = 0
 	r.tick(true)
-	const later = calls.filter(([name]) => name === "CircleTimer")
-	assert.deepEqual(later.map(timer => timer[3].progress).sort((a, b) => a - b), [0.25, 0.375, 0.5, 0.625])
+	assert.deepEqual(progress(), [0.25, 0.375, 0.5, 0.625])
 	// Nothing of it lands on the group's own surface but the room it takes, which frames the drag area.
 	assert.ok(r.roots[2].children.every(child => !child.shown))
 })

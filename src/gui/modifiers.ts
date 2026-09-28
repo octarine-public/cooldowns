@@ -175,14 +175,21 @@ export class ModifierGUI extends BaseGUI {
 		color: Color
 	) {
 		if (modeImage === EModeImage.Round) {
-			this.ring(ratio, position, color)
+			ModifierGUI.ring(
+				this.canvas,
+				position.pos1.Add(position.Size.DivideScalar(2)),
+				Math.min(position.Width, position.Height),
+				ratio,
+				color
+			)
 		} else {
 			this.frame(ratio, position, color)
 		}
 	}
 	/**
-	 * The teleport timer's circular portrait and soft outer shadow, with the modifier's
-	 * colour and remaining duration. Readings use the same sizing as item cooldowns and charges.
+	 * A round portrait with the modifier's colour and remaining duration, the art cut to a disc
+	 * and the ring on its rim with nothing round it: a halo blurs an icon this small. Readings
+	 * use the same sizing as item cooldowns and charges.
 	 */
 	private circleTimer(
 		timers: MenuSDK.Canvas,
@@ -205,16 +212,11 @@ export class ModifierGUI extends BaseGUI {
 		if (ModifierGUI.isBacked(modifier.Name)) {
 			timers.Circle(at, extent, { color: Color.Black.SetA(alpha) })
 		}
-		const band = ModifierGUI.bandWidth(size)
-		timers.CircleTimer(at, size, {
-			texture: modifier.GetTexturePath(),
-			progress: ratio / 100,
-			color: color.Clone().SetA(255),
-			ringWidth: band,
-			shadow: Math.max(Math.round(size * 0.1), 2),
-			innerShadow: false,
-			opacity: alpha / 255
+		timers.Image(modifier.GetTexturePath(), at, extent, {
+			circle: true,
+			color: Color.White.SetA(alpha)
 		})
+		ModifierGUI.ring(timers, at.AddScalar(size / 2), size, ratio, color)
 		const box = new Rectangle(at, at.Add(extent))
 		if (menu.Remaining.value && cooldown > 0) {
 			const noCharge = charge === 0
@@ -263,25 +265,24 @@ export class ModifierGUI extends BaseGUI {
 		)
 	}
 	/**
-	 * The rim of a round icon on a surface with no SDK canvas: the ring the timer draws, laid
-	 * on the icon's own edge and nothing else.
+	 * The rim of a round icon `size` across about `center`, on the SDK timer's canvas or on a
+	 * surface with none: a band on the icon's own edge and nothing else, ending at twelve
+	 * o'clock with its start coming round clockwise as the modifier runs out.
 	 */
-	private ring(ratio: number, position: Rectangle, color: Color) {
-		const size = Math.min(position.Width, position.Height),
-			band = ModifierGUI.bandWidth(size),
+	private static ring(
+		canvas: Pick<MenuSDK.Canvas, "Arc">,
+		center: Vector2,
+		size: number,
+		ratio: number,
+		color: Color
+	) {
+		const band = ModifierGUI.bandWidth(size),
 			radius = (size - band) / 2,
 			sweep = ModifierGUI.sweep(ratio)
 		if (!(radius > 0 && sweep > 0)) {
 			return
 		}
-		this.canvas.Arc(
-			position.pos1.Add(position.Size.DivideScalar(2)),
-			radius,
-			band,
-			-90 - sweep,
-			sweep,
-			color
-		)
+		canvas.Arc(center, radius, band, -90 - sweep, sweep, color)
 	}
 	/**
 	 * The frame of a square icon, the ring's counterpart: a band as wide as the ring's on the
