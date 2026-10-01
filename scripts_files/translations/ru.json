@@ -80,5 +80,7 @@
 	"Animation": "Анимация",
 	"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide": "Новая способность, предмет или бафф появляется\nна полоске плавно, а не мгновенно: ячейка\nпроявляется с подсветкой, а соседние сдвигаются",
 	"No mana brightness": "Яркость без маны",
-	"How bright an icon its owner cannot pay for is drawn:\n0 is the game's own dark wash, 100 keeps the icon\nas bright as it is": "Насколько яркой рисуется иконка, на которую\nне хватает маны: 0 — тёмная, как в игре,\n100 — иконка остаётся такой же яркой"
+	"How bright an icon its owner cannot pay for is drawn:\n0 is the game's own dark wash, 100 keeps the icon\nas bright as it is": "Насколько яркой рисуется иконка, на которую\nне хватает маны: 0 — тёмная, как в игре,\n100 — иконка остаётся такой же яркой",
+	"The hero the card is dressed for: his body, the items he is given and the abilities the sample strip is drawn from": "Герой для предпросмотра: его модель, выданные предметы и способности, показанные на панели",
+	"Stand the hero in the items the game gives him. Turned off, he stands in the body underneath them, which is what the game draws before a hero is dressed": "Показывать героя с его косметическими предметами. Если выключено, отображается базовая модель героя без них"
 }
