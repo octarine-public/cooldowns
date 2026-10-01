@@ -38,10 +38,10 @@ export function DrawStyledText(
 				? "right"
 				: "center"
 	// Measure the displayed digits after fitting, then snap their center to the icon's pixels.
-	const width =
-		align === "center"
-			? MenuSDK.MeasureTextPx(text, size, weight, family)?.[0]
-			: undefined
+	// An odd pixel left over goes to the right: digits' ink sits right of their advance more
+	// often than left (a leading "1"'s stem, a shadow cast down-right), and rounding the half
+	// up would add a second pixel to the same side.
+	const width = align === "center" ? advance(text, size, weight, family) : undefined
 	const centerWidth = width !== undefined && width > 0 ? width : undefined
 	target.Push({
 		kind: "text",
@@ -49,7 +49,7 @@ export function DrawStyledText(
 			centerWidth === undefined
 				? box.x
 				: Math.round(box.x) +
-					Math.round((Math.round(box.Width) - centerWidth) / 2),
+					Math.floor((Math.round(box.Width) - centerWidth) / 2),
 		y,
 		w: centerWidth === undefined ? box.Width : Math.ceil(centerWidth),
 		h: height,
@@ -65,4 +65,27 @@ export function DrawStyledText(
 		effectColor: MenuSDK.HudColor(style.EffectColor.SelectedColor, 255),
 		effectOpacity: style.EffectOpacity.value / 100
 	})
+}
+
+/**
+ * How far `text` advances, summed a character at a time. A countdown reads a new string every
+ * tick, and a string the measure cache has not seen yet comes back empty for a frame - the
+ * reading would then be centred by the layout's own rounding and step a pixel aside each tick.
+ * Its characters are a dozen at most, measured once and kept; digits do not kern.
+ */
+function advance(
+	text: string,
+	size: number,
+	weight: number,
+	family: string
+): Nullable<number> {
+	let width = 0
+	for (let index = 0; index < text.length; index++) {
+		const measured = MenuSDK.MeasureTextPx(text[index], size, weight, family)
+		if (measured === undefined) {
+			return undefined
+		}
+		width += measured[0]
+	}
+	return width
 }
