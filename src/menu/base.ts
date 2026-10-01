@@ -75,9 +75,10 @@ export class BaseMenu {
 	/**
 	 * Declares the element's text settings row. A subclass calls this once it has
 	 * added its own rows, so the row lands below them and above the sub-settings.
+	 * `override` is whether the element starts on its own settings rather than the shared ones.
 	 */
-	protected AddStyle(): TextStyleMenu {
-		return (this.style ??= new TextStyleMenu(this.Tree, this.shared))
+	protected AddStyle(override = false): TextStyleMenu {
+		return (this.style ??= new TextStyleMenu(this.Tree, this.shared, override))
 	}
 
 	/**

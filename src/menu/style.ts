@@ -1,5 +1,8 @@
 import { ETextEffect } from "../gui/types"
 
+/** The face readings start in, where the host has it; the theme's own otherwise. */
+const DEFAULT_FONT = "RadianceM"
+
 export class TextStyleMenu {
 	public readonly Node: Menu.Node
 	public readonly Override: Nullable<Menu.Toggle>
@@ -16,7 +19,8 @@ export class TextStyleMenu {
 
 	constructor(
 		parent: Menu.Node,
-		private readonly shared?: TextStyleMenu
+		private readonly shared?: TextStyleMenu,
+		override = false
 	) {
 		const node =
 			shared === undefined
@@ -27,15 +31,19 @@ export class TextStyleMenu {
 		if (shared !== undefined) {
 			this.Override = node.AddToggle(
 				"Override",
-				false,
+				override,
 				"Use separate text settings for this element"
 			)
 		}
-		this.Font = node.AddDropdown("Font", ["Default", ...this.families])
+		this.Font = node.AddDropdown(
+			"Font",
+			["Default", ...this.families],
+			this.families.indexOf(DEFAULT_FONT) + 1
+		)
 		this.Font.IconPath = Menu.Icons.Type
 		this.Size = node.AddSlider(
 			"Text size",
-			90,
+			86,
 			70,
 			150,
 			0,

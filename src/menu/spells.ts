@@ -50,7 +50,7 @@ export class SpellMenu extends BaseMenu {
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
 		this.ChargeColor.IconPath = Menu.Icons.Zap
 		this.ModePosition = this.AddPosition()
-		this.AddStyle()
+		this.AddStyle(true)
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Spell)
 		this.Creep = new CreepSettingsMenu(this.Tree, EMenuType.Spell)
