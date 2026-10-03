@@ -6,6 +6,7 @@ import { ItemMenu } from "../menu/items"
 import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
 import { IsTeamSelected } from "../menu/team"
+import { UnitBody } from "./body"
 
 export class UnitData {
 	public Priority: number = Infinity
@@ -16,6 +17,9 @@ export class UnitData {
 	private readonly itemGUI = new ItemGUI()
 	private readonly spellGUI = new SpellGUI()
 	private readonly modifierGUI = new ModifierGUI()
+	/** The body under each bar the unit has: where it stands, and where a teleport lands it. */
+	private readonly body = new UnitBody()
+	private readonly bodyEnd = new UnitBody()
 
 	constructor(public readonly Owner: Unit) {}
 
@@ -27,8 +31,8 @@ export class UnitData {
 			start = this.IsTeleported ? owner.TPStartPosition : owner.Position,
 			end = this.IsTeleported ? owner.TPEndPosition : undefined
 		return [
-			this.HealthBarPosition(owner, start),
-			end?.IsValid ? this.HealthBarPosition(owner, end) : undefined
+			this.HealthBarPosition(owner, start, this.body),
+			end?.IsValid ? this.HealthBarPosition(owner, end, this.bodyEnd) : undefined
 		]
 	}
 	public Draw(menu: MenuManager) {
@@ -188,7 +192,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				itemMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 		if (spellState) {
@@ -197,7 +203,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				spellMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 		if (modifierState) {
@@ -206,7 +214,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				modifierMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 		this.setPriority(position, positionEnd)
@@ -236,21 +246,25 @@ export class UnitData {
 		}
 		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
 	}
+	/** Where the bar over `origin` is drawn, measuring `body` under it on the way. */
 	public HealthBarPosition(
 		owner: Unit,
-		origin: Nullable<Vector3> = undefined
+		origin: Nullable<Vector3> = undefined,
+		body: Nullable<UnitBody> = undefined
 	): Nullable<Vector2> {
-		const position = (origin ?? owner.Position)
-			.Clone()
-			.AddScalarZ(owner.HealthBarOffset)
-		const screenPosition = RendererSDK.WorldToScreen(position)
-		if (screenPosition === undefined) {
+		const feet = origin ?? owner.Position,
+			height = owner.HealthBarOffset
+		const head = RendererSDK.WorldToScreen(feet.Clone().AddScalarZ(height))
+		if (head === undefined) {
 			return undefined
 		}
+		const screenPosition = head.Clone()
 		if (owner.HasVisualShield) {
 			screenPosition.AddScalarY(5)
 		}
-		return screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
+		screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
+		body?.Measure(screenPosition, head, feet, height)
+		return screenPosition
 	}
 	private getKeyName(modifier: Modifier) {
 		if (modifier.Name === "modifier_rubick_spell_steal") {

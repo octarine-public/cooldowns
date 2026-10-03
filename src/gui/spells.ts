@@ -1,6 +1,7 @@
 import { BaseMenu } from "../menu/base"
 import { SpellMenu } from "../menu/spells"
 import { TextStyleMenu } from "../menu/style"
+import { UnitBody } from "../models/body"
 import { BaseGUI, SpellDisplay } from "./index"
 
 export class SpellGUI extends BaseGUI {
@@ -24,9 +25,19 @@ export class SpellGUI extends BaseGUI {
 		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
-		scale: number
+		scale: number,
+		body?: UnitBody,
+		bodyEnd?: UnitBody
 	) {
-		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
+		super.Update(
+			position,
+			positionEnd,
+			healthBarSize,
+			additionalSize,
+			scale,
+			body,
+			bodyEnd
+		)
 		const size = SpellGUI.minSize + additionalSize * 4
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 		this.size.x -= (this.size.x + 1) % 2
@@ -43,12 +54,13 @@ export class SpellGUI extends BaseGUI {
 		if (this.Contains()) {
 			return
 		}
+		const rise = this.Rise(menu, this.size.y, GUIInfo.ScaleHeight(BaseGUI.border + 1))
 		this.DrawAt(
 			this.position,
 			mainAlpha,
 			menu,
 			spells,
-			additionalPosition,
+			this.Follow(additionalPosition, rise),
 			isSilenced,
 			isPassiveDisabled
 		)
@@ -57,7 +69,7 @@ export class SpellGUI extends BaseGUI {
 			mainAlpha,
 			menu,
 			spells,
-			additionalPosition,
+			this.Follow(additionalPosition, rise, true),
 			isSilenced,
 			isPassiveDisabled
 		)

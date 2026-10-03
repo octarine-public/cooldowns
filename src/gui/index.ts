@@ -1,6 +1,7 @@
 import { canvas as timerCanvas, surface } from "../../render"
 import { BaseMenu } from "../menu/base"
 import { TextStyleMenu } from "../menu/style"
+import { UnitBody } from "../models/body"
 import { easeOut, ISlotMotion, SlotMotion } from "./motion"
 import { DrawStyledText } from "./text"
 import {
@@ -55,6 +56,9 @@ export abstract class BaseGUI {
 
 	protected readonly position = new Rectangle()
 	protected readonly positionEnd = new Rectangle()
+	/** The unit's body under each bar, which a strip set below the bar follows; none in the preview. */
+	private body: Nullable<UnitBody>
+	private bodyEnd: Nullable<UnitBody>
 	/** How far the cell being drawn is into its entrance, as the fade on everything it draws. */
 	protected fade = 1
 	/** The wash the strip being drawn colours an icon its owner cannot pay for in. */
@@ -83,8 +87,12 @@ export abstract class BaseGUI {
 		positionEnd: Nullable<Vector2>,
 		size: Vector2,
 		_additionalSize: number,
-		_scale: number
+		_scale: number,
+		body?: UnitBody,
+		bodyEnd?: UnitBody
 	): void {
+		this.body = body
+		this.bodyEnd = bodyEnd
 		if (position === undefined) {
 			this.position.pos1.Invalidate()
 			this.position.pos2.Invalidate()
@@ -110,6 +118,21 @@ export abstract class BaseGUI {
 		isDisable?: boolean,
 		isUniqueDisabled?: boolean
 	): void
+
+	/**
+	 * Where a strip set `offset` from the bar stands at its anchor, or where a teleport lands.
+	 * `rise` is how far over that offset its top edge stands, from {@link BaseGUI.Rise}.
+	 */
+	protected Follow(offset: Vector2, rise: number, end = false): Vector2 {
+		return (end ? this.bodyEnd : this.body)?.Follow(offset, rise) ?? offset
+	}
+	/**
+	 * How far over its offset a strip's top edge stands, as {@link BaseGUI.GetPosition} lays it
+	 * out: a row stands on the bar `border` clear of it, and a column hangs from the bar's top.
+	 */
+	protected Rise(menu: BaseMenu, height: number, border: number): number {
+		return menu.IsVertical ? 0 : height + border * 2
+	}
 
 	protected Contains() {
 		return (

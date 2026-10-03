@@ -1,5 +1,6 @@
 import { BaseMenu } from "../menu/base"
 import { ItemMenu } from "../menu/items"
+import { UnitBody } from "../models/body"
 import { BaseGUI, ItemDisplay } from "./index"
 
 export class ItemGUI extends BaseGUI {
@@ -26,9 +27,19 @@ export class ItemGUI extends BaseGUI {
 		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
-		scale: number
+		scale: number,
+		body?: UnitBody,
+		bodyEnd?: UnitBody
 	) {
-		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
+		super.Update(
+			position,
+			positionEnd,
+			healthBarSize,
+			additionalSize,
+			scale,
+			body,
+			bodyEnd
+		)
 		const square = ItemGUI.minSize + additionalSize
 
 		this.size.CopyFrom(GUIInfo.ScaleVector(square * 1.375 * scale, square * scale))
@@ -44,12 +55,13 @@ export class ItemGUI extends BaseGUI {
 		if (this.Contains()) {
 			return
 		}
+		const rise = this.Rise(menu, this.size.y, GUIInfo.ScaleHeight(BaseGUI.border + 1))
 		this.DrawAt(
 			this.position,
 			mainAlpha,
 			menu,
 			items,
-			additionalPosition,
+			this.Follow(additionalPosition, rise),
 			isDisable,
 			isTethered
 		)
@@ -58,7 +70,7 @@ export class ItemGUI extends BaseGUI {
 			mainAlpha,
 			menu,
 			items,
-			additionalPosition,
+			this.Follow(additionalPosition, rise, true),
 			isDisable,
 			isTethered
 		)
