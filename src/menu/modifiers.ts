@@ -1,4 +1,4 @@
-import { EMenuType } from "../enum"
+import { EMenuType, ETeamState } from "../enum"
 import { BaseMenu } from "./base"
 import { CooldownIcons } from "./icons"
 import {
@@ -12,17 +12,26 @@ import {
 import { TextStyleMenu } from "./style"
 import { CreateTeamSelect } from "./team"
 
+/** Your own hero's auras, buffs, debuffs and important modifiers are off by default */
+const otherTeams = [ETeamState.Enemy, ETeamState.Ally]
+
 export class BaseModifierMenu {
 	public readonly State: Menu.Toggle
 	public readonly TeamState: Menu.MultiSelect
 
 	public readonly Tree: Menu.Node
 
-	constructor(node: Menu.Node, nodeName: string, icon: string, tooltip?: string) {
+	constructor(
+		node: Menu.Node,
+		nodeName: string,
+		icon: string,
+		tooltip?: string,
+		teams?: ETeamState[]
+	) {
 		this.Tree = node.AddSettings(nodeName, icon, tooltip)
 		this.State = this.Tree.AddToggle("State", true)
 		this.Tree.HeaderControl = this.State
-		this.TeamState = CreateTeamSelect(this.Tree)
+		this.TeamState = CreateTeamSelect(this.Tree, teams)
 	}
 
 	public MenuChanged(callback: () => void) {
@@ -35,7 +44,7 @@ class AurasSettingsMenu extends BaseModifierMenu {
 	public readonly Globally: Menu.Toggle
 
 	constructor(node: Menu.Node) {
-		super(node, "Auras", CooldownIcons.Auras)
+		super(node, "Auras", CooldownIcons.Auras, undefined, otherTeams)
 		this.Globally = this.Tree.AddToggle("Globally")
 		this.Globally.IconPath = Menu.Icons.Globe
 	}
@@ -47,12 +56,12 @@ class AurasSettingsMenu extends BaseModifierMenu {
 }
 class BuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Buffs", CooldownIcons.Buffs)
+		super(node, "Buffs", CooldownIcons.Buffs, undefined, otherTeams)
 	}
 }
 class DebuffSettingsMenu extends BaseModifierMenu {
 	constructor(node: Menu.Node) {
-		super(node, "Debuffs", CooldownIcons.Debuffs)
+		super(node, "Debuffs", CooldownIcons.Debuffs, undefined, otherTeams)
 	}
 }
 
@@ -62,7 +71,8 @@ class ImportantSettingsMenu extends BaseModifierMenu {
 			node,
 			"Important",
 			CooldownIcons.Important,
-			"Important modifiers (stun, silence, shields, etc.)"
+			"Important modifiers (stun, silence, shields, etc.)",
+			otherTeams
 		)
 	}
 }
