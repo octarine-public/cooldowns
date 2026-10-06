@@ -41,6 +41,11 @@ export class ModifierManager {
 		if (!modifier.IsValid || (modifier.IsHidden && !modifier.ForceVisible)) {
 			return false
 		}
+		// a pulse the game lays and lifts within a tick, such as the blind Fire Spirits' burn
+		// strikes every 0.2s: drawn, it blinks and shoves the row about
+		if (modifier.Duration === 0) {
+			return false
+		}
 		if (owner.IsCourier && this.ignoreModifiers.includes(modifier.Name)) {
 			return false
 		}
