@@ -1,3 +1,4 @@
+import { EMeepoClones } from "../enum"
 import { CooldownIcons } from "./icons"
 import { ItemMenu } from "./items"
 import { ModifierMenu } from "./modifiers"
@@ -11,6 +12,7 @@ export class MenuManager {
 	public readonly Scale: Menu.Toggle
 	public readonly OpacityByCursor: Menu.Toggle
 	public readonly Animation: Menu.Toggle
+	public readonly MeepoClones: Menu.Dropdown
 
 	public readonly Opacity: Menu.Slider
 	public readonly NoMana: Menu.Slider
@@ -73,6 +75,13 @@ export class MenuManager {
 			"Bring a new spell, item or buff onto its strip\ninstead of switching it on: the cell fades in\nand is rung in, and its neighbours glide"
 		)
 		this.Animation.IconPath = Menu.Icons.Animation
+		this.MeepoClones = general.AddDropdown(
+			"Meepo clones",
+			["Full", "Compact", "Hidden"],
+			EMeepoClones.Compact,
+			"What Meepo's clones show: items and passives are\nthe main Meepo's, so Compact keeps only\nEarthbind and Poof, the clone's own cooldowns"
+		)
+		this.MeepoClones.IconPath = Menu.Icons.SquareStack
 
 		this.Style = new TextStyleMenu(this.baseNode)
 		this.SpellMenu = new SpellMenu(

@@ -20,3 +20,9 @@ export const enum EMenuType {
 	Item,
 	Modifier
 }
+
+export const enum EMeepoClones {
+	Full,
+	Compact,
+	Hidden
+}

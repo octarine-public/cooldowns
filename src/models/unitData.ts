@@ -1,3 +1,4 @@
+import { EMeepoClones } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
@@ -8,10 +9,15 @@ import { SpellMenu } from "../menu/spells"
 import { IsTeamSelected } from "../menu/team"
 import { UnitBody } from "./body"
 
+/** The spells each Meepo casts on its own: everything else a clone has is the main Meepo's. */
+const meepoOwnSpells = new Set(["meepo_earthbind", "meepo_poof"])
+
 export class UnitData {
 	public Priority: number = Infinity
 	private items: Item[] = []
 	private spells: [Ability, number][] = []
+	/** The spells a compact Meepo clone keeps. */
+	private ownSpells: [Ability, number][] = []
 	private modifiers: Modifier[] = []
 
 	private readonly itemGUI = new ItemGUI()
@@ -48,6 +54,12 @@ export class UnitData {
 			return
 		}
 		const owner = this.Owner
+		const clone = this.cloneMode(menu)
+		if (clone === EMeepoClones.Hidden) {
+			return
+		}
+		const compact = clone === EMeepoClones.Compact,
+			spells = compact ? this.ownSpells : this.spells
 		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
 		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
 			return
@@ -63,8 +75,8 @@ export class UnitData {
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
 
-		const spellsDrawn = spellState && this.spells.length > 0
-		const itemsDrawn = itemState && this.items.length > 0
+		const spellsDrawn = spellState && spells.length > 0
+		const itemsDrawn = itemState && !compact && this.items.length > 0
 		if (itemsDrawn) {
 			this.itemGUI.Draw(
 				alpha,
@@ -82,7 +94,7 @@ export class UnitData {
 			this.spellGUI.Draw(
 				alpha,
 				spellMenu,
-				this.spells,
+				spells,
 				this.GetAdditionalPosition(spellMenu),
 				owner.IsSilenced,
 				owner.IsPassiveDisabled
@@ -108,6 +120,7 @@ export class UnitData {
 	public UnitAbilitiesChanged(newAbils: [Ability, number][]) {
 		this.spells = newAbils
 		this.spells.orderBy(([, idx]) => idx)
+		this.updateOwnSpells()
 	}
 	public ModifierCreated(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.push(modifier)
@@ -133,12 +146,14 @@ export class UnitData {
 			case entity instanceof Ability:
 				this.spells.removeCallback(([x]) => x === entity)
 				this.spells.orderBy(([, idx]) => idx)
+				this.updateOwnSpells()
 				break
 		}
 	}
 	public DisposeAll() {
 		this.items.clear()
 		this.spells.clear()
+		this.ownSpells.clear()
 		this.modifiers.clear()
 	}
 	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
@@ -265,6 +280,17 @@ export class UnitData {
 		screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
 		body?.Measure(screenPosition, head, feet, height)
 		return screenPosition
+	}
+	/** How this unit is drawn if it is a Meepo clone, or nothing if it is not one. */
+	private cloneMode(menu: MenuManager): Nullable<EMeepoClones> {
+		const owner = this.Owner
+		if (!(owner instanceof npc_dota_hero_meepo) || !owner.IsClone) {
+			return undefined
+		}
+		return menu.MeepoClones.SelectedID as EMeepoClones
+	}
+	private updateOwnSpells() {
+		this.ownSpells = this.spells.filter(([abil]) => meepoOwnSpells.has(abil.Name))
 	}
 	private getKeyName(modifier: Modifier) {
 		if (modifier.Name === "modifier_rubick_spell_steal") {
