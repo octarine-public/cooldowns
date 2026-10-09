@@ -10,6 +10,8 @@ class Vector2 {
 	get IsValid() { return Number.isFinite(this.x) && Number.isFinite(this.y) }
 	Clone() { return new Vector2(this.x, this.y) }
 	CopyFrom(value) { this.x = value.x; this.y = value.y; return this }
+	SetX(value) { this.x = value; return this }
+	SetY(value) { this.y = value; return this }
 	Invalidate() { this.x = this.y = NaN }
 	Add(value) { return new Vector2(this.x + value.x, this.y + value.y) }
 	AddScalar(value) { return new Vector2(this.x + value, this.y + value) }
@@ -44,6 +46,7 @@ class Color {
 	get data32() { return (((this.a << 24) | (this.b << 16) | (this.g << 8) | this.r) >>> 0) }
 	Clone() { return new Color(this.r, this.g, this.b, this.a) }
 	SetA(value) { this.a = value; return this }
+	CopyFrom(color) { Object.assign(this, { r: color.r, g: color.g, b: color.b, a: color.a }); return this }
 	static fromUint32() { return new Color(0, 0, 0, 0) }
 }
 for (const [key, rgb] of Object.entries({ White: [255, 255, 255], Black: [0, 0, 0], Green: [0, 255, 0], Yellow: [255, 255, 0], Red: [255, 0, 0], Aqua: [0, 255, 255] })) {

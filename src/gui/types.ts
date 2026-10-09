@@ -103,3 +103,8 @@ export type ModifierDisplay = Pick<
 	IsBuff(): boolean
 	IsChannel(): boolean
 }
+
+/** A shape style a strip keeps and refills for each cell it draws. */
+export type CellShapeStyle = {
+	-readonly [K in keyof MenuSDK.CanvasShapeStyle]: MenuSDK.CanvasShapeStyle[K]
+}

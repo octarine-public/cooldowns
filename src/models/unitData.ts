@@ -1,4 +1,5 @@
 import { EMeepoClones } from "../enum"
+import { BaseGUI } from "../gui/index"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
@@ -13,6 +14,17 @@ import { UnitBody } from "./body"
 const meepoOwnSpells = new Set(["meepo_earthbind", "meepo_poof"])
 
 export class UnitData {
+	/**
+	 * The HUD a bar may stand under, as it stood at the start of the frame: the shop and the
+	 * scoreboard open and shut and the window is resized on the client, with no tick to say so -
+	 * and a paused replay sends no ticks at all. Counted up whenever any of it changes, so a bar's
+	 * cover and size are taken again then rather than every frame.
+	 */
+	private static hud = 0
+	private static shopOpen = false
+	private static scoreboardOpen = false
+	private static readonly window = new Vector2()
+
 	public Priority: number = Infinity
 	private items: Item[] = []
 	private spells: [Ability, number][] = []
@@ -27,19 +39,134 @@ export class UnitData {
 	private readonly body = new UnitBody()
 	private readonly bodyEnd = new UnitBody()
 
+	/**
+	 * What the unit's strips read off it, taken once a server tick: all of it is networked, but
+	 * for the bar's size, which is laid out for the window and is taken again with the HUD.
+	 */
+	private readTick = -1
+	private readHud = -1
+	private teleported = false
+	private shown = false
+	private silenced = false
+	private passiveDisabled = false
+	private muted = false
+	private tethered = false
+	private barOffset = 0
+	private visualShield = false
+	private readonly barSize = new Vector2()
+	private readonly barCorrection = new Vector2()
+	/** Where the bars stood the last time their cover was asked, and the answer, kept for the tick and the HUD. */
+	private coverTick = -1
+	private coverHud = -1
+	private covered = false
+	private readonly coverStart = new Vector2().Invalidate()
+	private readonly coverEnd = new Vector2().Invalidate()
+	private readonly feet = new Vector3()
+	private readonly bar = new Vector2()
+	private readonly barEnd = new Vector2()
+
 	constructor(public readonly Owner: Unit) {}
 
 	public get IsTeleported() {
 		return this.Owner.TPStartPosition.IsValid && this.Owner.TPEndPosition.IsValid
 	}
-	protected get Positions(): [Nullable<Vector2>, Nullable<Vector2>] {
+	protected Positions(teleported: boolean): [Nullable<Vector2>, Nullable<Vector2>] {
 		const owner = this.Owner,
-			start = this.IsTeleported ? owner.TPStartPosition : owner.Position,
-			end = this.IsTeleported ? owner.TPEndPosition : undefined
+			start = teleported ? owner.TPStartPosition : owner.Position,
+			end = teleported ? owner.TPEndPosition : undefined
 		return [
-			this.HealthBarPosition(owner, start, this.body),
-			end?.IsValid ? this.HealthBarPosition(owner, end, this.bodyEnd) : undefined
+			this.HealthBarPosition(start, this.body, this.bar),
+			end?.IsValid
+				? this.HealthBarPosition(end, this.bodyEnd, this.barEnd)
+				: undefined
 		]
+	}
+	/**
+	 * Reads the HUD the bars stand under this frame, before any unit is drawn: once for every
+	 * unit, rather than once a unit.
+	 */
+	public static BeginFrame(): void {
+		const shop = GUIInfo.OpenShop.IsOpen,
+			scoreboard = GUIInfo.Scoreboard.IsOpen,
+			window = RendererSDK.WindowSize
+		if (
+			shop === UnitData.shopOpen &&
+			scoreboard === UnitData.scoreboardOpen &&
+			window.x === UnitData.window.x &&
+			window.y === UnitData.window.y
+		) {
+			return
+		}
+		UnitData.shopOpen = shop
+		UnitData.scoreboardOpen = scoreboard
+		UnitData.window.CopyFrom(window)
+		UnitData.hud++
+	}
+	/**
+	 * Reads what the strips take off the unit, once a server tick: its number is set before its
+	 * data is applied, and it runs on through a pause, which holds the game's tick still.
+	 */
+	private readOwner(): void {
+		const tick = GameState.CurrentServerTick,
+			hud = UnitData.hud
+		if (this.readTick === tick && this.readHud === hud) {
+			return
+		}
+		this.readTick = tick
+		this.readHud = hud
+		const owner = this.Owner
+		this.teleported = this.IsTeleported
+		this.shown =
+			(this.teleported || owner.IsFogVisible || owner.IsVisible) &&
+			owner.IsAlive &&
+			!owner.IsHideWorldHud &&
+			!(owner.IsCreep && !owner.IsSpawned)
+		if (!this.shown) {
+			return
+		}
+		this.silenced = owner.IsSilenced
+		this.passiveDisabled = owner.IsPassiveDisabled
+		this.muted = owner.IsMuted
+		this.tethered = owner.IsTethered
+		this.barOffset = owner.HealthBarOffset
+		this.visualShield = owner.HasVisualShield
+		this.barSize.CopyFrom(owner.HealthBarSize)
+		this.barCorrection.CopyFrom(owner.HealthBarPositionCorrection)
+	}
+	/**
+	 * Whether the bars stand under the HUD, asked again only once they move, the HUD changes or a
+	 * server tick lands - the last for what the HUD lays out without a flag to watch, such as the
+	 * shop's own panels.
+	 */
+	private isCovered(start: Nullable<Vector2>, end: Nullable<Vector2>): boolean {
+		const tick = GameState.CurrentServerTick,
+			hud = UnitData.hud
+		if (
+			this.coverTick === tick &&
+			this.coverHud === hud &&
+			UnitData.same(this.coverStart, start) &&
+			UnitData.same(this.coverEnd, end)
+		) {
+			return this.covered
+		}
+		this.coverTick = tick
+		this.coverHud = hud
+		UnitData.keep(this.coverStart, start)
+		UnitData.keep(this.coverEnd, end)
+		this.covered = BaseGUI.Covered(start, end)
+		return this.covered
+	}
+	private static same(held: Vector2, position: Nullable<Vector2>): boolean {
+		return position === undefined
+			? !held.IsValid
+			: held.x === position.x && held.y === position.y
+	}
+	private static keep(held: Vector2, position: Nullable<Vector2>): void {
+		if (position === undefined) {
+			held.Invalidate()
+		} else {
+			held.CopyFrom(position)
+		}
 	}
 	public Draw(menu: MenuManager) {
 		const itemMenu = menu.ItemMenu,
@@ -53,30 +180,33 @@ export class UnitData {
 		if (!itemState && !spellState && !modifierState) {
 			return
 		}
-		const owner = this.Owner
 		const clone = this.cloneMode(menu)
 		if (clone === EMeepoClones.Hidden) {
 			return
 		}
 		const compact = clone === EMeepoClones.Compact,
 			spells = compact ? this.ownSpells : this.spells
-		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
-		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
+		const spellsDrawn = spellState && spells.length > 0
+		const itemsDrawn = itemState && !compact && this.items.length > 0
+		const modifiersDrawn = modifierState && this.modifiers.length > 0
+		if (!spellsDrawn && !itemsDrawn && !modifiersDrawn) {
 			return
 		}
-		if (owner.IsCreep && !owner.IsSpawned) {
+		this.readOwner()
+		if (!this.shown) {
 			return
 		}
-		const [position, positionEnd] = this.Positions
+		const [position, positionEnd] = this.Positions(this.teleported)
 		const distanceScale = this.getDistanceScale(position, positionEnd)
 
 		const scale = menu.Scale.value ? distanceScale : 1
 		const alpha = menu.Opacity.value * 2.55 * (menu.OpacityByCursor.value ? -1 : 1)
 
 		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
+		if (this.isCovered(position, positionEnd)) {
+			return
+		}
 
-		const spellsDrawn = spellState && spells.length > 0
-		const itemsDrawn = itemState && !compact && this.items.length > 0
 		if (itemsDrawn) {
 			this.itemGUI.Draw(
 				alpha,
@@ -85,8 +215,8 @@ export class UnitData {
 				this.GetAdditionalPosition(itemMenu).AddScalarX(
 					this.spellGUI.ColumnShift(spellMenu, itemMenu, spellsDrawn)
 				),
-				owner.IsMuted,
-				owner.IsTethered
+				this.muted,
+				this.tethered
 			)
 		}
 
@@ -96,12 +226,12 @@ export class UnitData {
 				spellMenu,
 				spells,
 				this.GetAdditionalPosition(spellMenu),
-				owner.IsSilenced,
-				owner.IsPassiveDisabled
+				this.silenced,
+				this.passiveDisabled
 			)
 		}
 
-		if (modifierState && this.modifiers.length) {
+		if (modifiersDrawn) {
 			this.modifierGUI.Draw(
 				alpha,
 				modifierMenu,
@@ -199,7 +329,7 @@ export class UnitData {
 		const itemState = itemMenu.State.value,
 			spellState = spellMenu.State.value,
 			modifierState = modifierMenu.State.value,
-			healthBarSize = this.Owner.HealthBarSize
+			healthBarSize = this.barSize
 
 		if (itemState) {
 			this.itemGUI.Update(
@@ -261,25 +391,26 @@ export class UnitData {
 		}
 		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
 	}
-	/** Where the bar over `origin` is drawn, measuring `body` under it on the way. */
-	public HealthBarPosition(
-		owner: Unit,
-		origin: Nullable<Vector3> = undefined,
-		body: Nullable<UnitBody> = undefined
+	/** Where the bar over `origin` is drawn, into `out`, measuring `body` under it on the way. */
+	private HealthBarPosition(
+		origin: Vector3,
+		body: UnitBody,
+		out: Vector2
 	): Nullable<Vector2> {
-		const feet = origin ?? owner.Position,
-			height = owner.HealthBarOffset
-		const head = RendererSDK.WorldToScreen(feet.Clone().AddScalarZ(height))
+		const height = this.barOffset
+		const head = RendererSDK.WorldToScreen(
+			this.feet.CopyFrom(origin).AddScalarZ(height)
+		)
 		if (head === undefined) {
 			return undefined
 		}
-		const screenPosition = head.Clone()
-		if (owner.HasVisualShield) {
-			screenPosition.AddScalarY(5)
+		out.CopyFrom(head)
+		if (this.visualShield) {
+			out.AddScalarY(5)
 		}
-		screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
-		body?.Measure(screenPosition, head, feet, height)
-		return screenPosition
+		out.SubtractForThis(this.barCorrection)
+		body.Measure(out, head, origin, height)
+		return out
 	}
 	/** How this unit is drawn if it is a Meepo clone, or nothing if it is not one. */
 	private cloneMode(menu: MenuManager): Nullable<EMeepoClones> {

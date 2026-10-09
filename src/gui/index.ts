@@ -13,7 +13,7 @@ import {
 	TextSurface
 } from "./types"
 
-export type { ItemDisplay, ModifierDisplay, SpellDisplay } from "./types"
+export type { CellShapeStyle, ItemDisplay, ModifierDisplay, SpellDisplay } from "./types"
 
 const ORIGIN = new Vector2()
 
@@ -53,6 +53,18 @@ export abstract class BaseGUI {
 	private static readonly washLightTop = new Color(200, 222, 255)
 	/** The wash at every brightness the row has stood at, minted once each. */
 	private static readonly washes = new Map<number, ArtWash>()
+	/** Colours read and never written, so a frame does not mint them per cell. */
+	protected static readonly transparent = new Color(0, 0, 0, 0)
+	protected static readonly black = new Color(0, 0, 0)
+	protected static readonly aqua = new Color(0, 255, 255)
+
+	/**
+	 * Scratch colours a cell is drawn in: the canvas reads a style's colours as it is called and
+	 * keeps none of them, so one of each serves every cell of the strip in turn.
+	 */
+	protected readonly cellRim = new Color()
+	protected readonly white = new Color(255, 255, 255)
+	private readonly shade = new Color(0, 0, 0)
 
 	protected readonly position = new Rectangle()
 	protected readonly positionEnd = new Rectangle()
@@ -134,14 +146,23 @@ export abstract class BaseGUI {
 		return menu.IsVertical ? 0 : height + border * 2
 	}
 
-	protected Contains() {
+	/**
+	 * Whether a bar at `position`, or where a teleport lands it, stands under the shop, the
+	 * minimap or the scoreboard - a unit's strips all share its bars, so this is asked once a unit
+	 * rather than once a strip.
+	 */
+	public static Covered(
+		position: Nullable<Vector2>,
+		positionEnd: Nullable<Vector2>
+	): boolean {
+		return BaseGUI.covers(position) || BaseGUI.covers(positionEnd)
+	}
+	private static covers(position: Nullable<Vector2>): boolean {
 		return (
-			GUIInfo.ContainsShop(this.position.pos1) ||
-			GUIInfo.ContainsMiniMap(this.position.pos1) ||
-			GUIInfo.ContainsScoreboard(this.position.pos1) ||
-			GUIInfo.ContainsShop(this.positionEnd.pos1) ||
-			GUIInfo.ContainsMiniMap(this.positionEnd.pos1) ||
-			GUIInfo.ContainsScoreboard(this.positionEnd.pos1)
+			position !== undefined &&
+			(GUIInfo.ContainsShop(position) ||
+				GUIInfo.ContainsMiniMap(position) ||
+				GUIInfo.ContainsScoreboard(position))
 		)
 	}
 	/**
@@ -156,6 +177,17 @@ export abstract class BaseGUI {
 			MenuSDK.DrawClock(preview),
 			menu.Animation.value && (!preview || MenuSDK.PreviewMotion.value)
 		)
+	}
+	/**
+	 * The tick a cell's reading of its spell or item is good for: everything a cell shows is
+	 * networked or timed off the game clock, and both move only as a server tick is applied,
+	 * its number landing before its data. The server's tick rather than the game's, which a
+	 * pause holds still while the server goes on sending - a spell learned in a pause shows at
+	 * once. The preview's cells run on the stage's clock instead and are read afresh every
+	 * frame, which is -1.
+	 */
+	protected Tick(): number {
+		return this.preview ? -1 : GameState.CurrentServerTick
 	}
 	/** Closes the strip's frame: every cell not seated this time is dropped. */
 	protected EndMotion(): void {
@@ -233,7 +265,7 @@ export abstract class BaseGUI {
 		alpha: number
 	): void {
 		this.canvas.Rect(position, size, {
-			color: Color.Black.SetA(alpha * (SHADE / 255)),
+			color: this.shade.SetA(alpha * (SHADE / 255)),
 			radius:
 				rounding === 0 ? Math.min(size.x, size.y) / 2 : Math.max(rounding / 2, 0)
 		})

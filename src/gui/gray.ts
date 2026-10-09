@@ -614,6 +614,8 @@ function encodePng(width: number, height: number, raw: Uint8Array): Uint8Array {
 const decoded = new Map<string, GrayImage | null>()
 /** Copies by path, size and wash, as the sources the host minted for them; `""` for one that could not be made. */
 const copies = new Map<string, string>()
+/** The sources of the copies still kept: one the cache has dropped is freed. */
+const held = new Set<string>()
 let decodesLeft = DECODES_PER_FRAME
 
 /** Keeps `value` under `key`, dropping the oldest entry once the map holds more than `limit`. */
@@ -675,10 +677,22 @@ export function WashCopy(
 			: RegisterImageBlob(
 					EncodeWashPng(CutGray(image, width, height), WashGrade(wash))
 				)
+	if (source !== "") {
+		held.add(source)
+	}
 	keep(copies, key, source, COPIES_KEPT, old => {
+		held.delete(old)
 		if (old !== "" && typeof FreeImageBlob === "function") {
 			FreeImageBlob(old)
 		}
 	})
 	return source === "" ? undefined : source
+}
+
+/**
+ * Whether `source`, a copy {@link WashCopy} handed out, is still kept: one it has since dropped is
+ * freed, and an element still showing it has to ask for the copy again.
+ */
+export function WashCopyHeld(source: Nullable<string>): boolean {
+	return source !== undefined && held.has(source)
 }

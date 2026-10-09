@@ -1,4 +1,4 @@
-import { OpenGrayFrame, WashCopy } from "./gray"
+import { OpenGrayFrame, WashCopy, WashCopyHeld } from "./gray"
 import { OpenRoundedFrame, RoundedArt } from "./rounded"
 import { ETextEffect, GuiCanvas, HudImageStyle, StyledText, TextSurface } from "./types"
 
@@ -32,6 +32,31 @@ interface Slot {
 	face?: string
 	weight?: number
 	typography?: string
+	/** The box, stacking order and visibility last written, so a frame that holds still writes none of them. */
+	left?: number
+	top?: number
+	width?: number
+	height?: number
+	order?: number
+	shown?: boolean
+	/** Whether the styles every element of its kind wears unchanged have been written. */
+	fixed?: boolean
+	/**
+	 * What an icon was last drawn from, and whether what it drew is final: a settled icon drawn
+	 * from the same inputs again has nothing left to write. One still waiting on the host - a
+	 * source not yet measured, a washed copy not yet cut - is never settled and is redone.
+	 */
+	path?: string
+	washSource?: string
+	wash?: object
+	grayscale?: boolean
+	settled?: boolean
+	/** The reading last written, and the numbers it was set in. */
+	text?: string
+	size?: number
+	lineHeight?: number
+	opacity?: number
+	align?: string
 }
 
 export class HudCanvas implements GuiCanvas, TextSurface {
@@ -41,6 +66,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	private static readonly cover: [number, number] = [0, 0]
 	public readonly Bounds: MenuSDK.ScreenRect = { x: 0, y: 0, w: 0, h: 0 }
 	private root: Nullable<HTMLElement>
+	/** The root's document, read once a frame: the native getter is too dear to ask per element. */
+	private document: Nullable<HTMLDocument>
 	private readonly shapes: Slot[] = []
 	private readonly strips: Slot[] = []
 	private readonly images: Slot[] = []
@@ -50,6 +77,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	private imageCount = 0
 	private textCount = 0
 	private order = 0
+	/** Layout units per screen pixel, read once a frame: the scale behind it is two host reads. */
+	private layoutUnit = 1
 
 	public readonly Ref = (element: HTMLElement | null | undefined): void => {
 		for (const slot of this.images) {
@@ -63,9 +92,12 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 			this.texts.length =
 				0
 		this.root = element ?? undefined
+		this.document = this.root?.ownerDocument ?? undefined
 	}
 
 	public Begin(): void {
+		this.document = this.root?.ownerDocument ?? undefined
+		this.layoutUnit = MenuSDK.ToLayoutUnits(1)
 		OpenGrayFrame()
 		OpenRoundedFrame()
 		this.shapeCount =
@@ -100,7 +132,7 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		}
 		const border = style.borderWidth ? Math.min(Math.max(style.borderWidth, 1), 2) : 0
 		this.place(
-			slot.element,
+			slot,
 			position.x - border / 2 - 1,
 			position.y - border / 2 - 1,
 			size.x + border + 2,
@@ -109,38 +141,39 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		const start = (style.start ?? -90) + 90 + (sweep < 0 ? sweep : 0)
 		const fill = style.color ?? Color.WhiteReadonly
 		const stroke = style.borderColor ?? Color.WhiteReadonly
-		const radius = MenuSDK.ToLayoutUnits(style.radius ?? 0)
-		const width = MenuSDK.ToLayoutUnits(border)
+		const radius = (style.radius ?? 0) * this.layoutUnit
+		const width = border * this.layoutUnit
 		const percent = Math.min(Math.abs(sweep) / 3.6, 100)
 		const from = ((start % 360) + 360) % 360
 		if (
-			slot.decorator === undefined ||
-			slot.radius !== radius ||
-			slot.fill !== fill.data32 ||
-			slot.border !== width ||
-			slot.stroke !== stroke.data32 ||
-			slot.sweep !== percent ||
-			slot.start !== from
+			slot.decorator !== undefined &&
+			slot.radius === radius &&
+			slot.fill === fill.data32 &&
+			slot.border === width &&
+			slot.stroke === stroke.data32 &&
+			slot.sweep === percent &&
+			slot.start === from
 		) {
-			slot.radius = radius
-			slot.fill = fill.data32
-			slot.border = width
-			slot.stroke = stroke.data32
-			slot.sweep = percent
-			slot.start = from
-			slot.decorator =
-				MenuSDK.SdfShape(
-					radius,
-					MenuSDK.CssColor(fill),
-					width,
-					MenuSDK.CssColor(stroke),
-					1,
-					0,
-					"",
-					percent,
-					from
-				).decorator ?? "none"
+			return
 		}
+		slot.radius = radius
+		slot.fill = fill.data32
+		slot.border = width
+		slot.stroke = stroke.data32
+		slot.sweep = percent
+		slot.start = from
+		slot.decorator =
+			MenuSDK.SdfShape(
+				radius,
+				MenuSDK.CssColor(fill),
+				width,
+				MenuSDK.CssColor(stroke),
+				1,
+				0,
+				"",
+				percent,
+				from
+			).decorator ?? "none"
 		MenuSDK.WriteStyle(slot.element, "decorator", slot.decorator)
 	}
 
@@ -205,7 +238,7 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		if (slot === undefined) {
 			return
 		}
-		this.place(slot.element, x - length / 2, y - thickness / 2, length, thickness)
+		this.place(slot, x - length / 2, y - thickness / 2, length, thickness)
 		MenuSDK.WriteStyle(slot.element, "background-color", fill)
 		MenuSDK.WriteStyle(
 			slot.element,
@@ -239,20 +272,42 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		const width = Math.max(Math.round(size.x), 1)
 		const height = Math.max(Math.round(size.y), 1)
 		const radius = style.circle ? Math.min(width, height) / 2 : (style.radius ?? 0)
+		const wash = style.wash
+		const color = style.color ?? Color.WhiteReadonly
+		const grayscale = style.grayscale === true
+		const resized = slot.width !== width || slot.height !== height
+		this.place(slot, Math.round(position.x), Math.round(position.y), width, height)
+		if (
+			slot.settled === true &&
+			!resized &&
+			slot.path === path &&
+			slot.radius === radius &&
+			slot.wash === wash &&
+			slot.washSource === style.washSource &&
+			slot.fill === color.data32 &&
+			slot.grayscale === grayscale &&
+			// a settled washed icon shows its copy, which the cache may have dropped and freed since
+			(wash === undefined || WashCopyHeld(slot.graySource))
+		) {
+			return
+		}
+		slot.path = path
+		slot.radius = radius
+		slot.wash = wash
+		slot.washSource = style.washSource
+		slot.fill = color.data32
+		slot.grayscale = grayscale
+		slot.settled = false
 		const rounded =
-			radius > 0 ? RoundedArt(path, width, height, radius, style.wash) : undefined
-		this.place(
-			slot.element,
-			Math.round(position.x),
-			Math.round(position.y),
-			width,
-			height
-		)
-		MenuSDK.WriteStyle(slot.element, "overflow", "hidden")
-		MenuSDK.WriteStyle(slot.element, "clip", "always")
-		// Rounded copies already carry antialiased coverage. A second rounded clip would
-		// cut those partially transparent edge pixels back to a jagged stencil boundary.
-		MenuSDK.WriteStyle(slot.element, "mask-image", "none")
+			radius > 0 ? RoundedArt(path, width, height, radius, wash) : undefined
+		if (slot.fixed !== true) {
+			slot.fixed = true
+			MenuSDK.WriteStyle(slot.element, "overflow", "hidden")
+			MenuSDK.WriteStyle(slot.element, "clip", "always")
+			// Rounded copies already carry antialiased coverage. A second rounded clip would
+			// cut those partially transparent edge pixels back to a jagged stencil boundary.
+			MenuSDK.WriteStyle(slot.element, "mask-image", "none")
+		}
 		MenuSDK.WritePx(
 			slot.element,
 			"border-radius",
@@ -266,7 +321,6 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		// a washed icon is a copy of the art grayed and graded in the wash, cut to the same box;
 		// while there is no copy yet, or none to be had, the art itself is tinted in the wash's
 		// top colour, which is the wash of a gray icon and a darkening of a coloured one
-		const wash = style.wash
 		const gray =
 			wash === undefined || rounded !== undefined
 				? undefined
@@ -284,7 +338,6 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		MenuSDK.WritePx(shown, "top", Math.round((height - artHeight) / 2))
 		MenuSDK.WritePx(shown, "width", artWidth)
 		MenuSDK.WritePx(shown, "height", artHeight)
-		const color = style.color ?? Color.WhiteReadonly
 		const tint =
 			wash === undefined || shown === slot.gray || rounded !== undefined
 				? color
@@ -297,16 +350,19 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		MenuSDK.WriteStyle(
 			shown,
 			"filter",
-			style.grayscale && wash === undefined ? "grayscale(1)" : "none"
+			grayscale && wash === undefined ? "grayscale(1)" : "none"
 		)
+		const measured = HudCanvas.naturals.has(path)
 		if (gray !== undefined && shown === slot.gray) {
 			if (slot.graySource !== gray) {
 				slot.graySource = gray
 				shown.setAttribute("src", gray)
 			}
+			slot.settled = radius <= 0 && measured
 			return
 		}
 		MenuSDK.WriteSizedArt(slot.art, rounded ?? path, artWidth, artHeight)
+		slot.settled = radius <= 0 && wash === undefined && measured
 	}
 
 	/**
@@ -364,7 +420,9 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 			command.effectColor * 84 + Math.round(opacity * 20) * 4 + command.effect
 		let effect = slot.effectStyle
 		let filter = slot.filterStyle
+		let restyled = false
 		if (effect === undefined || filter === undefined || slot.effect !== shading) {
+			restyled = true
 			slot.effect = shading
 			const shade = `#${(command.effectColor >>> 8).toString(16).padStart(6, "0")}${Math.round(
 				opacity * 255
@@ -384,22 +442,46 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		}
 		let color = slot.tintStyle
 		if (color === undefined || slot.tint !== command.color) {
+			restyled = true
 			slot.tint = command.color
 			slot.tintStyle =
 				color = `#${(command.color >>> 0).toString(16).padStart(8, "0")}`
 		}
-		this.place(element, command.x, command.y, command.w, command.h)
+		this.place(slot, command.x, command.y, command.w, command.h)
+		const lineHeight = command.lineHeight ?? command.h,
+			textOpacity = command.opacity ?? 1
+		if (
+			!restyled &&
+			slot.text === command.text &&
+			slot.size === command.size &&
+			slot.lineHeight === lineHeight &&
+			slot.opacity === textOpacity &&
+			slot.align === command.align &&
+			slot.face === family &&
+			slot.weight === weight &&
+			slot.typography === effect
+		) {
+			return
+		}
+		slot.text = command.text
+		slot.size = command.size
+		slot.lineHeight = lineHeight
+		slot.opacity = textOpacity
+		slot.align = command.align
+		if (slot.fixed !== true) {
+			slot.fixed = true
+			MenuSDK.WriteStyle(element, "white-space", "nowrap")
+			MenuSDK.WriteStyle(element, "overflow", "visible")
+		}
 		MenuSDK.WritePx(element, "font-size", command.size)
-		MenuSDK.WritePx(element, "line-height", command.lineHeight ?? command.h)
+		MenuSDK.WritePx(element, "line-height", lineHeight)
 		MenuSDK.WriteStyle(element, "font-family", family)
 		MenuSDK.WriteFmt(element, "font-weight", weight, "")
 		MenuSDK.WriteStyle(element, "font-effect", effect)
 		MenuSDK.WriteStyle(element, "filter", filter)
 		MenuSDK.WriteStyle(element, "color", color)
-		MenuSDK.WriteFmt(element, "opacity", command.opacity ?? 1, "")
+		MenuSDK.WriteFmt(element, "opacity", textOpacity, "")
 		MenuSDK.WriteStyle(element, "text-align", command.align)
-		MenuSDK.WriteStyle(element, "white-space", "nowrap")
-		MenuSDK.WriteStyle(element, "overflow", "visible")
 		if (
 			slot.face !== family ||
 			slot.weight !== weight ||
@@ -414,13 +496,14 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	}
 
 	private slot(pool: Slot[], index: number, image = false): Nullable<Slot> {
-		const root = this.root
-		if (root?.ownerDocument === undefined) {
+		const root = this.root,
+			document = this.document
+		if (root === undefined || document === undefined) {
 			return undefined
 		}
 		let slot = pool[index]
 		if (slot === undefined) {
-			const element = root.ownerDocument.createElement("div")
+			const element = document.createElement("div")
 			MenuSDK.applyStyle(element, {
 				position: "absolute",
 				display: "none",
@@ -428,8 +511,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 				backgroundColor: "transparent"
 			})
 			root.appendChild(element)
-			const art = image ? root.ownerDocument.createElement("img") : undefined
-			const gray = image ? root.ownerDocument.createElement("img") : undefined
+			const art = image ? document.createElement("img") : undefined
+			const gray = image ? document.createElement("img") : undefined
 			if (art !== undefined) {
 				MenuSDK.applyStyle(art, { position: "absolute", pointerEvents: "none" })
 				element.appendChild(art)
@@ -467,25 +550,47 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		this.Bounds.h = bottom - this.Bounds.y
 	}
 
-	private place(
-		element: HTMLElement,
-		x: number,
-		y: number,
-		width: number,
-		height: number
-	): void {
+	private place(slot: Slot, x: number, y: number, width: number, height: number): void {
 		this.grow(x, y, width, height)
-		MenuSDK.WritePx(element, "left", Math.round(x))
-		MenuSDK.WritePx(element, "top", Math.round(y))
-		MenuSDK.WritePx(element, "width", Math.round(width))
-		MenuSDK.WritePx(element, "height", Math.round(height))
-		MenuSDK.WriteFmt(element, "z-index", this.order++, "")
-		MenuSDK.WriteShown(element, true)
+		const element = slot.element,
+			left = Math.round(x),
+			top = Math.round(y),
+			boxWidth = Math.round(width),
+			boxHeight = Math.round(height),
+			order = this.order++
+		if (slot.left !== left) {
+			slot.left = left
+			MenuSDK.WritePx(element, "left", left)
+		}
+		if (slot.top !== top) {
+			slot.top = top
+			MenuSDK.WritePx(element, "top", top)
+		}
+		if (slot.width !== boxWidth) {
+			slot.width = boxWidth
+			MenuSDK.WritePx(element, "width", boxWidth)
+		}
+		if (slot.height !== boxHeight) {
+			slot.height = boxHeight
+			MenuSDK.WritePx(element, "height", boxHeight)
+		}
+		if (slot.order !== order) {
+			slot.order = order
+			MenuSDK.WriteFmt(element, "z-index", order, "")
+		}
+		if (slot.shown !== true) {
+			slot.shown = true
+			MenuSDK.WriteShown(element, true)
+		}
 	}
 
 	private hideUnused(pool: Slot[], used: number): void {
 		for (let index = used; index < pool.length; index++) {
-			MenuSDK.WriteShown(pool[index].element, false)
+			const slot = pool[index]
+			if (slot.shown !== false) {
+				slot.shown = false
+				MenuSDK.WriteShown(slot.element, false)
+			}
 		}
 	}
 }

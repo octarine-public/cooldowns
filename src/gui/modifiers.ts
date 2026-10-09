@@ -37,9 +37,6 @@ export class ModifierGUI extends BaseGUI {
 		modifiers: ModifierDisplay[],
 		additionalPosition: Vector2
 	): void {
-		if (this.Contains()) {
-			return
-		}
 		const rise = this.Rise(menu, this.size.y, GUIInfo.ScaleHeight(BaseGUI.border) + 1)
 		this.DrawAt(
 			this.position,

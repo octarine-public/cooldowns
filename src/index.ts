@@ -57,6 +57,7 @@ new (class CCooldowns {
 				return
 			}
 			UnitBody.BeginFrame()
+			UnitData.BeginFrame()
 			const arr = this.units.orderBy(x => x.Priority)
 			for (let i = arr.length - 1; i > -1; i--) {
 				arr[i].Draw(this.menu)
