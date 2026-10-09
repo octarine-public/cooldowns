@@ -9,7 +9,7 @@ import { MenuManager } from "../menu/index"
 import { PreviewDrag } from "./drag"
 import { PreviewGroup } from "./group"
 import { PreviewGuides } from "./guides"
-import { PreviewHealthBar } from "./healthbar"
+import { BarArt, BarReachOf, PreviewHealthBar } from "./healthbar"
 import {
 	BarAbilities,
 	DefaultHero,
@@ -18,7 +18,7 @@ import {
 	HeroRoster,
 	PreviewHero
 } from "./heroes"
-import { EPreviewUnit, PreviewModel, PreviewWearables } from "./models"
+import { EPreviewUnit, PreviewBarOf, PreviewModel, PreviewWearables } from "./models"
 import { PreviewSamples, SampleModifier } from "./samples"
 import { PreviewSilence } from "./silence"
 
@@ -30,6 +30,16 @@ const wearHint =
 	" underneath them, which is what the game draws before a hero is dressed"
 /** The body alone, for a card showing a hero undressed; handed out rather than minted a frame. */
 const bare: readonly string[] = []
+
+/** The bear's face, a sprite of the minimap's sheet, which is where the game takes it from. */
+const BEAR_ICON: BarArt = {
+	path: "materials/vgui/hud/minimap_hero_sheet.vtex_c",
+	region: { x: 384, y: 320, width: 32, height: 32 }
+}
+/** The room kept between the bar's drawing and the edges of the stage, in design pixels. */
+const GUTTER = 2
+/** How far the bar stands below the top of the stage at least: the silence is drawn over it. */
+const SILENCE_ROOM = 33
 
 /** How long the stage takes to drop a cell and bring it back, in seconds. */
 const CYCLE = 4
@@ -71,6 +81,10 @@ export class PreviewController {
 		}
 	}
 	private readonly samples = new PreviewSamples()
+	/** The point the game draws the unit's bar from, on the stage. */
+	private readonly anchor = new Vector2()
+	/** The face of the hero the card is dressed for, beside his bar and his courier's. */
+	private heroIcon: BarArt = { path: HeroIcon(DefaultHero.name) }
 	private readonly cursor = new Vector2()
 	private readonly stage = new Vector2()
 	private readonly spells: SpellGUI
@@ -258,7 +272,7 @@ export class PreviewController {
 	 */
 	public Dress(hero: PreviewHero): void {
 		this.hero = hero
-		this.HealthBar.Hero = hero.name
+		this.heroIcon = { path: HeroIcon(hero.name) }
 		const bar = BarAbilities(hero)
 		this.samples.SetAbilities(bar.length > 0 ? bar : DefaultHero.abilities)
 	}
@@ -311,42 +325,7 @@ export class PreviewController {
 			this.Drag.Cancel()
 		}
 		this.Drag.Tick()
-		const hero = this.Unit.SelectedID === 0
-		const barWidth = Math.min(
-			hero
-				? GUIInfo.ScaleHeight(
-						this.Team.SelectedID === ETeamState.Local ? 107 : 99
-					)
-				: GUIInfo.ScaleWidth(110),
-			width * 0.6
-		)
-		const barHeight = GUIInfo.ScaleHeight(hero ? 8 : 7)
-		const leftInset = GUIInfo.ScaleHeight(hero ? 27 : 2)
-		const topInset = GUIInfo.ScaleHeight(33)
-		this.Bar.pos1.x = Math.round(
-			Math.clamp(
-				(width - barWidth) / 2,
-				leftInset,
-				Math.max(leftInset, width - barWidth - GUIInfo.ScaleHeight(hero ? 20 : 2))
-			)
-		)
-		this.Bar.pos1.y = Math.round(
-			Math.clamp(
-				height * 0.34,
-				topInset,
-				Math.max(
-					topInset,
-					height -
-						Math.max(
-							barHeight + GUIInfo.ScaleHeight(9),
-							GUIInfo.ScaleHeight(hero ? 19 : 0)
-						)
-				)
-			)
-		)
-		this.Bar.pos2.x = this.Bar.x + barWidth
-		this.Bar.pos2.y = this.Bar.y + barHeight
-		this.HealthBar.Layout(this.Bar, hero)
+		this.layBar(width, height)
 		const [cursorX, cursorY] = MenuSDK.HostCursorPosition()
 		this.cursor.x = cursorX - this.Frame.x
 		this.cursor.y = cursorY - this.Frame.y
@@ -441,7 +420,7 @@ export class PreviewController {
 					)
 				)
 		)
-		this.HealthBar.Draw(visible, this.Bar, this.Team.SelectedID, hero)
+		this.HealthBar.Draw(visible, this.Team.SelectedID)
 		this.Silence.Draw(visible && this.ShowSilence.value, this.Bar)
 		if (this.AnchorArea !== undefined) {
 			const pad = MenuSDK.DpToPx(3)
@@ -465,6 +444,39 @@ export class PreviewController {
 			)
 		}
 		this.Guides.Draw(visible ? this.Drag.Guides : [])
+	}
+
+	/**
+	 * Lays the unit's bar out on the stage: the rectangle the SDK hands the script for it, which
+	 * the strips are laid out against, and the point the game draws its own bar from. The drawing
+	 * stays whole on the stage - centred where it fits, pushed in from an edge where it does not -
+	 * and stands low enough to leave the silence room over it.
+	 */
+	private layBar(width: number, height: number): void {
+		const unit = this.Unit.SelectedID
+		const spec = PreviewBarOf(unit, this.Team.SelectedID)
+		const pixel = GUIInfo.ScaleHeight(1)
+		const reach = BarReachOf(spec)
+		const left = (GUTTER - reach.left) * pixel
+		const right = width - (reach.right + GUTTER) * pixel
+		const anchorX =
+			left <= right
+				? Math.clamp(width / 2, left, right)
+				: (width - (reach.left + reach.right) * pixel) / 2
+		const top = Math.max(SILENCE_ROOM, GUTTER - reach.top - spec.correctionY) * pixel
+		const bottom = height - (reach.bottom + spec.correctionY + GUTTER) * pixel
+		this.Bar.pos1.x = Math.round(anchorX - spec.correctionX * pixel)
+		this.Bar.pos1.y = Math.round(
+			Math.clamp(height * 0.34, top, Math.max(top, bottom))
+		)
+		this.Bar.pos2.x = this.Bar.x + spec.width * pixel
+		this.Bar.pos2.y = this.Bar.y + spec.height * pixel
+		this.anchor.x = this.Bar.x + spec.correctionX * pixel
+		this.anchor.y = this.Bar.y + spec.correctionY * pixel
+		const bear = unit === EPreviewUnit.SpiritBear
+		this.HealthBar.Icon = bear ? BEAR_ICON : this.heroIcon
+		this.HealthBar.Level = bear ? "4" : "7"
+		this.HealthBar.Layout(this.Bar, this.anchor, spec)
 	}
 
 	/** Whether the cell a group cycles is away this instant, on the stage's clock at `offset`. */

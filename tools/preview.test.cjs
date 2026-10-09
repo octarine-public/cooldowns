@@ -93,6 +93,12 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 		HostImageReady: () => true,
 		WriteSizedArt(element, source) { element.source = source },
 		ReleaseSizedArt() { released++ },
+		// detaches the element and queues it to be freed, as the SDK's destroy queue does
+		deferDestroy(element, parent) {
+			const index = parent?.children.indexOf(element) ?? -1
+			if (index !== -1) parent.children.splice(index, 1)
+			element.destroyed = true
+		},
 		WritePx(element, name, value) { element.style[name] = value },
 		WriteFmt(element, name, value, suffix) { element.style[name] = `${value}${suffix}` },
 		WriteStyle(element, name, value) { element.style[name] = value },
@@ -1205,10 +1211,11 @@ test("the hero picker offers the game's own roster and dresses the one it is set
 	r.preview.Hero.Pick(0)
 	assert.equal(r.preview.Model(), "models/heroes/axe/axe.vmdl")
 	assert.deepEqual([...r.preview.Wearables()], ["models/heroes/axe/axe_weapon.vmdl"])
-	assert.equal(r.preview.HealthBar.Hero, "npc_dota_hero_axe")
 
-	// and the strip over him is his own bar, the hidden slots left out
+	// his face is in the bar as it is next laid out, and the strip over him is his own bar,
+	// the hidden slots left out
 	r.tick(true)
+	assert.equal(r.preview.HealthBar.Icon.path, "heroes/icons/npc_dota_hero_axe_png.vtex_c")
 	const art = r.roots[0].children
 		.flatMap(child => child.children.map(piece => piece.source))
 		.join(" ")
