@@ -594,3 +594,42 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		}
 	}
 }
+
+/**
+ * Readings pushed onto an SDK canvas's own surface, laid out the way the overlay lays them: the
+ * same box, line and snapped left edge, unclipped. A round modifier's art and ring stand on that
+ * canvas, and in the preview it stands over the card the overlay is drawn on, so a reading has
+ * to go out on it too to be seen over its icon. The SDK's glyph effects are black and hard, so
+ * the style's effect colour does not reach them and a soft shadow is cast as a plain one.
+ */
+export class SurfaceText implements TextSurface {
+	constructor(private readonly surface: MenuSDK.CHudSurface) {}
+
+	public Push(command: StyledText): void {
+		this.surface.Push({
+			kind: "text",
+			// the surface clips a run that is not preformatted to its box, rim and all
+			preformatted: true,
+			x: command.x,
+			y: command.y,
+			w: command.w,
+			h: command.h,
+			lineHeight: command.lineHeight,
+			align: command.align,
+			text: command.text,
+			size: command.size,
+			weight: command.weight,
+			family: command.family,
+			color: command.color,
+			opacity: command.opacity,
+			effect:
+				command.effect === ETextEffect.Shadow ||
+				command.effect === ETextEffect.SoftShadow
+					? MenuSDK.EHudTextEffect.Shadow
+					: command.effect === ETextEffect.Outline
+						? MenuSDK.EHudTextEffect.Outline
+						: MenuSDK.EHudTextEffect.None,
+			effectOpacity: command.effectOpacity
+		})
+	}
+}

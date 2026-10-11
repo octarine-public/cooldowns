@@ -147,12 +147,14 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	// here is not an instance of the Map the script tests against
 	const makeMap = vm.runInContext("entries => new Map(entries)", context)
 	const kv = entries => makeMap(Object.entries(entries))
-	// The SDK canvas the preview draws its round modifiers on, keeping every call it takes.
+	// The SDK canvas the preview draws its round modifiers on, keeping every call it takes, and
+	// the readings pushed onto the same surface, kept in the same list as "Text".
 	const timers = { calls: [] }
 	for (const name of ["Circle", "Image", "Arc", "CircleTimer", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values]) }
+	const timerText = { Push(command) { timers.calls.push(["Text", command]) } }
 	const cache = new Map()
 	function load(name) {
-		if (name === "render") return { canvas: {}, surface: {}, previewCanvas: timers }
+		if (name === "render") return { canvas: {}, canvasText: { Push() {} }, surface: {}, previewCanvas: timers, previewCanvasText: timerText }
 		if (cache.has(name)) return cache.get(name).exports
 		const base = path.join(__dirname, "..", name)
 		const filename = fs.existsSync(`${base}.ts`) ? `${base}.ts` : `${base}.tsx`
@@ -1342,7 +1344,7 @@ test("the hero wears his default items and nothing else on the stage does", () =
 		assert.deepEqual([...r.preview.Wearables()], [])
 	}
 })
-test("round modifiers are bare discs of art with the game's rings and item-sized readings", () => {
+test("round modifiers are bare discs of art with the game's rings and their readings over them", () => {
 	const r = runtime()
 	r.menu.ModifierMenu.ModeImage.SelectedID = 1
 	r.tick(true)
@@ -1352,7 +1354,9 @@ test("round modifiers are bare discs of art with the game's rings and item-sized
 	// Nothing blurs round them: no timer, no halo, only the art cut to a disc.
 	assert.equal(calls.filter(([name]) => name === "CircleTimer").length, 0)
 	const timers = calls.filter(([name]) => name === "Image").map(([, texture, at, extent, style]) => [texture, at, extent.x, style])
-	const readings = calls.filter(([name]) => name === "TextIn").map(call => call[1])
+	const readings = () => calls.filter(([name]) => name === "Text").map(call => call[1])
+	// Readings go out on the timers' own surface, laid out the overlay's way rather than clipped.
+	assert.equal(calls.filter(([name]) => name === "TextIn").length, 0)
 	assert.equal(timers.length, 4)
 	// Each icon is a disc at the preview's frame plus its place on the stage, its reading over it.
 	for (const [texture, at, , style] of timers) {
@@ -1376,16 +1380,15 @@ test("round modifiers are bare discs of art with the game's rings and item-sized
 		assert.equal(Math.round(color.a), Math.round(style.color.a))
 	}
 	const progress = () => rings().map(ring => Math.round((ring[5] / 360) * 1000) / 1000).sort((a, b) => a - b)
-	assert.deepEqual(readings.filter(text => text.endsWith(".0")).sort(), ["4.0", "5.0", "6.0", "7.0"])
-	const size = timers[0][2]
+	assert.deepEqual(readings().map(reading => reading.text).filter(text => text.endsWith(".0")).sort(), ["4.0", "5.0", "6.0", "7.0"])
 	const textStyle = r.menu.ModifierMenu.TextStyle
-	for (const [, text, , style] of calls.filter(([name]) => name === "TextIn")) {
-		const cooldown = text.includes(".")
-		const minimum = !cooldown && r.menu.ModifierMenu.Size.value === 0 ? 100 : 70
-		const scale = Math.max(textStyle.Size.value, minimum) / 100
-		assert.equal(style.size, Math.round((size / (cooldown ? 2 : 2.75) + 4) * scale))
-		assert.equal(style.weight, textStyle.FontWeight)
-		assert.equal(style.family, textStyle.FontFamily)
+	for (const reading of readings()) {
+		const timer = timers.find(([, at, size]) => reading.x >= at.x && reading.x < at.x + size && reading.y >= at.y && reading.y < at.y + size)
+		assert.ok(timer, `${reading.text} stands over its icon`)
+		assert.equal(reading.weight, textStyle.FontWeight)
+		assert.equal(reading.family, textStyle.FontFamily)
+		assert.equal(reading.effect, textStyle.Effect.SelectedID)
+		assert.equal(Math.round(reading.opacity * 255), Math.round(timer[3].color.a))
 	}
 	assert.deepEqual(progress(), [0.5, 0.625, 0.75, 0.875])
 	r.time(3)
@@ -1394,6 +1397,50 @@ test("round modifiers are bare discs of art with the game's rings and item-sized
 	assert.deepEqual(progress(), [0.25, 0.375, 0.5, 0.625])
 	// Nothing of it lands on the group's own surface but the room it takes, which frames the drag area.
 	assert.ok(r.roots[2].children.every(child => !child.shown))
+})
+
+test("modifier readings keep their smallest icon's look and grow with the icon, round or square", () => {
+	const r = runtime()
+	const modifiers = r.menu.ModifierMenu
+	r.menu.Style.Size.value = 86
+	for (const mode of [1, 0]) {
+		modifiers.ModeImage.SelectedID = mode
+		const sizes = []
+		for (let size = 0; size <= modifiers.Size.max; size++) {
+			modifiers.Size.value = size
+			r.timers.calls.length = 0
+			r.tick(true)
+			const readings = mode === 1
+				? r.timers.calls.filter(([name]) => name === "Text").map(([, command]) => [command.text, command.size])
+				: r.roots[2].children.filter(child => child.shown && child.text).map(child => [child.text, child.style["font-size"]])
+			const count = readings.find(([text]) => text === "2")[1]
+			const time = Math.max(...readings.filter(([text]) => text.includes(".")).map(([, font]) => font))
+			sizes.push([count, time])
+		}
+		// the smallest icon reads as it always has: an 11px count at full size, an 11px time at 86%
+		assert.deepEqual(sizes[0], [Math.round(18 / 2.75 + 4), Math.round((18 / 2 + 4) * 0.86)])
+		for (let size = 1; size < sizes.length; size++) {
+			assert.ok(sizes[size][0] >= sizes[size - 1][0], `count at ${size}: ${sizes[size][0]} < ${sizes[size - 1][0]}`)
+			assert.ok(sizes[size][1] >= sizes[size - 1][1], `time at ${size}: ${sizes[size][1]} < ${sizes[size - 1][1]}`)
+		}
+		// at the largest icon each reading is still about the share of it it has on the smallest
+		const largest = 18 + modifiers.Size.max
+		assert.ok(Math.abs(sizes.at(-1)[0] - (largest * (18 / 2.75 + 4)) / 18) <= 1)
+		assert.ok(Math.abs(sizes.at(-1)[1] - (largest * (18 / 2 + 4) * 0.86) / 18) <= 1)
+	}
+})
+
+test("readings pushed onto an SDK surface keep the overlay's layout, unclipped, in the effects it has", () => {
+	const r = runtime()
+	const { SurfaceText } = r.load("src/gui/canvas")
+	const pushed = []
+	const text = new SurfaceText({ Push(command) { pushed.push(command) } })
+	const command = { kind: "text", x: 3, y: 4, w: 7, h: 11, lineHeight: 11, align: "left", text: "2", size: 11, weight: 700, family: "Roboto", color: 0xffffffff, opacity: 0.5, effect: 3, effectColor: 0xff0000ff, effectOpacity: 0.8 }
+	for (const [effect, expected] of [[0, 0], [1, 1], [2, 2], [3, 1]]) {
+		text.Push({ ...command, effect })
+		const { effectColor, ...rest } = command
+		assert.deepEqual({ ...pushed.at(-1) }, { ...rest, effect: expected, preformatted: true })
+	}
 })
 
 test("square modifiers wear the ring's band as a frame inside the icon, draining clockwise from twelve o'clock", () => {

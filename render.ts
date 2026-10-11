@@ -1,4 +1,4 @@
-import { HudCanvas } from "./src/gui/canvas"
+import { HudCanvas, SurfaceText } from "./src/gui/canvas"
 
 /**
  * The one overlay every strip is drawn on - frames, icons and readings in a single pool of the
@@ -15,6 +15,10 @@ export const surface = new HudCanvas()
  * anything the overlay paints at the same spot.
  */
 export const canvas = new MenuSDK.Canvas("cooldowns")
+/** The readings over a round modifier, on the surface that canvas draws on. */
+export const canvasText = new SurfaceText(
+	MenuSDK.HudSurfaceOf("cooldowns", MenuSDK.EPanelLayer.World)
+)
 
 /**
  * The same for the preview: it stands with the menu, so its timers go out on the menu's layer,
@@ -24,6 +28,10 @@ export const canvas = new MenuSDK.Canvas("cooldowns")
 export const previewCanvas = new MenuSDK.Canvas(
 	"cooldowns-preview",
 	MenuSDK.EPanelLayer.Menu
+)
+/** The readings over a round modifier in the preview, on the surface that canvas draws on. */
+export const previewCanvasText = new SurfaceText(
+	MenuSDK.HudSurfaceOf("cooldowns-preview", MenuSDK.EPanelLayer.Menu)
 )
 
 MenuSDK.RegisterPanel(

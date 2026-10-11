@@ -1,4 +1,4 @@
-import { previewCanvas } from "../../render"
+import { previewCanvas, previewCanvasText } from "../../render"
 import { ETeamState } from "../enum"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
@@ -211,7 +211,8 @@ export class PreviewController {
 			() => this.cursor,
 			true,
 			previewCanvas,
-			() => this.stage.SetVector(this.Frame.x, this.Frame.y)
+			() => this.stage.SetVector(this.Frame.x, this.Frame.y),
+			previewCanvasText
 		)
 		this.Unit.OnValue(() => {
 			const hero = this.Unit.SelectedID === EPreviewUnit.Hero

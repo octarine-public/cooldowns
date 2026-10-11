@@ -1,4 +1,4 @@
-import { canvas as timerCanvas, surface } from "../../render"
+import { canvas as timerCanvas, canvasText, surface } from "../../render"
 import { BaseMenu } from "../menu/base"
 import { TextStyleMenu } from "../menu/style"
 import { UnitBody } from "../models/body"
@@ -13,7 +13,14 @@ import {
 	TextSurface
 } from "./types"
 
-export type { CellShapeStyle, ItemDisplay, ModifierDisplay, SpellDisplay } from "./types"
+export { DrawStyledText } from "./text"
+export type {
+	CellShapeStyle,
+	ItemDisplay,
+	ModifierDisplay,
+	SpellDisplay,
+	TextSurface
+} from "./types"
 
 const ORIGIN = new Vector2()
 
@@ -84,6 +91,7 @@ export abstract class BaseGUI {
 	 * stands on that canvas: nowhere in the game, where both are the screen, and at the stage's
 	 * frame in the preview. A surface with no such canvas draws its rings itself. `preview` says
 	 * the strip is a preview's: its motion runs on the stage's clock and stands still with it.
+	 * `timerText` is where the readings over a round icon go out: the surface `timers` draws on.
 	 */
 	constructor(
 		protected readonly canvas: GuiCanvas = surface,
@@ -91,7 +99,8 @@ export abstract class BaseGUI {
 		private readonly cursor: () => Vector2 = () => InputManager.CursorOnScreen,
 		private readonly preview = false,
 		protected readonly timers: MenuSDK.Canvas | null = timerCanvas,
-		protected readonly origin: () => Vector2 = () => ORIGIN
+		protected readonly origin: () => Vector2 = () => ORIGIN,
+		protected readonly timerText: TextSurface = canvasText
 	) {}
 
 	public Update(

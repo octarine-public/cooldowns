@@ -1,10 +1,20 @@
 import { EModeImage } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"
 import { UnitBody } from "../models/body"
-import { BaseGUI, ModifierDisplay } from "./index"
+import { BaseGUI, DrawStyledText, ModifierDisplay, TextSurface } from "./index"
 
 export class ModifierGUI extends BaseGUI {
 	private static readonly minSize = 18
+	/**
+	 * How tall a reading is against its icon at the text style's full size: what it is on the
+	 * smallest icon - half the icon and four pixels for the time left, a 2.75th and four for a
+	 * stack count - kept as the icon grows. A few fixed pixels and a fraction of the icon would
+	 * thin a reading out against a larger one.
+	 */
+	private static readonly timeShare =
+		(ModifierGUI.minSize / 2 + 4) / ModifierGUI.minSize
+	private static readonly countShare =
+		(ModifierGUI.minSize / 2.75 + 4) / ModifierGUI.minSize
 	private static readonly debuffColor = new Color(242, 82, 87)
 	/** The band on an icon's edge, ring or frame: a twelfth of its size, and a pixel at least. */
 	private static readonly bandFraction = 0.08
@@ -64,7 +74,6 @@ export class ModifierGUI extends BaseGUI {
 			return
 		}
 		const vecSize = this.size,
-			additionalSize = menu.Size.value,
 			modeImage = menu.ModeImage.SelectedID,
 			border = GUIInfo.ScaleHeight(BaseGUI.border)
 
@@ -133,35 +142,55 @@ export class ModifierGUI extends BaseGUI {
 				circle: modeImage === EModeImage.Round
 			})
 			this.outline(ratio, position, modeImage, outlinedColor)
-
-			if (charge !== 0) {
-				this.Text(
-					menu.TextStyle,
-					charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
-					position,
-					TextFlags.Right | TextFlags.Bottom,
-					2.75,
-					undefined,
-					additionalSize === 0 ? 100 : 70
-				)
-			}
-
-			if (!menu.Remaining.value || cooldown <= 0) {
-				continue
-			}
-
-			const minOffset = 3
-			const noCharge = charge === 0
-
-			const flags = noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top
-			const cdText = cooldown.toFixed(cooldown <= 10 ? 1 : 0)
-			const canOffset = !noCharge && additionalSize >= minOffset
-			const textPosition = canOffset
-				? position.Clone().Add(GUIInfo.ScaleVector(minOffset, minOffset))
-				: position
-
-			this.Text(menu.TextStyle, cdText, textPosition, flags)
+			this.readings(this.textSurface, menu, position, charge, cooldown)
 		}
+	}
+	/**
+	 * The stack count in the icon's bottom right corner, and the time left over its middle, or in
+	 * its top left corner beside a count. Each is the share of the icon it has on the smallest
+	 * one, and a count is never set under the style's full size: under it, a count on the
+	 * smallest icon no longer reads.
+	 */
+	private readings(
+		target: TextSurface,
+		menu: ModifierMenu,
+		box: Rectangle,
+		charge: number,
+		cooldown: number,
+		color?: Color
+	) {
+		const style = menu.TextStyle,
+			height = box.Height
+		if (charge !== 0) {
+			DrawStyledText(
+				style,
+				charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
+				box,
+				TextFlags.Right | TextFlags.Bottom,
+				height * ModifierGUI.countShare,
+				color,
+				target,
+				100
+			)
+		}
+		if (!menu.Remaining.value || cooldown <= 0) {
+			return
+		}
+		const minOffset = 3,
+			noCharge = charge === 0
+		const textBox =
+			!noCharge && menu.Size.value >= minOffset
+				? box.Clone().Add(GUIInfo.ScaleVector(minOffset, minOffset))
+				: box
+		DrawStyledText(
+			style,
+			cooldown.toFixed(cooldown <= 10 ? 1 : 0),
+			textBox,
+			noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top,
+			height * ModifierGUI.timeShare,
+			color,
+			target
+		)
 	}
 	/**
 	 * A horizontal strip is centred on the health bar with `border` either side of every cell,
@@ -209,8 +238,8 @@ export class ModifierGUI extends BaseGUI {
 	}
 	/**
 	 * A round portrait with the modifier's colour and remaining duration, the art cut to a disc
-	 * and the ring on its rim with nothing round it: a halo blurs an icon this small. Readings
-	 * use the same sizing as item cooldowns and charges.
+	 * and the ring on its rim with nothing round it: a halo blurs an icon this small. Its readings
+	 * are a square icon's, laid out the overlay's way on the surface the portrait stands on.
 	 */
 	private circleTimer(
 		timers: MenuSDK.Canvas,
@@ -224,8 +253,6 @@ export class ModifierGUI extends BaseGUI {
 		cooldown: number
 	) {
 		const size = Math.min(position.Width, position.Height)
-		const style = menu.TextStyle
-		const scale = Math.max(style.Size.value, 70) / 100
 		// the surface this row is laid out on still frames and drags it
 		const extent = position.Size
 		this.canvas.Reserve(position.pos1, extent)
@@ -238,36 +265,14 @@ export class ModifierGUI extends BaseGUI {
 			color: Color.White.SetA(alpha)
 		})
 		ModifierGUI.ring(timers, at.AddScalar(size / 2), size, ratio, color)
-		const box = new Rectangle(at, at.Add(extent))
-		if (menu.Remaining.value && cooldown > 0) {
-			const noCharge = charge === 0
-			const textBox =
-				!noCharge && menu.Size.value >= 3
-					? box.Clone().Add(GUIInfo.ScaleVector(3, 3))
-					: box
-			timers.TextIn(cooldown.toFixed(cooldown <= 10 ? 1 : 0), textBox, {
-				flags: noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top,
-				size: Math.round((size / 2 + 4) * scale),
-				color: style.Color.SelectedColor.Clone().SetA(alpha),
-				family: style.FontFamily,
-				weight: style.FontWeight
-			})
-		}
-		if (charge !== 0) {
-			const chargeScale =
-				Math.max(style.Size.value, menu.Size.value === 0 ? 100 : 70) / 100
-			timers.TextIn(
-				charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
-				box,
-				{
-					flags: TextFlags.Right | TextFlags.Bottom,
-					size: Math.round((size / 2.75 + 4) * chargeScale),
-					color: style.Color.SelectedColor.Clone().SetA(alpha),
-					family: style.FontFamily,
-					weight: style.FontWeight
-				}
-			)
-		}
+		this.readings(
+			this.timerText,
+			menu,
+			new Rectangle(at, at.Add(extent)),
+			charge,
+			cooldown,
+			menu.TextStyle.Color.SelectedColor.Clone().SetA(alpha)
+		)
 	}
 	/** The band's width for an icon that size: a twelfth of it, and a pixel at least. */
 	private static bandWidth(size: number): number {
