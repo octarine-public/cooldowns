@@ -40,6 +40,20 @@ export type GuiCanvas = Pick<MenuSDK.Canvas, "Rect" | "Circle" | "Arc"> & {
 	Image(path: string, position: Vector2, size: Vector2, style?: HudImageStyle): void
 	/** Counts a box drawn on another surface into this one's bounds, which frame and drag it. */
 	Reserve(position: Vector2, size: Vector2): void
+	/**
+	 * Draws what follows into the group of `key`, standing at the whole pixel `x`, `y`: a strip
+	 * of its own that moves as one and keeps its elements whatever else is drawn.
+	 */
+	BeginGroup(key: object, x: number, y: number): void
+	/** Closes the group being drawn into. */
+	EndGroup(): void
+	/**
+	 * Holds the group of `key` over this frame as the last one left it, moved to `x`, `y`, and
+	 * answers whether it could: where it could not, the strip is drawn as ever.
+	 */
+	KeepGroup(key: object, x: number, y: number): boolean
+	/** How far `point` stands from what the group of `key` last drew, were it standing at `x`, `y`. */
+	GroupDistance(key: object, x: number, y: number, point: Vector2): number
 }
 
 export const enum ETextEffect {

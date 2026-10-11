@@ -1,12 +1,13 @@
 import { HudCanvas, SurfaceText } from "./src/gui/canvas"
 
 /**
- * The one overlay every strip is drawn on - frames, icons and readings in a single pool of the
- * script's own elements, the way deadlock-esp draws its cells. The icons are `img` elements
- * minted at the whole-pixel size they stand at rather than a shared canvas cutting art to
- * cover a box, so what the preview shows is what the game draws.
+ * The one overlay every strip is drawn on - frames, icons and readings as the script's own
+ * elements, the way deadlock-esp draws its cells, each strip in a container of its own that
+ * moves with it. The icons are `img` elements minted at the whole-pixel size they stand at
+ * rather than a shared canvas cutting art to cover a box, so what the preview shows is what the
+ * game draws.
  */
-export const surface = new HudCanvas()
+export const surface = new HudCanvas(true)
 
 /**
  * The SDK's own canvas, for what is drawn the way teleport-esp draws its markers: a round

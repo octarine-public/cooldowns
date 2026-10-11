@@ -79,6 +79,26 @@ export class ModifierGUI extends BaseGUI {
 
 		const vertical = menu.IsVertical
 
+		// a round icon is drawn on the SDK canvas, which keeps nothing from one frame to the next:
+		// such a strip is drawn every frame, and its group on this canvas holds nothing to keep
+		const round = this.timers !== null && modeImage === EModeImage.Round
+		const stamp = round
+			? undefined
+			: this.Restamp(recPosition, mainAlpha, menu, modifiers.length)
+		if (stamp !== undefined) {
+			stamp.Put(vecSize.x)
+			stamp.Put(vecSize.y)
+			stamp.Put(border)
+			stamp.Put(modeImage)
+			stamp.Put(menu.Remaining.value)
+			for (let index = 0; index < modifiers.length; index++) {
+				stamp.Put(modifiers[index])
+			}
+			if (this.Keep(stamp, recPosition, additionalPosition, mainAlpha, vecSize)) {
+				return
+			}
+		}
+		this.BeginStrip(recPosition, additionalPosition)
 		for (let index = 0; index < modifiers.length; index++) {
 			const modifier = modifiers[index]
 			// nothing of this strip moves: a modifier is drawn whole in its own lane the frame it
@@ -144,6 +164,7 @@ export class ModifierGUI extends BaseGUI {
 			this.outline(ratio, position, modeImage, outlinedColor)
 			this.readings(this.textSurface, menu, position, charge, cooldown)
 		}
+		this.EndStrip()
 	}
 	/**
 	 * The stack count in the icon's bottom right corner, and the time left over its middle, or in
@@ -197,7 +218,8 @@ export class ModifierGUI extends BaseGUI {
 	 * so a lane is that pitch from the bar's middle; a vertical one stands beside the bar's right
 	 * end, as the spell and item columns do, its cells under each other from the bar's top. A
 	 * column is laid from the bar's end rather than its middle so one offset clears every bar:
-	 * Roshan's is twice a hero's, and a column pushed clear of a hero's stood on his.
+	 * Roshan's is twice a hero's, and a column pushed clear of a hero's stood on his. The cell is
+	 * laid out from the strip's whole-pixel anchor, as every strip's is.
 	 */
 	protected GetPosition(
 		rec: Rectangle,
@@ -209,9 +231,12 @@ export class ModifierGUI extends BaseGUI {
 	) {
 		const pitch = border * 2
 		const pos1 = vertical
-			? new Vector2(rec.x + rec.Width + pitch, rec.y + lane * (size.y + pitch))
-			: new Vector2(rec.x + rec.Width / 2 + border + lane * (size.x + pitch), rec.y)
-		return pos1.AddForThis(additional).RoundForThis()
+			? new Vector2(rec.Width + pitch, lane * (size.y + pitch))
+			: new Vector2(rec.Width / 2 + border + lane * (size.x + pitch), 0)
+		return pos1
+			.RoundForThis()
+			.AddScalarX(BaseGUI.Anchor(rec.x, additional.x))
+			.AddScalarY(BaseGUI.Anchor(rec.y, additional.y))
 	}
 	/**
 	 * What is left of the modifier, on the icon's own edge and over its art: a ring on a round

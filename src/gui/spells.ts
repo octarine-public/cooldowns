@@ -121,7 +121,27 @@ export class SpellGUI extends BaseGUI {
 		const vecSize = this.size,
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1),
 			vertical = menu.IsVertical
+		const stamp = this.Restamp(recPosition, mainAlpha, menu, spells.length)
+		if (stamp !== undefined) {
+			stamp.Put(vecSize.x)
+			stamp.Put(vecSize.y)
+			stamp.Put(border)
+			stamp.Put(menu.IsMinimalistic.value)
+			stamp.Put(menu.LevelColor.SelectedColor.data32)
+			stamp.Put(menu.ChargeColor.SelectedColor.data32)
+			stamp.Put(isSilenced)
+			stamp.Put(isPassiveDisabled)
+			for (let index = 0; index < spells.length; index++) {
+				const entry = spells[index]
+				stamp.Put(entry[0])
+				stamp.Put(entry[1])
+			}
+			if (this.Keep(stamp, recPosition, additionalPosition, mainAlpha, vecSize)) {
+				return
+			}
+		}
 		this.wash = this.NoManaWash(menu)
+		this.BeginStrip(recPosition, additionalPosition)
 		this.BeginMotion(menu)
 		for (let index = 0; index < spells.length; index++) {
 			const [spell, idx] = spells[index]
@@ -219,6 +239,7 @@ export class SpellGUI extends BaseGUI {
 			}
 		}
 		this.EndMotion()
+		this.EndStrip()
 	}
 	private minimilistic(
 		idx: number,

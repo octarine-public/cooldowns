@@ -116,7 +116,24 @@ export class ItemGUI extends BaseGUI {
 			border = GUIInfo.ScaleHeight(BaseGUI.border + 1),
 			vertical = menu.IsVertical
 
+		const stamp = this.Restamp(recPosition, mainAlpha, menu, items.length)
+		if (stamp !== undefined) {
+			stamp.Put(vecSize.x)
+			stamp.Put(vecSize.y)
+			stamp.Put(border)
+			stamp.Put(menu.SquareMode.SelectedID)
+			stamp.Put(menu.DimOnCooldown.value)
+			stamp.Put(isDisable)
+			stamp.Put(isTethered)
+			for (let index = 0; index < items.length; index++) {
+				stamp.Put(items[index])
+			}
+			if (this.Keep(stamp, recPosition, additionalPosition, mainAlpha, vecSize)) {
+				return
+			}
+		}
 		this.wash = this.NoManaWash(menu)
+		this.BeginStrip(recPosition, additionalPosition)
 		this.BeginMotion(menu)
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index]
@@ -220,6 +237,7 @@ export class ItemGUI extends BaseGUI {
 			this.Text(menu.TextStyle, cdText, textPosition, flags)
 		}
 		this.EndMotion()
+		this.EndStrip()
 	}
 	/** The cell's reading of `item`, taken afresh only on a new tick or for another item. */
 	private read(item: ItemDisplay, index: number): ItemReading {

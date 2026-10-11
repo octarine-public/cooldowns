@@ -3,7 +3,7 @@ import { BaseMenu } from "../menu/base"
 import { TextStyleMenu } from "../menu/style"
 import { UnitBody } from "../models/body"
 import { easeOut, ISlotMotion, SlotMotion } from "./motion"
-import { DrawStyledText } from "./text"
+import { DrawStyledText, Unmeasured } from "./text"
 import {
 	ArtWash,
 	GuiCanvas,
@@ -35,6 +35,46 @@ const SHADE = 100
 
 /** What a ring is struck on: the strip's own surface, or the SDK canvas a round timer stands on. */
 type RingCanvas = Pick<MenuSDK.Canvas, "Rect" | "Circle">
+
+/**
+ * What one strip's cells were last drawn from, put in a value at a time in the same order every
+ * frame, and what that drawing left behind: a frame put together from the same values draws the
+ * same cells, so the strip can be held over it as it stands, see {@link BaseGUI.Keep}.
+ */
+export class StripStamp {
+	/**
+	 * Whether the last drawing was final: run to its end with every reading measured. A reading
+	 * laid out before the host had measured it moves once the measure lands.
+	 */
+	public final = false
+	/** Whether the cursor dimmed any cell of the last drawing, see {@link BaseGUI.GetAlpha}. */
+	public shaded = false
+	private readonly values: unknown[] = []
+	private index = 0
+	private same = true
+
+	public Begin(): void {
+		this.index = 0
+		this.same = true
+	}
+	public Put(value: unknown): void {
+		const values = this.values
+		if (values[this.index] !== value) {
+			values[this.index] = value
+			this.same = false
+		}
+		this.index++
+	}
+	/** Closes the frame's values and answers whether they are the last frame's, every one. */
+	public Close(): boolean {
+		const values = this.values
+		if (values.length !== this.index) {
+			values.length = this.index
+			this.same = false
+		}
+		return this.same
+	}
+}
 
 export abstract class BaseGUI {
 	protected static readonly border = 2
@@ -84,6 +124,16 @@ export abstract class BaseGUI {
 	protected wash: Nullable<ArtWash>
 	/** The entrances and the reflow of this strip's cells, kept between frames. */
 	private readonly motion = new SlotMotion()
+	/** What the strip at each bar was last drawn from: where the unit stands, and where a teleport lands it. */
+	private readonly stampStart = new StripStamp()
+	private readonly stampEnd = new StripStamp()
+	/**
+	 * The stamp of the strip being drawn, and what its drawing has come across so far: whether
+	 * the cursor dimmed a cell, and the count of unmeasured readings it opened at.
+	 */
+	private stamp = this.stampStart
+	private shading = false
+	private unmeasured = 0
 
 	/**
 	 * `timers` is the SDK canvas a round icon is drawn on as its circular timer, the way
@@ -325,10 +375,125 @@ export abstract class BaseGUI {
 		)
 	}
 	/**
+	 * Opens the strip at the bar `rec` on a group of the canvas of its own, standing at the
+	 * strip's anchor - the bar's corner moved by the strip's offset - on the whole pixel
+	 * {@link BaseGUI.Anchor} rounds it to, the one every cell is laid out from. The bar is the
+	 * strip's own, one for where the unit stands and one for where a teleport lands it, so it
+	 * keys the strip. Everything the strip draws until {@link BaseGUI.EndStrip} goes in it.
+	 */
+	protected BeginStrip(rec: Rectangle, additionalPosition: Vector2): void {
+		this.stamp = this.stampOf(rec)
+		this.stamp.final = false
+		this.shading = false
+		this.unmeasured = Unmeasured()
+		this.canvas.BeginGroup(
+			rec,
+			BaseGUI.Anchor(rec.x, additionalPosition.x),
+			BaseGUI.Anchor(rec.y, additionalPosition.y)
+		)
+	}
+	/** Closes the strip's group, and notes what its stamp needs to know of the drawing. */
+	protected EndStrip(): void {
+		this.canvas.EndGroup()
+		const stamp = this.stamp
+		stamp.final = Unmeasured() === this.unmeasured
+		stamp.shaded = this.shading
+	}
+	/**
+	 * Opens the stamp of the strip at the bar `rec` and puts in it what every strip's `count`
+	 * cells are drawn from: the server tick and the game's clock, which every reading moves
+	 * with; the window, which the strip is scaled for; the bar's width, which the cells are laid
+	 * along; the strip's opacity; and the rows of the menu every strip reads, its text style
+	 * whole. The caller puts its own after these and asks {@link BaseGUI.Keep}. There is none in
+	 * the preview, whose cells run on the stage's clock and are drawn afresh every frame.
+	 */
+	protected Restamp(
+		rec: Rectangle,
+		mainAlpha: number,
+		menu: BaseMenu,
+		count: number
+	): Nullable<StripStamp> {
+		if (this.preview) {
+			return undefined
+		}
+		const stamp = this.stampOf(rec),
+			window = RendererSDK.WindowSize,
+			style = menu.TextStyle
+		stamp.Begin()
+		stamp.Put(count)
+		stamp.Put(GameState.CurrentServerTick)
+		stamp.Put(GameState.RawGameTime)
+		stamp.Put(window.x)
+		stamp.Put(window.y)
+		stamp.Put(rec.Width)
+		stamp.Put(mainAlpha)
+		stamp.Put(menu.Size.value)
+		stamp.Put(menu.Rounding.value)
+		stamp.Put(menu.IsVertical)
+		stamp.Put(menu.Animation.value)
+		stamp.Put(menu.NoMana.value)
+		stamp.Put(style)
+		stamp.Put(style.Size.value)
+		stamp.Put(style.FontFamily)
+		stamp.Put(style.FontWeight)
+		stamp.Put(style.Color.SelectedColor.data32)
+		stamp.Put(style.Effect.SelectedID)
+		stamp.Put(style.EffectColor.SelectedColor.data32)
+		stamp.Put(style.EffectOpacity.value)
+		stamp.Put(MenuSDK.FontEpoch())
+		return stamp
+	}
+	/**
+	 * Holds the strip at the bar `rec` over this frame as it stands, moved to where the bar is,
+	 * and answers whether it did: the caller then draws none of its cells. Only a strip whose
+	 * stamp is the last frame's to the value, whose last drawing was final, whose cells all stand
+	 * still and whose group the canvas can hold, see {@link GuiCanvas.KeepGroup}. Where the
+	 * cursor dims a cell by its distance - a strip drawn at an opacity under nought - the strip
+	 * is held only while the cursor stands too far from every cell to dim any of them, and its
+	 * last drawing dimmed none: `cellSize` is how far that reaches, as {@link BaseGUI.GetAlpha}
+	 * has it.
+	 */
+	protected Keep(
+		stamp: StripStamp,
+		rec: Rectangle,
+		additionalPosition: Vector2,
+		mainAlpha: number,
+		cellSize: Vector2
+	): boolean {
+		if (!stamp.Close() || !stamp.final || !this.motion.Still) {
+			return false
+		}
+		const x = BaseGUI.Anchor(rec.x, additionalPosition.x),
+			y = BaseGUI.Anchor(rec.y, additionalPosition.y)
+		if (
+			mainAlpha <= 0 &&
+			(stamp.shaded ||
+				this.canvas.GroupDistance(rec, x, y, this.cursor()) <
+					BaseGUI.reach(cellSize))
+		) {
+			return false
+		}
+		return this.canvas.KeepGroup(rec, x, y)
+	}
+	/** The stamp of the strip at the bar `rec`. */
+	private stampOf(rec: Rectangle): StripStamp {
+		return rec === this.positionEnd ? this.stampEnd : this.stampStart
+	}
+	/**
+	 * The whole pixel a strip is laid out from along one axis: the bar's edge moved by the
+	 * strip's offset. A cell stands at that pixel plus its own offset from it rounded, so while
+	 * the strip only moves every cell keeps its place in it to the pixel, rather than each one
+	 * rounding its own fraction of a moving bar and stepping a pixel against the others.
+	 */
+	protected static Anchor(edge: number, offset: number): number {
+		return Math.round(edge + offset)
+	}
+	/**
 	 * Where the cell in `lane` starts. A horizontal strip is a row over the health bar centred
 	 * on it, so a lane is counted from the bar's middle and is a fraction of one while the strip
 	 * is reflowing; a vertical strip is a column hanging from the bar's top at its right end,
-	 * and counts down from there.
+	 * and counts down from there. The cell's offset from the strip's anchor is rounded on its own
+	 * and the anchor is a whole pixel, see {@link BaseGUI.Anchor}.
 	 */
 	protected GetPosition(
 		rec: Rectangle,
@@ -339,15 +504,15 @@ export abstract class BaseGUI {
 		vertical = false
 	) {
 		const start = vertical
-			? new Vector2(
-					rec.x + rec.Width + border * 2,
-					rec.y + lane * (size.y + border)
-				)
+			? new Vector2(rec.Width + border * 2, lane * (size.y + border))
 			: new Vector2(
-					rec.x + (rec.Width + border) / 2 + lane * (size.x + border),
-					rec.y - size.y - border * 2
+					(rec.Width + border) / 2 + lane * (size.x + border),
+					-size.y - border * 2
 				)
-		return start.AddForThis(additionalPosition).RoundForThis()
+		return start
+			.RoundForThis()
+			.AddScalarX(BaseGUI.Anchor(rec.x, additionalPosition.x))
+			.AddScalarY(BaseGUI.Anchor(rec.y, additionalPosition.y))
 	}
 	protected GetRounding(menu: BaseMenu, size: Vector2): number {
 		const rnd = (menu.Rounding.value / 10) * Math.min(size.x, size.y)
@@ -357,13 +522,20 @@ export abstract class BaseGUI {
 		if (mainAlpha > 0) {
 			return mainAlpha
 		}
-		const startDistance = (vecSize.x + vecSize.y) * 4
+		const startDistance = BaseGUI.reach(vecSize)
 		const cursor = this.cursor()
 		const distance = Math.hypot(
 			cursor.x - (vecPos.x + vecSize.x / 2),
 			cursor.y - (vecPos.y + vecSize.y / 2)
 		)
+		if (!(distance >= startDistance)) {
+			this.shading = true
+		}
 		return -1 * mainAlpha * Math.min(Math.max(0.5, distance / startDistance), 1)
+	}
+	/** How far from a cell's middle the cursor dims it, for a cell of `size`. */
+	private static reach(size: Vector2): number {
+		return (size.x + size.y) * 4
 	}
 	protected ImageMask(
 		vecPos: Vector2,

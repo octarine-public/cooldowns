@@ -2,6 +2,18 @@ import { surface } from "../../render"
 import { TextStyleMenu } from "../menu/style"
 import { TextSurface } from "./types"
 
+/**
+ * How many readings have been laid out without a measure the host had yet, ever: such a reading
+ * stands where the next frame, measure in hand, will not set it, so a strip that drew one is not
+ * held over a frame as it stands.
+ */
+let unmeasured = 0
+
+/** The count of readings laid out unmeasured so far, see {@link unmeasured}. */
+export function Unmeasured(): number {
+	return unmeasured
+}
+
 export function DrawStyledText(
 	style: TextStyleMenu,
 	text: string,
@@ -22,7 +34,9 @@ export function DrawStyledText(
 	const family = style.FontFamily
 	const weight = style.FontWeight
 	const measured = MenuSDK.MeasureTextPx(text.replace(/\d/g, "0"), size, weight, family)
-	if (measured !== undefined && measured[0] > box.Width) {
+	if (measured === undefined) {
+		unmeasured++
+	} else if (measured[0] > box.Width) {
 		size = Math.max(Math.floor((size * box.Width) / measured[0]), 1)
 	}
 	// Let RmlUi center the line inside the icon instead of positioning a font-size box.
@@ -42,6 +56,9 @@ export function DrawStyledText(
 	// often than left (a leading "1"'s stem, a shadow cast down-right), and rounding the half
 	// up would add a second pixel to the same side.
 	const width = align === "center" ? advance(text, size, weight, family) : undefined
+	if (align === "center" && width === undefined) {
+		unmeasured++
+	}
 	const centerWidth = width !== undefined && width > 0 ? width : undefined
 	target.Push({
 		kind: "text",

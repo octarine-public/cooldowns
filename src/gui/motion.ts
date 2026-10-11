@@ -67,7 +67,17 @@ export class SlotMotion {
 	private next = 0
 	private standing = false
 	private enabled = true
+	private still = true
 	private readonly states = new Map<object, ISlotState>()
+
+	/**
+	 * Whether every cell stood still as the last frame closed: entered, its ring gone and its
+	 * glide over, so a frame placing the same cells in the same columns draws each of them just
+	 * where the last one did. Always so while the motion is switched off.
+	 */
+	public get Still(): boolean {
+		return this.still
+	}
 
 	/** Opens a frame on the draw clock, in seconds. */
 	public Begin(now: number, enabled: boolean): void {
@@ -76,6 +86,7 @@ export class SlotMotion {
 				this.Reset()
 			}
 			this.enabled = false
+			this.still = true
 			return
 		}
 		// the preview runs on a clock that stands still while its motion is held, and drops back to
@@ -136,12 +147,17 @@ export class SlotMotion {
 		if (!this.enabled) {
 			return
 		}
-		const states = this.states
+		const states = this.states,
+			now = this.now
+		let still = true
 		for (const [key, state] of states) {
-			if (state.seen !== this.now) {
+			if (state.seen !== now) {
 				states.delete(key)
+			} else if (state.appear < 1 || state.flash > 0 || now - state.since < SLIDE) {
+				still = false
 			}
 		}
+		this.still = still
 		// a panel that emptied - turned off by its key, its heroes gone - opens cold when it comes
 		// back, so a row returning whole does not arrive wearing a ring on every one of its cells
 		this.standing = states.size > 0
@@ -151,6 +167,7 @@ export class SlotMotion {
 	public Reset(): void {
 		this.states.clear()
 		this.standing = false
+		this.still = true
 	}
 }
 

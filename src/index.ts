@@ -15,6 +15,12 @@ new (class CCooldowns {
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
 	private readonly units: UnitData[] = []
+	/**
+	 * The units that have something on screen this frame, in the order they are drawn: kept
+	 * between frames so a frame fills it rather than mints it, and read only up to the count the
+	 * frame put in - the slots past it are left from an earlier frame.
+	 */
+	private readonly drawn: UnitData[] = []
 	private readonly cachedUnits = new WeakSet<Unit>()
 
 	constructor() {
@@ -57,10 +63,26 @@ new (class CCooldowns {
 				return
 			}
 			UnitBody.BeginFrame()
-			UnitData.BeginFrame()
-			const arr = this.units.orderBy(x => x.Priority)
-			for (let i = arr.length - 1; i > -1; i--) {
-				arr[i].Draw(this.menu)
+			if (!UnitData.BeginFrame(this.menu)) {
+				return
+			}
+			// every unit is asked whether it has anything on screen, and only those that do are put
+			// in order and drawn: most of the units carried stand off screen most of the time
+			const units = this.units,
+				drawn = this.drawn
+			let count = 0
+			for (let i = 0, end = units.length; i < end; i++) {
+				const unit = units[i]
+				if (unit.Prepare()) {
+					drawn[count++] = unit
+				}
+			}
+			if (count > 1) {
+				this.order(count)
+			}
+			// the farthest from the cursor first, so the nearest stands over the strips it overlaps
+			for (let i = count - 1; i > -1; i--) {
+				drawn[i].Draw(this.menu)
 			}
 		} finally {
 			surface.End()
@@ -170,6 +192,27 @@ new (class CCooldowns {
 			return getUnitData
 		}
 		return getUnitData
+	}
+	/**
+	 * Puts the first `count` units to be drawn in order of how near the cursor they stand, the
+	 * nearest first. Only the order of strips that overlap rides on it, so it is taken only when
+	 * there are two units or more to draw; they are a handful at most, which an insertion sort
+	 * settles in place, keeping units that tie in the order they were found.
+	 */
+	private order(count: number) {
+		const drawn = this.drawn
+		for (let i = 0; i < count; i++) {
+			drawn[i].UpdatePriority()
+		}
+		for (let i = 1; i < count; i++) {
+			const unit = drawn[i],
+				priority = unit.Priority
+			let j = i - 1
+			for (; j > -1 && drawn[j].Priority > priority; j--) {
+				drawn[j + 1] = drawn[j]
+			}
+			drawn[j + 1] = unit
+		}
 	}
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
 		if (!this.isUnit(entity) || this.isIllusion(entity)) {

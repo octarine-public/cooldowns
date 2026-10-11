@@ -59,62 +59,376 @@ interface Slot {
 	align?: string
 }
 
-export class HudCanvas implements GuiCanvas, TextSurface {
-	/** How far a strip of an arc may stand off the circle it follows, in pixels: a fifth keeps a ring round on the smallest icons. */
-	private static readonly chordSag = 0.15
-	private static readonly naturals = new Map<string, [number, number]>()
-	private static readonly cover: [number, number] = [0, 0]
-	public readonly Bounds: MenuSDK.ScreenRect = { x: 0, y: 0, w: 0, h: 0 }
-	private root: Nullable<HTMLElement>
-	/** The root's document, read once a frame: the native getter is too dear to ask per element. */
-	private document: Nullable<HTMLDocument>
-	private readonly shapes: Slot[] = []
-	private readonly strips: Slot[] = []
-	private readonly images: Slot[] = []
-	private readonly texts: Slot[] = []
-	private shapeCount = 0
-	private stripCount = 0
-	private imageCount = 0
-	private textCount = 0
-	private order = 0
-	/** Layout units per screen pixel, read once a frame: the scale behind it is two host reads. */
-	private layoutUnit = 1
+/**
+ * Pooled elements under one parent and how many of each the frame has drawn: the overlay's root,
+ * or the container of one strip. An element's box is written against the layer's origin, which
+ * for the root is the screen's corner, and its stacking order counts from nought in each layer.
+ */
+class Layer {
+	public readonly shapes: Slot[] = []
+	public readonly strips: Slot[] = []
+	public readonly images: Slot[] = []
+	public readonly texts: Slot[] = []
+	public shapeCount = 0
+	public stripCount = 0
+	public imageCount = 0
+	public textCount = 0
+	/** The stacking order the next element drawn into the layer takes. */
+	public order = 0
+	/** Where the layer's corner stands on the screen, in whole pixels. */
+	public originX = 0
+	public originY = 0
+	/**
+	 * The box everything drawn into a group since it was opened stands in, counted from its
+	 * origin: what a group held over a frame adds to the bounds, and how near the cursor its
+	 * strip stands. Empty while its left edge stands right of its right one.
+	 */
+	public boxLeft = Infinity
+	public boxTop = Infinity
+	public boxRight = -Infinity
+	public boxBottom = -Infinity
 
-	public readonly Ref = (element: HTMLElement | null | undefined): void => {
-		for (const slot of this.images) {
-			if (slot.art !== undefined) {
-				MenuSDK.ReleaseSizedArt(slot.art)
-			}
-		}
-		this.shapes.length =
-			this.strips.length =
-			this.images.length =
-			this.texts.length =
-				0
-		this.root = element ?? undefined
-		this.document = this.root?.ownerDocument ?? undefined
-	}
+	constructor(public readonly parent: Nullable<HTMLElement>) {}
 
-	public Begin(): void {
-		this.document = this.root?.ownerDocument ?? undefined
-		this.layoutUnit = MenuSDK.ToLayoutUnits(1)
-		OpenGrayFrame()
-		OpenRoundedFrame()
+	public Reset(): void {
 		this.shapeCount =
 			this.stripCount =
 			this.imageCount =
 			this.textCount =
 			this.order =
 				0
+		this.boxLeft = this.boxTop = Infinity
+		this.boxRight = this.boxBottom = -Infinity
+	}
+
+	/** Hides every element the frame did not draw into. */
+	public HideUnused(): void {
+		Layer.hide(this.shapes, this.shapeCount)
+		Layer.hide(this.strips, this.stripCount)
+		Layer.hide(this.images, this.imageCount)
+		Layer.hide(this.texts, this.textCount)
+	}
+
+	/** Hands the art every icon of the layer holds back to the host. */
+	public ReleaseArt(): void {
+		for (const slot of this.images) {
+			if (slot.art !== undefined) {
+				MenuSDK.ReleaseSizedArt(slot.art)
+			}
+		}
+	}
+
+	private static hide(pool: Slot[], used: number): void {
+		for (let index = used; index < pool.length; index++) {
+			const slot = pool[index]
+			if (slot.shown !== false) {
+				slot.shown = false
+				MenuSDK.WriteShown(slot.element, false)
+			}
+		}
+	}
+}
+
+/**
+ * One strip's layer: a container standing at the strip's origin, holding the strip's elements
+ * at boxes counted from there. A strip that only moves - its unit walking, the camera panning -
+ * writes the container's corner and nothing of what it holds, and a strip keeps its elements
+ * whatever the strips drawn before it did this frame.
+ */
+class Group extends Layer {
+	/** The corner, stacking order and visibility last written to the container. */
+	public left?: number
+	public top?: number
+	public stack?: number
+	public shown?: boolean
+	/** The frame the strip was last drawn in, and the time of the last frame it was drawn in. */
+	public frame = -1
+	public seen = 0
+	/** Whether the container has been let go of: a strip drawn again after that gets a new one. */
+	public released = false
+	/**
+	 * Whether the strip's last drawing ran to {@link HudCanvas.EndGroup}, and whether this frame
+	 * holds that drawing rather than making a new one, see {@link HudCanvas.KeepGroup}.
+	 */
+	public complete = false
+	public kept = false
+	/** The layout scale it was last drawn at, and the count of elements the host had freed by then. */
+	public layoutUnit = 0
+	public freed = 0
+
+	constructor(
+		public readonly container: HTMLElement,
+		public readonly host: HTMLElement
+	) {
+		super(container)
+	}
+
+	/** Gives the container and everything in it back: the art to the host, the elements to the destroy queue. */
+	public Release(): void {
+		this.released = true
+		this.ReleaseArt()
+		MenuSDK.deferDestroy(this.container, this.host)
+	}
+}
+
+export class HudCanvas implements GuiCanvas, TextSurface {
+	/** How far a strip of an arc may stand off the circle it follows, in pixels: a fifth keeps a ring round on the smallest icons. */
+	private static readonly chordSag = 0.15
+	/**
+	 * How long a strip may go undrawn before its container is let go of, in milliseconds: long
+	 * enough that a unit stepping into the fog or the camera glancing away keeps its elements,
+	 * short enough that the strips of units gone for good do not pile up.
+	 */
+	private static readonly releaseAfter = 10000
+	private static readonly naturals = new Map<string, [number, number]>()
+	private static readonly cover: [number, number] = [0, 0]
+	public readonly Bounds: MenuSDK.ScreenRect = { x: 0, y: 0, w: 0, h: 0 }
+	private root: Nullable<HTMLElement>
+	/** The root's document, read once a frame: the native getter is too dear to ask per element. */
+	private document: Nullable<HTMLDocument>
+	/** What is drawn outside any strip's group, straight under the root. */
+	private base = new Layer(undefined)
+	/** The layer being drawn into: the base, or the group of the strip being drawn. */
+	private layer: Layer = this.base
+	/** The group being drawn into, if any. */
+	private group: Nullable<Group>
+	/**
+	 * Each strip's group by its key. The map holds no key alive, and a group holds nothing of its
+	 * key, so a strip whose unit is gone loses its entry here on its own; its container is let go
+	 * of once it has gone undrawn long enough.
+	 */
+	private groups = new WeakMap<object, Group>()
+	/** Every group with a container standing, in the order they were made. */
+	private readonly live: Group[] = []
+	private frame = 0
+	/** Layout units per screen pixel, read once a frame: the scale behind it is two host reads. */
+	private layoutUnit = 1
+	/** How many times the host has freed elements without telling their holder, read once a frame. */
+	private freed = 0
+
+	/**
+	 * `grouped` says strips get groups of their own, see {@link HudCanvas.BeginGroup}: the game's
+	 * overlay, where dozens of strips move with their units and the camera. A canvas holding one
+	 * strip that stands still, as each of the preview's does, gains nothing by it and draws
+	 * everything straight under its root.
+	 */
+	constructor(private readonly grouped = false) {}
+
+	public readonly Ref = (element: HTMLElement | null | undefined): void => {
+		this.base.ReleaseArt()
+		for (const group of this.live) {
+			group.ReleaseArt()
+		}
+		this.live.length = 0
+		this.groups = new WeakMap()
+		this.root = element ?? undefined
+		this.document = this.root?.ownerDocument ?? undefined
+		this.base = this.layer = new Layer(this.root)
+	}
+
+	public Begin(): void {
+		this.document = this.root?.ownerDocument ?? undefined
+		this.layoutUnit = MenuSDK.ToLayoutUnits(1)
+		if (this.grouped) {
+			this.freed = MenuSDK.ElementsFreedEpoch()
+		}
+		OpenGrayFrame()
+		OpenRoundedFrame()
+		this.frame++
+		this.base.Reset()
+		this.layer = this.base
+		this.group = undefined
 		this.Bounds.x = this.Bounds.y = Infinity
 		this.Bounds.w = this.Bounds.h = 0
 	}
 
 	public End(): void {
-		this.hideUnused(this.shapes, this.shapeCount)
-		this.hideUnused(this.strips, this.stripCount)
-		this.hideUnused(this.images, this.imageCount)
-		this.hideUnused(this.texts, this.textCount)
+		this.layer = this.base
+		this.group = undefined
+		this.base.HideUnused()
+		const live = this.live,
+			frame = this.frame
+		if (live.length === 0) {
+			return
+		}
+		const now = Date.now()
+		let kept = 0
+		for (let index = 0; index < live.length; index++) {
+			const group = live[index]
+			if (group.frame === frame) {
+				group.seen = now
+				// a group held over the frame drew nothing, so nothing of it went unused
+				if (!group.kept) {
+					group.HideUnused()
+				}
+			} else {
+				if (now - group.seen > HudCanvas.releaseAfter) {
+					group.Release()
+					continue
+				}
+				if (group.shown !== false) {
+					group.shown = false
+					// visibility is inherited, and the elements inside carry their own
+					MenuSDK.WriteStyle(group.container, "display", "none")
+				}
+			}
+			live[kept++] = group
+		}
+		live.length = kept
+	}
+
+	/**
+	 * Draws what follows, up to {@link HudCanvas.EndGroup}, into the group of `key`: a container
+	 * of its own standing at `x`, `y` - whole pixels, rounded if not - with pools of its own, so
+	 * the strip keeps its elements from frame to frame whatever else is drawn. Calls inside take
+	 * screen coordinates as ever; the canvas counts their boxes from the origin, and an element
+	 * rounded onto the screen's pixels is rounded onto the container's alike. A strip laid out
+	 * from that origin at fixed offsets writes nothing of its elements as it moves.
+	 *
+	 * Groups stack in the order they are first drawn in a frame, each over everything drawn
+	 * before it. A group drawn again in the same frame goes on where it left off, at the origin
+	 * it was opened at first. One not drawn in a frame is hidden at its end.
+	 */
+	public BeginGroup(key: object, x: number, y: number): void {
+		const root = this.root,
+			document = this.document
+		if (!this.grouped || root === undefined || document === undefined) {
+			return
+		}
+		let group = this.groups.get(key)
+		if (group === undefined || group.released) {
+			const container = document.createElement("div")
+			MenuSDK.applyStyle(container, {
+				position: "absolute",
+				display: "none",
+				pointerEvents: "none",
+				backgroundColor: "transparent"
+			})
+			root.appendChild(container)
+			group = new Group(container, root)
+			group.seen = Date.now()
+			this.groups.set(key, group)
+			this.live.push(group)
+		}
+		this.layer = group
+		this.group = group
+		if (group.frame === this.frame) {
+			return
+		}
+		group.frame = this.frame
+		group.Reset()
+		group.kept = group.complete = false
+		group.layoutUnit = this.layoutUnit
+		group.freed = this.freed
+		this.stand(group, x, y)
+	}
+
+	/** Goes back to drawing straight under the root. */
+	public EndGroup(): void {
+		if (this.group !== undefined) {
+			this.group.complete = true
+			this.group = undefined
+		}
+		this.layer = this.base
+	}
+
+	/**
+	 * Holds the group of `key` over this frame as the last one left it, standing at `x`, `y`
+	 * instead: its corner and its place in the stack are written as {@link HudCanvas.BeginGroup}
+	 * writes them, and nothing of what it holds is touched, drawn or hidden. Answers whether it
+	 * could; where it could not, the caller draws the strip as ever.
+	 *
+	 * Only a drawing still standing whole can be held: one made or held the frame before this,
+	 * run to its end, at this frame's layout scale, with no element freed behind the canvas's
+	 * back since, and every icon in it final - none still waiting on the host for its size or
+	 * its washed copy, none whose copy the cache has let go of since. A group hidden for a
+	 * frame, or made again since the root was, has nothing standing to hold.
+	 */
+	public KeepGroup(key: object, x: number, y: number): boolean {
+		if (!this.grouped || this.root === undefined) {
+			return false
+		}
+		const group = this.groups.get(key)
+		if (
+			group === undefined ||
+			group.released ||
+			!group.complete ||
+			group.frame !== this.frame - 1 ||
+			group.shown !== true ||
+			group.layoutUnit !== this.layoutUnit ||
+			group.freed !== this.freed ||
+			!HudCanvas.final(group)
+		) {
+			return false
+		}
+		group.frame = this.frame
+		group.kept = true
+		this.stand(group, x, y)
+		if (group.boxLeft <= group.boxRight) {
+			this.grow(
+				group.originX + group.boxLeft,
+				group.originY + group.boxTop,
+				group.boxRight - group.boxLeft,
+				group.boxBottom - group.boxTop
+			)
+		}
+		return true
+	}
+
+	/**
+	 * How far `point` stands from the box of what the group of `key` last drew, were it standing
+	 * at `x`, `y`: nought from inside it, and for a group that has drawn nothing yet.
+	 */
+	public GroupDistance(key: object, x: number, y: number, point: Vector2): number {
+		const group = this.grouped ? this.groups.get(key) : undefined
+		if (group === undefined || !(group.boxLeft <= group.boxRight)) {
+			return 0
+		}
+		const left = Math.round(x),
+			top = Math.round(y)
+		return Math.hypot(
+			Math.max(left + group.boxLeft - point.x, point.x - left - group.boxRight, 0),
+			Math.max(top + group.boxTop - point.y, point.y - top - group.boxBottom, 0)
+		)
+	}
+
+	/** Whether every icon the group drew is final, see {@link HudCanvas.KeepGroup}. */
+	private static final(group: Group): boolean {
+		const images = group.images
+		for (let index = 0; index < group.imageCount; index++) {
+			const slot = images[index]
+			if (
+				slot?.settled !== true ||
+				(slot.wash !== undefined && !WashCopyHeld(slot.graySource))
+			) {
+				return false
+			}
+		}
+		return true
+	}
+
+	/** Stands the group's container at `x`, `y`, next in the stack, writing only what moved. */
+	private stand(group: Group, x: number, y: number): void {
+		const container = group.container,
+			left = (group.originX = Math.round(x)),
+			top = (group.originY = Math.round(y)),
+			stack = this.base.order++
+		if (group.left !== left) {
+			group.left = left
+			MenuSDK.WritePx(container, "left", left)
+		}
+		if (group.top !== top) {
+			group.top = top
+			MenuSDK.WritePx(container, "top", top)
+		}
+		if (group.stack !== stack) {
+			group.stack = stack
+			MenuSDK.WriteFmt(container, "z-index", stack, "")
+		}
+		if (group.shown !== true) {
+			group.shown = true
+			MenuSDK.WriteStyle(container, "display", "block")
+		}
 	}
 
 	public Rect(
@@ -126,7 +440,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		if (size.x <= 0 || size.y <= 0 || sweep === 0) {
 			return
 		}
-		const slot = this.slot(this.shapes, this.shapeCount++)
+		const layer = this.layer
+		const slot = this.slot(layer.shapes, layer.shapeCount++)
 		if (slot === undefined) {
 			return
 		}
@@ -234,7 +549,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		angle: number,
 		fill: string
 	): void {
-		const slot = this.slot(this.strips, this.stripCount++)
+		const layer = this.layer
+		const slot = this.slot(layer.strips, layer.stripCount++)
 		if (slot === undefined) {
 			return
 		}
@@ -265,7 +581,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		if (path === "" || size.x <= 0 || size.y <= 0) {
 			return
 		}
-		const slot = this.slot(this.images, this.imageCount++, true)
+		const layer = this.layer
+		const slot = this.slot(layer.images, layer.imageCount++, true)
 		if (slot?.art === undefined) {
 			return
 		}
@@ -408,7 +725,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	}
 
 	public Push(command: StyledText): void {
-		const slot = this.slot(this.texts, this.textCount++)
+		const layer = this.layer
+		const slot = this.slot(layer.texts, layer.textCount++)
 		if (slot === undefined) {
 			return
 		}
@@ -495,10 +813,11 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		MenuSDK.WriteText(element, command.text)
 	}
 
+	/** Slot `index` of a pool of the layer being drawn into, minted under its parent if it has none yet. */
 	private slot(pool: Slot[], index: number, image = false): Nullable<Slot> {
-		const root = this.root,
+		const parent = this.layer.parent,
 			document = this.document
-		if (root === undefined || document === undefined) {
+		if (parent === undefined || document === undefined) {
 			return undefined
 		}
 		let slot = pool[index]
@@ -510,7 +829,7 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 				pointerEvents: "none",
 				backgroundColor: "transparent"
 			})
-			root.appendChild(element)
+			parent.appendChild(element)
 			const art = image ? document.createElement("img") : undefined
 			const gray = image ? document.createElement("img") : undefined
 			if (art !== undefined) {
@@ -548,16 +867,31 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		this.Bounds.y = Math.min(this.Bounds.y, y)
 		this.Bounds.w = right - this.Bounds.x
 		this.Bounds.h = bottom - this.Bounds.y
+		const layer = this.layer
+		if (layer !== this.base) {
+			const left = x - layer.originX,
+				top = y - layer.originY
+			layer.boxLeft = Math.min(layer.boxLeft, left)
+			layer.boxTop = Math.min(layer.boxTop, top)
+			layer.boxRight = Math.max(layer.boxRight, left + width)
+			layer.boxBottom = Math.max(layer.boxBottom, top + height)
+		}
 	}
 
+	/**
+	 * Writes the box an element stands in, on the screen at `x`, `y`, and its stacking order. The
+	 * bounds count the box where it stands on the screen; the element is placed in its layer,
+	 * whose origin is a whole pixel, so rounding there is rounding on the screen moved by it.
+	 */
 	private place(slot: Slot, x: number, y: number, width: number, height: number): void {
 		this.grow(x, y, width, height)
-		const element = slot.element,
-			left = Math.round(x),
-			top = Math.round(y),
+		const layer = this.layer,
+			element = slot.element,
+			left = Math.round(x) - layer.originX,
+			top = Math.round(y) - layer.originY,
 			boxWidth = Math.round(width),
 			boxHeight = Math.round(height),
-			order = this.order++
+			order = layer.order++
 		if (slot.left !== left) {
 			slot.left = left
 			MenuSDK.WritePx(element, "left", left)
@@ -581,16 +915,6 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		if (slot.shown !== true) {
 			slot.shown = true
 			MenuSDK.WriteShown(element, true)
-		}
-	}
-
-	private hideUnused(pool: Slot[], used: number): void {
-		for (let index = used; index < pool.length; index++) {
-			const slot = pool[index]
-			if (slot.shown !== false) {
-				slot.shown = false
-				MenuSDK.WriteShown(slot.element, false)
-			}
 		}
 	}
 }
