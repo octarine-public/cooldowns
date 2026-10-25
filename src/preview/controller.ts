@@ -483,7 +483,7 @@ export class PreviewController {
 	/** Whether the cell a group cycles is away this instant, on the stage's clock at `offset`. */
 	private away(offset: number): boolean {
 		return (
-			this.Menu.Animation.value &&
+			this.Menu.Animates &&
 			MenuSDK.PreviewMotion.value &&
 			(MenuSDK.PreviewClock() / CYCLE + offset) % 1 < AWAY
 		)

@@ -23,6 +23,10 @@ export class BaseMenu {
 	public readonly TeamState: Menu.MultiSelect
 	/** The script's one switch for its motion, on the General tab, read beside the element's own rows. */
 	public readonly Animation: Menu.Toggle
+	/** Whether the strips move: the script's own switch, and the menu's "Overlay animations". */
+	public get Animates(): boolean {
+		return this.Animation.value && MenuSDK.MotionEnabled(MenuSDK.EThemeScope.World)
+	}
 	/** How bright an icon its owner cannot pay for is drawn, on the General tab, read the same way. */
 	public readonly NoMana: Menu.Slider
 

@@ -12,6 +12,10 @@ export class MenuManager {
 	public readonly Scale: Menu.Toggle
 	public readonly OpacityByCursor: Menu.Toggle
 	public readonly Animation: Menu.Toggle
+	/** Whether the strips move: the script's own switch, and the menu's "Overlay animations". */
+	public get Animates(): boolean {
+		return this.Animation.value && MenuSDK.MotionEnabled(MenuSDK.EThemeScope.World)
+	}
 	public readonly MeepoClones: Menu.Dropdown
 
 	public readonly Opacity: Menu.Slider

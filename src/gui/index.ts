@@ -234,7 +234,7 @@ export abstract class BaseGUI {
 		const preview = this.preview
 		this.motion.Begin(
 			MenuSDK.DrawClock(preview),
-			menu.Animation.value && (!preview || MenuSDK.PreviewMotion.value)
+			menu.Animates && (!preview || MenuSDK.PreviewMotion.value)
 		)
 	}
 	/**
@@ -430,7 +430,7 @@ export abstract class BaseGUI {
 		stamp.Put(menu.Size.value)
 		stamp.Put(menu.Rounding.value)
 		stamp.Put(menu.IsVertical)
-		stamp.Put(menu.Animation.value)
+		stamp.Put(menu.Animates)
 		stamp.Put(menu.NoMana.value)
 		stamp.Put(style)
 		stamp.Put(style.Size.value)
