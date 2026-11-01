@@ -1,34 +1,78 @@
-import {
-	Ability,
-	Color,
-	DOTA_ABILITY_BEHAVIOR,
-	EAbilitySlot,
-	GUIInfo,
-	npc_dota_hero_doom_bringer,
-	npc_dota_hero_invoker,
-	npc_dota_hero_rubick,
-	Rectangle,
-	RendererSDK,
-	TextFlags,
-	Vector2
-} from "github.com/octarine-public/wrapper/index"
-
-import { ELevelType } from "../enum"
+import { BaseMenu } from "../menu/base"
 import { SpellMenu } from "../menu/spells"
-import { BaseGUI } from "./index"
+import { TextStyleMenu } from "../menu/style"
+import { UnitBody } from "../models/body"
+import { BaseGUI, CellShapeStyle, SpellDisplay } from "./index"
+
+/** What a cell shows of its spell, read once a tick. */
+interface SpellReading {
+	spell?: SpellDisplay
+	tick: number
+	cooldown: number
+	texture: string
+	charges: number
+	level: number
+	maxLevel: number
+	grayScale: boolean
+	noMana: boolean
+	inPhase: boolean
+	altCast: boolean
+	passive: boolean
+	tethered: boolean
+	unlearned: boolean
+	inactive: boolean
+	washSource?: string
+}
 
 export class SpellGUI extends BaseGUI {
 	private static readonly minSize = 17
 	private readonly size = new Vector2()
+	/** Scratch the cell being drawn is laid out in, read straight away by everything it is handed to. */
+	private readonly cellBox = new Rectangle()
+	private readonly levelColor = new Color()
+	private readonly chargeColor = new Color()
+	private readonly levelOutline = new Color(0, 0, 0)
+	private readonly pipPosition = new Vector2()
+	private readonly pipInner = new Vector2()
+	private readonly pipSize = new Vector2()
+	private readonly pipInnerSize = new Vector2()
+	/** Styles the canvas reads as it is called and keeps none of, refilled for each cell. */
+	private readonly rimStyle: CellShapeStyle = {}
+	private readonly pipOutline: CellShapeStyle = {}
+	private readonly pipFill: CellShapeStyle = {}
+	/** Each cell's reading of its spell, by the cell's place in the strip. */
+	private readonly readings: SpellReading[] = []
+
+	/**
+	 * How far right a column of items stands to clear this strip hanging from the same bar as a
+	 * column: the spell cell and its gap while both strips are columns and this one is drawn at
+	 * all, nothing otherwise. Both hang from the bar's right end, and the spells stand nearest
+	 * it as they do under it in a row; two columns on one anchor would stand on each other.
+	 */
+	public ColumnShift(spells: SpellMenu, items: BaseMenu, drawn: boolean): number {
+		return drawn && spells.IsVertical && items.IsVertical
+			? this.size.x + GUIInfo.ScaleHeight(BaseGUI.border + 1)
+			: 0
+	}
 
 	public Update(
 		position: Nullable<Vector2>,
 		positionEnd: Nullable<Vector2>,
 		healthBarSize: Vector2,
 		additionalSize: number,
-		scale: number
+		scale: number,
+		body?: UnitBody,
+		bodyEnd?: UnitBody
 	) {
-		super.Update(position, positionEnd, healthBarSize, additionalSize, scale)
+		super.Update(
+			position,
+			positionEnd,
+			healthBarSize,
+			additionalSize,
+			scale,
+			body,
+			bodyEnd
+		)
 		const size = SpellGUI.minSize + additionalSize * 4
 		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
 		this.size.x -= (this.size.x + 1) % 2
@@ -37,35 +81,36 @@ export class SpellGUI extends BaseGUI {
 	public Draw(
 		mainAlpha: number,
 		menu: SpellMenu,
-		spells: [Ability, number][],
+		spells: [SpellDisplay, number][],
 		additionalPosition: Vector2,
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
 	): void {
-		this.DrawSpells(
+		const rise = this.Rise(menu, this.size.y, GUIInfo.ScaleHeight(BaseGUI.border + 1))
+		this.DrawAt(
 			this.position,
 			mainAlpha,
 			menu,
 			spells,
-			additionalPosition,
+			this.Follow(additionalPosition, rise),
 			isSilenced,
 			isPassiveDisabled
 		)
-		this.DrawSpells(
+		this.DrawAt(
 			this.positionEnd,
 			mainAlpha,
 			menu,
 			spells,
-			additionalPosition,
+			this.Follow(additionalPosition, rise, true),
 			isSilenced,
 			isPassiveDisabled
 		)
 	}
-	protected DrawSpells(
+	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
 		menu: SpellMenu,
-		spells: [Ability, number][],
+		spells: [SpellDisplay, number][],
 		additionalPosition: Vector2,
 		isSilenced: boolean,
 		isPassiveDisabled: boolean
@@ -74,130 +119,148 @@ export class SpellGUI extends BaseGUI {
 			return
 		}
 		const vecSize = this.size,
-			border = GUIInfo.ScaleHeight(BaseGUI.border + 1) // 2 + 1
-		for (let index = spells.length - 1; index > -1; index--) {
+			border = GUIInfo.ScaleHeight(BaseGUI.border + 1),
+			vertical = menu.IsVertical
+		const stamp = this.Restamp(recPosition, mainAlpha, menu, spells.length)
+		if (stamp !== undefined) {
+			stamp.Put(vecSize.x)
+			stamp.Put(vecSize.y)
+			stamp.Put(border)
+			stamp.Put(menu.IsMinimalistic.value)
+			stamp.Put(menu.LevelColor.SelectedColor.data32)
+			stamp.Put(menu.ChargeColor.SelectedColor.data32)
+			stamp.Put(isSilenced)
+			stamp.Put(isPassiveDisabled)
+			for (let index = 0; index < spells.length; index++) {
+				const entry = spells[index]
+				stamp.Put(entry[0])
+				stamp.Put(entry[1])
+			}
+			if (this.Keep(stamp, recPosition, additionalPosition, mainAlpha, vecSize)) {
+				return
+			}
+		}
+		this.wash = this.NoManaWash(menu)
+		this.BeginStrip(recPosition, additionalPosition)
+		this.BeginMotion(menu)
+		for (let index = 0; index < spells.length; index++) {
 			const [spell, idx] = spells[index]
+			const cell = this.Seat(spell, index, spells.length, vertical)
+			if (cell.appear <= 0) {
+				continue
+			}
 			const vecPos = this.GetPosition(
 				recPosition,
 				vecSize,
 				border,
-				index,
+				cell.slot,
 				additionalPosition,
-				false, // vertical
-				spells.length
+				vertical
 			)
 
-			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize)
+			const alpha = this.GetAlpha(mainAlpha, vecPos, vecSize) * this.Enter(cell)
 
-			// width of outlined
-			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
-			const cooldown = spell.Cooldown,
-				texture = spell.TexturePath,
-				currCharges = spell.CurrentCharges,
-				grayScale = spell.Level === 0 || !spell.IsActivated,
-				noMana = !spell.IsManaEnough(),
-				isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
+			const position = this.cellBox
+			position.pos1.CopyFrom(vecPos)
+			position.pos2.CopyFrom(vecPos).AddForThis(vecSize)
+			const reading = this.read(spell, index),
+				cooldown = reading.cooldown,
+				currCharges = reading.charges,
+				noMana = reading.noMana,
 				rounding = this.GetRounding(menu, vecSize),
-				isAltCastState = spell.AltCastState,
-				hasRootDisable = spell.HasBehavior(
-					DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
-				)
-			let isDisabled = false,
-				isUniqueDisabled = false
-			if (spell.IsPassive) {
-				isDisabled = isPassiveDisabled
-			}
-			if (hasRootDisable) {
-				isUniqueDisabled = spell.Owner?.IsTethered ?? false
-			}
+				isDisabled = reading.passive && isPassiveDisabled,
+				isUniqueDisabled = reading.tethered
 			if (menu.IsMinimalistic.value) {
 				this.minimilistic(
 					idx,
 					alpha,
+					cell.flash,
 					spell,
+					reading,
 					vecPos,
 					vecSize,
 					rounding,
 					border,
 					position,
-					cooldown,
 					isSilenced || isUniqueDisabled,
-					isDisabled,
-					noMana,
-					isAltCastState
+					isDisabled
 				)
 			} else {
 				this.image(
 					alpha,
-					texture,
+					cell.flash,
+					reading.texture,
 					vecPos,
 					vecSize,
 					rounding,
 					border + +(rounding > 0),
 					cooldown,
-					grayScale,
-					isInPhase,
+					reading.grayScale,
+					reading.inPhase,
 					isSilenced || isUniqueDisabled,
 					isDisabled,
 					noMana,
-					isAltCastState,
-					spell.IsPassive
+					reading.altCast,
+					reading.passive,
+					reading.washSource
 				)
 			}
 
-			const levelType = menu.LevelType.SelectedID,
-				alphaCorrect = Math.min(alpha * 1.75, 255),
-				levelColor = menu.LevelColor.SelectedColor.Clone().SetA(alphaCorrect),
-				chargeColor = menu.ChargeColor.SelectedColor.Clone().SetA(alphaCorrect)
+			const alphaCorrect = Math.min(alpha * 1.75, 255)
 
-			// draw charges
 			if (currCharges !== 0) {
-				this.textChargeOrLevel(currCharges, true, position, chargeColor)
+				this.Text(
+					menu.TextStyle,
+					currCharges.toString(),
+					position,
+					TextFlags.Right | TextFlags.Top,
+					2.75,
+					this.chargeColor
+						.CopyFrom(menu.ChargeColor.SelectedColor)
+						.SetA(alphaCorrect)
+				)
 			}
 
-			switch (levelType) {
-				case ELevelType.Square:
-					this.squareLevel(
-						spell,
-						vecPos,
-						vecSize,
-						menu.IsMinimalistic.value,
-						levelColor,
-						Color.Black.SetA(alpha)
-					)
-					break
-				default: {
-					this.textChargeOrLevel(spell.Level, false, position, levelColor)
-					break
-				}
-			}
+			this.squareLevel(
+				reading,
+				vecPos,
+				vecSize,
+				menu.IsMinimalistic.value && noMana,
+				this.levelColor
+					.CopyFrom(menu.LevelColor.SelectedColor)
+					.SetA(alphaCorrect),
+				this.levelOutline.SetA(alpha),
+				menu.TextStyle
+			)
 
 			if (cooldown !== 0) {
 				const cdText = cooldown.toFixed(cooldown <= 3 ? 1 : 0)
-				this.Text(cdText, position, TextFlags.Center)
+				this.Text(menu.TextStyle, cdText, position, TextFlags.Center)
 			}
 		}
+		this.EndMotion()
+		this.EndStrip()
 	}
 	private minimilistic(
 		idx: number,
 		alpha: number,
-		spell: Ability,
+		flash: number,
+		spell: SpellDisplay,
+		reading: SpellReading,
 		vecPos: Vector2,
 		vecSize: Vector2,
 		rounding: number,
 		width: number,
 		position: Rectangle,
-		cooldown: number,
 		isSilenced: boolean,
-		isPassiveDisabled: boolean,
-		noMana: boolean,
-		isAltCastState: boolean
+		isPassiveDisabled: boolean
 	) {
-		const minimalistic = position.Clone(),
+		const cooldown = reading.cooldown,
+			minimalistic = position.Clone(),
 			ignoreMinimalistic = this.ignoreMinimalistic(spell, idx),
-			outlinedColor = noMana
-				? BaseGUI.noManaOutlineColor.SetA(180)
-				: Color.Black.SetA(180)
+			outlinedColor = this.cellRim
+				.CopyFrom(reading.noMana ? BaseGUI.noManaOutlineColor : BaseGUI.black)
+				.SetA(180 * this.fade)
 
 		if (cooldown === 0) {
 			minimalistic.Height /= 4
@@ -208,42 +271,96 @@ export class SpellGUI extends BaseGUI {
 		}
 
 		if (cooldown === 0 || !ignoreMinimalistic) {
-			RendererSDK.FilledRect(minimalistic.pos1, minimalistic.Size, outlinedColor)
-			return
-		}
-		let isDisabled = false,
-			isUniqueDisabled = false
-		if (spell.IsPassive) {
-			isDisabled = isPassiveDisabled
-		}
-		const texture = spell.TexturePath,
-			grayScale = spell.Level === 0 || isSilenced || !spell.IsActivated,
-			isInPhase = spell.IsInAbilityPhase || spell.IsChanneling,
-			hasRootDisable = spell.HasBehavior(
-				DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
+			this.canvas.Rect(minimalistic.pos1, minimalistic.Size, {
+				color: outlinedColor
+			})
+			this.Ring(
+				this.canvas,
+				minimalistic.pos1,
+				minimalistic.Size,
+				1,
+				0,
+				false,
+				flash,
+				alpha
 			)
-		if (hasRootDisable) {
-			isUniqueDisabled = spell.Owner?.IsTethered ?? false
+			return
 		}
 		this.image(
 			alpha,
-			texture,
+			flash,
+			reading.texture,
 			vecPos,
 			vecSize,
 			rounding,
 			width,
 			cooldown,
-			grayScale,
-			isInPhase,
-			isSilenced || isUniqueDisabled,
-			isDisabled,
-			noMana,
-			isAltCastState,
-			spell.IsPassive
+			reading.unlearned || isSilenced || reading.inactive,
+			reading.inPhase,
+			isSilenced || reading.tethered,
+			reading.passive && isPassiveDisabled,
+			reading.noMana,
+			reading.altCast,
+			reading.passive,
+			reading.washSource
 		)
 	}
+	/** The cell's reading of `spell`, taken afresh only on a new tick or for another spell. */
+	private read(spell: SpellDisplay, index: number): SpellReading {
+		let reading = this.readings[index]
+		if (reading === undefined) {
+			reading = this.readings[index] = {
+				tick: -1,
+				cooldown: 0,
+				texture: "",
+				charges: 0,
+				level: 0,
+				maxLevel: 0,
+				grayScale: false,
+				noMana: false,
+				inPhase: false,
+				altCast: false,
+				passive: false,
+				tethered: false,
+				unlearned: false,
+				inactive: false
+			}
+		}
+		const tick = this.Tick()
+		if (tick !== -1 && reading.tick === tick && reading.spell === spell) {
+			return reading
+		}
+		reading.spell = spell
+		reading.tick = tick
+		reading.cooldown = spell.Cooldown
+		reading.texture = spell.TexturePath
+		reading.charges = spell.CurrentCharges
+		reading.level = spell.Level
+		reading.maxLevel = spell.MaxLevel
+		reading.unlearned = reading.level === 0
+		reading.inactive = !spell.IsActivated
+		reading.grayScale = reading.unlearned || reading.inactive
+		reading.noMana = !spell.IsManaEnough()
+		reading.inPhase = spell.IsInAbilityPhase || spell.IsChanneling
+		reading.altCast = spell.AltCastState
+		reading.passive = spell.IsPassive
+		reading.tethered =
+			spell.HasBehavior(
+				DOTA_ABILITY_BEHAVIOR.DOTA_ABILITY_BEHAVIOR_ROOT_DISABLES
+			) &&
+			(spell.Owner?.IsTethered ?? false)
+		reading.washSource = spell.WashSource
+		return reading
+	}
+	/**
+	 * A cell as the game's own ability button draws its states: the icon washed blue while its
+	 * owner cannot pay for it, grayed while it is unlearned, shaded while it is on cooldown, and
+	 * its rim in the colour of what is stopping it - the bevel's blue without mana, aqua for an
+	 * alternate cast, green through its cast point, red on cooldown or disabled.
+	 */
 	private image(
 		alpha: number,
+		flash: number,
 		texture: string,
 		vecPos: Vector2,
 		vecSize: Vector2,
@@ -256,77 +373,78 @@ export class SpellGUI extends BaseGUI {
 		isPassiveDisabled?: boolean,
 		noMana?: boolean,
 		isAltCastState?: boolean,
-		isPassive?: boolean
+		isPassive?: boolean,
+		washSource?: string
 	) {
-		let outlinedColor = Color.Black
-		const noManaColor = BaseGUI.noManaOutlineColor.Clone()
-		if (noMana) {
-			outlinedColor = noManaColor.Clone()
-		} else if (isAltCastState) {
-			outlinedColor = Color.Aqua
-		} else if (isInPhase) {
-			outlinedColor = Color.Green
-		} else if (
-			cooldown !== 0 ||
-			(isUniqueDisabled && !isPassive) ||
-			isPassiveDisabled
-		) {
-			outlinedColor = Color.Red
-		}
-
-		RendererSDK.RectRounded(
-			vecPos,
-			vecSize,
-			rounding,
-			Color.fromUint32(0),
-			outlinedColor.SetA(alpha),
-			Math.round(border)
+		const outlinedColor = this.cellRim.CopyFrom(
+			noMana
+				? BaseGUI.noManaOutlineColor
+				: isAltCastState
+					? BaseGUI.aqua
+					: isInPhase
+						? BaseGUI.buffColor
+						: cooldown !== 0 ||
+							  (isUniqueDisabled && !isPassive) ||
+							  isPassiveDisabled
+							? BaseGUI.cooldownColor
+							: BaseGUI.black
 		)
 
-		RendererSDK.Image(
-			texture,
-			vecPos,
-			rounding,
-			vecSize,
-			(noMana ? noManaColor.Clone() : Color.White).SetA(alpha),
-			undefined,
-			undefined,
-			grayScale
-		)
+		const rim = this.rimStyle
+		rim.color = BaseGUI.transparent
+		rim.borderColor = outlinedColor.SetA(alpha)
+		rim.borderWidth = Math.round(border)
+		rim.radius = Math.max(rounding / 2, 0)
+		this.canvas.Rect(vecPos, vecSize, rim)
+
+		this.canvas.Image(texture, vecPos, vecSize, {
+			color: this.white.SetA(alpha),
+			wash: noMana ? this.wash : undefined,
+			washSource,
+			radius: Math.max(rounding / 2, 0),
+			circle: rounding === 0,
+			grayscale: grayScale
+		})
 		if (isPassiveDisabled) {
 			this.ImageMask(vecPos, vecSize, rounding, false)
 		}
 		if (isUniqueDisabled && !isPassive) {
 			this.ImageMask(vecPos, vecSize, rounding, true)
 		}
-		if (cooldown === 0) {
-			return
+		if (cooldown !== 0) {
+			this.Shade(vecPos, vecSize, rounding, alpha)
 		}
-		RendererSDK.RectRounded(
+		this.Ring(
+			this.canvas,
 			vecPos,
 			vecSize,
-			rounding,
-			Color.Black.SetA(alpha * (100 / 255)),
-			Color.fromUint32(0),
-			1
+			Math.round(border),
+			Math.max(rounding / 2, 0),
+			rounding === 0,
+			flash,
+			alpha
 		)
 	}
 	private squareLevel(
-		spell: Ability,
+		reading: SpellReading,
 		vecPos: Vector2,
 		vecSize: Vector2,
-		minimalistic: boolean,
+		noManaFill: boolean,
 		levelColor: Color,
-		outlineColor: Color
+		outlineColor: Color,
+		textStyle: TextStyleMenu
 	) {
-		const currLvl = spell.Level
-		if (spell.MaxLevel === 0 || currLvl === 0) {
+		const currLvl = reading.level
+		if (reading.maxLevel === 0 || currLvl === 0) {
 			return
 		}
 
-		const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize))
 		if (currLvl >= 5) {
+			const position = this.cellBox
+			position.pos1.CopyFrom(vecPos)
+			position.pos2.CopyFrom(vecPos).AddForThis(vecSize)
 			this.Text(
+				textStyle,
 				currLvl.toString(),
 				position,
 				TextFlags.Right | TextFlags.Bottom,
@@ -336,33 +454,45 @@ export class SpellGUI extends BaseGUI {
 			return
 		}
 
-		const fillColor = !(minimalistic && !spell.IsManaEnough())
-			? levelColor
-			: BaseGUI.noManaOutlineColor
+		const fillColor = noManaFill ? BaseGUI.noManaOutlineColor : levelColor
 
-		const borderThickness = Math.max(GUIInfo.ScaleHeight(1), 1)
+		const borderThickness = 1
 		const maxLvl = 4
 		const step = ((vecSize.x + borderThickness * 2) / maxLvl) | 0
-		const borderSize = new Vector2(borderThickness, borderThickness)
-		const squareSize = new Vector2(step, Math.round(step * (1 / 2))).Add(borderSize)
+		const squareSize = this.pipSize
+			.SetX(step + borderThickness)
+			.SetY(Math.round(step * 0.5) + borderThickness)
+		const innerSize = this.pipInnerSize
+			.SetX(squareSize.x - borderThickness * 2)
+			.SetY(squareSize.y - borderThickness * 2)
 
-		const pos = position.pos1
-			.Clone()
-			.AddScalarX((vecSize.x - (step * maxLvl + borderThickness)) / 2) // 1px fix
-			.AddScalarX(step * (maxLvl - currLvl) * 0.5) // center
-			.AddScalarY(position.Size.y - squareSize.y)
+		const pos = this.pipPosition
+			.CopyFrom(vecPos)
+			.AddScalarX((vecSize.x - (step * maxLvl + borderThickness)) / 2)
+			.AddScalarX(step * (maxLvl - currLvl) * 0.5)
+			.AddScalarY(vecSize.y - squareSize.y)
+		const inner = this.pipInner
+		const outline = this.pipOutline,
+			fill = this.pipFill
+		outline.color = outlineColor
+		fill.color = fillColor
 
+		// neighbouring pips share their rims, so the rims of a run are one plate under its faces
+		squareSize.x += step * (currLvl - 1)
+		this.canvas.Rect(pos, squareSize, outline)
 		for (let i = 0; i < currLvl; i++) {
-			RendererSDK.FilledRect(pos, squareSize, outlineColor)
-			RendererSDK.FilledRect(
-				pos.Add(borderSize),
-				squareSize.Subtract(borderSize.MultiplyScalar(2)),
-				fillColor
+			this.canvas.Rect(
+				inner
+					.CopyFrom(pos)
+					.AddScalarX(borderThickness)
+					.AddScalarY(borderThickness),
+				innerSize,
+				fill
 			)
 			pos.AddScalarX(step)
 		}
 	}
-	private ignoreMinimalistic(spell: Ability, idx: number) {
+	private ignoreMinimalistic(spell: SpellDisplay, idx: number) {
 		const owner = spell.Owner
 		if (owner === undefined || owner.IsNeutral) {
 			return false

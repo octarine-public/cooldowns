@@ -1,0 +1,52 @@
+import { HudCanvas, SurfaceText } from "./src/gui/canvas"
+
+/**
+ * The one overlay every strip is drawn on - frames, icons and readings as the script's own
+ * elements, the way deadlock-esp draws its cells, each strip in a container of its own that
+ * moves with it. The icons are `img` elements minted at the whole-pixel size they stand at
+ * rather than a shared canvas cutting art to cover a box, so what the preview shows is what the
+ * game draws.
+ */
+export const surface = new HudCanvas(true)
+
+/**
+ * The SDK's own canvas, for what is drawn the way teleport-esp draws its markers: a round
+ * modifier uses the same circular timer component, with readings sized like item text. Its
+ * panel is registered on the first draw, after the overlay's below, so a timer stands over
+ * anything the overlay paints at the same spot.
+ */
+export const canvas = new MenuSDK.Canvas("cooldowns")
+/** The readings over a round modifier, on the surface that canvas draws on. */
+export const canvasText = new SurfaceText(
+	MenuSDK.HudSurfaceOf("cooldowns", MenuSDK.EPanelLayer.World)
+)
+
+/**
+ * The same for the preview: it stands with the menu, so its timers go out on the menu's layer,
+ * at the preview's frame plus where the preview lays them out. A surface on that layer stands
+ * over the menu's own panels, so a timer shows over the stage rather than under the card.
+ */
+export const previewCanvas = new MenuSDK.Canvas(
+	"cooldowns-preview",
+	MenuSDK.EPanelLayer.Menu
+)
+/** The readings over a round modifier in the preview, on the surface that canvas draws on. */
+export const previewCanvasText = new SurfaceText(
+	MenuSDK.HudSurfaceOf("cooldowns-preview", MenuSDK.EPanelLayer.Menu)
+)
+
+MenuSDK.RegisterPanel(
+	"cooldowns-overlay",
+	() =>
+		React.createElement("div", {
+			ref: surface.Ref,
+			style: {
+				position: "absolute",
+				left: "0px",
+				top: "0px",
+				zIndex: 1,
+				pointerEvents: "none"
+			}
+		}),
+	MenuSDK.EPanelLayer.World
+)

@@ -1,29 +1,13 @@
 import "./translations"
 
-import {
-	Ability,
-	DOTAGameState,
-	DOTAGameUIState,
-	Entity,
-	EntityManager,
-	EventsSDK,
-	GameRules,
-	GameState,
-	Modifier,
-	npc_dota_brewmaster_earth,
-	npc_dota_brewmaster_storm,
-	npc_dota_brewmaster_void,
-	npc_dota_visage_familiar,
-	RendererSDK,
-	SpiritBear,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
-
+import { surface } from "../render"
 import { MenuManager } from "./menu/index"
+import { UnitBody } from "./models/body"
 import { UnitData } from "./models/unitData"
 import { ItemManager } from "./modules/items"
 import { ModifierManager } from "./modules/modifiers"
 import { SpellManager } from "./modules/spells"
+import { MountCooldownPreview } from "./preview"
 
 new (class CCooldowns {
 	private readonly menu = new MenuManager()
@@ -31,10 +15,17 @@ new (class CCooldowns {
 	private readonly spellManager = new SpellManager(this.menu)
 	private readonly modifierManager = new ModifierManager(this.menu)
 	private readonly units: UnitData[] = []
+	/**
+	 * The units that have something on screen this frame, in the order they are drawn: kept
+	 * between frames so a frame fills it rather than mints it, and read only up to the count the
+	 * frame put in - the slots past it are left from an earlier frame.
+	 */
+	private readonly drawn: UnitData[] = []
 	private readonly cachedUnits = new WeakSet<Unit>()
 
 	constructor() {
-		EventsSDK.on("Draw2D", this.DrawContent.bind(this))
+		MountCooldownPreview(this.menu)
+		EventsSDK.on("Draw", this.Draw.bind(this))
 		EventsSDK.on("EntityCreated", this.EntityCreated.bind(this))
 		EventsSDK.on("EntityDestroyed", this.EntityDestroyed.bind(this))
 		EventsSDK.on("UnitItemsChanged", this.UnitItemsChanged.bind(this))
@@ -53,20 +44,48 @@ new (class CCooldowns {
 	}
 	private get isPostGame() {
 		return (
-			GameRules === undefined ||
-			GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
+			Dota2SDK.GameRules === undefined ||
+			Dota2SDK.GameRules.GameState === DOTAGameState.DOTA_GAMERULES_STATE_POST_GAME
 		)
 	}
 	private get isUIGame() {
 		return GameState.UIState === DOTAGameUIState.DOTA_GAME_UI_DOTA_INGAME
 	}
-	protected DrawContent() {
-		if (!this.state || this.isPostGame || !this.isUIGame) {
-			return
-		}
-		const arr = this.units.orderBy(x => x.Priority)
-		for (let i = arr.length - 1; i > -1; i--) {
-			arr[i].DrawContent2D(this.menu)
+	protected Draw() {
+		surface.Begin()
+		try {
+			if (
+				!this.state ||
+				this.isPostGame ||
+				!this.isUIGame ||
+				!MenuSDK.HostCanDrawOverlays()
+			) {
+				return
+			}
+			UnitBody.BeginFrame()
+			if (!UnitData.BeginFrame(this.menu)) {
+				return
+			}
+			// every unit is asked whether it has anything on screen, and only those that do are put
+			// in order and drawn: most of the units carried stand off screen most of the time
+			const units = this.units,
+				drawn = this.drawn
+			let count = 0
+			for (let i = 0, end = units.length; i < end; i++) {
+				const unit = units[i]
+				if (unit.Prepare()) {
+					drawn[count++] = unit
+				}
+			}
+			if (count > 1) {
+				this.order(count)
+			}
+			// the farthest from the cursor first, so the nearest stands over the strips it overlaps
+			for (let i = count - 1; i > -1; i--) {
+				drawn[i].Draw(this.menu)
+			}
+		} finally {
+			surface.End()
 		}
 	}
 	protected EntityCreated(entity: Entity) {
@@ -75,7 +94,13 @@ new (class CCooldowns {
 		}
 	}
 	protected EntityDestroyed(entity: Entity) {
+		if (entity instanceof Ability) {
+			for (const unit of this.units) {
+				unit.EntityDestroyed(entity)
+			}
+		}
 		if (this.isUnit(entity) && this.cachedUnits.has(entity)) {
+			this.units.find(unit => unit.Owner === entity)?.DisposeAll()
 			this.units.removeCallback(x => x.Owner === entity)
 			this.cachedUnits.delete(entity)
 		}
@@ -168,6 +193,27 @@ new (class CCooldowns {
 		}
 		return getUnitData
 	}
+	/**
+	 * Puts the first `count` units to be drawn in order of how near the cursor they stand, the
+	 * nearest first. Only the order of strips that overlap rides on it, so it is taken only when
+	 * there are two units or more to draw; they are a handful at most, which an insertion sort
+	 * settles in place, keeping units that tie in the order they were found.
+	 */
+	private order(count: number) {
+		const drawn = this.drawn
+		for (let i = 0; i < count; i++) {
+			drawn[i].UpdatePriority()
+		}
+		for (let i = 1; i < count; i++) {
+			const unit = drawn[i],
+				priority = unit.Priority
+			let j = i - 1
+			for (; j > -1 && drawn[j].Priority > priority; j--) {
+				drawn[j + 1] = drawn[j]
+			}
+			drawn[j + 1] = unit
+		}
+	}
 	private shouldBeUnit(entity: Nullable<Entity>): entity is Unit {
 		if (!this.isUnit(entity) || this.isIllusion(entity)) {
 			return false
@@ -205,7 +251,6 @@ new (class CCooldowns {
 				this.updateAllManagers(unit)
 			}
 		}
-		RendererSDK.InvalidateDraw2D()
 	}
 	private isIllusion(unit: Unit) {
 		return unit.IsIllusion && !unit.IsStrongIllusion

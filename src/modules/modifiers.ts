@@ -1,16 +1,6 @@
-import {
-	GameState,
-	Modifier,
-	npc_dota_brewmaster_earth,
-	npc_dota_brewmaster_storm,
-	npc_dota_brewmaster_void,
-	npc_dota_visage_familiar,
-	Unit
-} from "github.com/octarine-public/wrapper/index"
-
-import { ETeamState } from "../enum"
 import { MenuManager } from "../menu/index"
 import { BaseModifierMenu } from "../menu/modifiers"
+import { IsTeamSelected } from "../menu/team"
 
 export class ModifierManager {
 	private readonly ignoreModifiers = ["modifier_phased", "modifier_magic_immune"]
@@ -51,6 +41,11 @@ export class ModifierManager {
 		if (!modifier.IsValid || (modifier.IsHidden && !modifier.ForceVisible)) {
 			return false
 		}
+		// a pulse the game lays and lifts within a tick, such as the blind Fire Spirits' burn
+		// strikes every 0.2s: drawn, it blinks and shoves the row about
+		if (modifier.Duration === 0) {
+			return false
+		}
 		if (owner.IsCourier && this.ignoreModifiers.includes(modifier.Name)) {
 			return false
 		}
@@ -58,7 +53,7 @@ export class ModifierManager {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return this.entityTeamState(owner, this.menu.ModifierMenu.Important)
+			return IsTeamSelected(owner, this.menu.ModifierMenu.Important.TeamState)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(modifier)
@@ -88,26 +83,10 @@ export class ModifierManager {
 	}
 	private isDisabled(menu: BaseModifierMenu, modifier: Modifier) {
 		const owner = modifier.Parent
-		if (owner === undefined || !this.entityTeamState(owner, menu)) {
-			return true
-		}
-		const time = GameState.RawGameTime / 60
-		return !menu.State.value || time >= menu.DisableByTme.value
-	}
-	private entityTeamState(entity: Unit, menu: BaseModifierMenu) {
-		switch (menu.TeamState.SelectedID) {
-			case ETeamState.All:
-				return true
-			case ETeamState.AllExceptSelf:
-				return !entity.IsMyHero
-			case ETeamState.Ally:
-				return !entity.IsEnemy() && !entity.IsMyHero
-			case ETeamState.AllyAndLocal:
-				return !entity.IsEnemy() || entity.IsMyHero
-			case ETeamState.Enemy:
-				return entity.IsEnemy()
-			default:
-				return false
-		}
+		return (
+			owner === undefined ||
+			!IsTeamSelected(owner, menu.TeamState) ||
+			!menu.State.value
+		)
 	}
 }

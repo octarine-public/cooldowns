@@ -1,7 +1,6 @@
-import { Color, Menu } from "github.com/octarine-public/wrapper/index"
-
 import { EMenuType } from "../enum"
 import { BaseMenu } from "./base"
+import { CooldownIcons } from "./icons"
 import {
 	BearSettingsMenu,
 	CourierSettingsMenu,
@@ -11,12 +10,13 @@ import {
 	PandasSettingsMenu,
 	RoshanSettingsMenu
 } from "./settings"
+import { TextStyleMenu } from "./style"
 
 export class SpellMenu extends BaseMenu {
 	public readonly IsMinimalistic: Menu.Toggle
-	public readonly LevelType: Menu.Dropdown
 	public readonly LevelColor: Menu.ColorPicker
 	public readonly ChargeColor: Menu.ColorPicker
+	public readonly ModePosition: Menu.Dropdown
 
 	public readonly Hero: HeroSettingsMenu
 	public readonly Creep: CreepSettingsMenu
@@ -26,14 +26,31 @@ export class SpellMenu extends BaseMenu {
 	public readonly Familiar: FamiliarSettingsMenu
 	public readonly Pandas: PandasSettingsMenu
 
-	constructor(node: Menu.Node) {
-		super({ node, defaultSize: 1, nodeName: "Spells" })
+	constructor(
+		node: Menu.Node,
+		textStyle: TextStyleMenu,
+		animation: Menu.Toggle,
+		noMana: Menu.Slider
+	) {
+		super({
+			node,
+			textStyle,
+			animation,
+			noMana,
+			defaultSize: 1,
+			nodeName: "Spells",
+			texture: CooldownIcons.Spells
+		})
 		this.Tree.SortNodes = true
 		this.Size.max /= 4
 		this.IsMinimalistic = this.Tree.AddToggle("Minimalistic", false)
-		this.LevelType = this.Tree.AddDropdown("Level type", ["Square", "Text"])
+		this.IsMinimalistic.IconPath = Menu.Icons.Minimize2
 		this.LevelColor = this.Tree.AddColorPicker("Level color", Color.Yellow)
+		this.LevelColor.IconPath = Menu.Icons.Palette
 		this.ChargeColor = this.Tree.AddColorPicker("Charge color", Color.Green)
+		this.ChargeColor.IconPath = Menu.Icons.Zap
+		this.ModePosition = this.AddPosition()
+		this.AddStyle(true)
 
 		this.Hero = new HeroSettingsMenu(this.Tree, EMenuType.Spell)
 		this.Creep = new CreepSettingsMenu(this.Tree, EMenuType.Spell)
@@ -54,6 +71,7 @@ export class SpellMenu extends BaseMenu {
 		this.State.OnValue(() => callback())
 		this.Rounding.OnValue(() => callback())
 		this.TeamState.OnValue(() => callback())
+		this.ModePosition.OnValue(() => callback())
 
 		this.Hero.MenuChanged(callback)
 		this.Creep.MenuChanged(callback)

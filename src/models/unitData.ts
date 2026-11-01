@@ -1,22 +1,5 @@
-import {
-	Ability,
-	AnchorKind,
-	GameState,
-	GUIInfo,
-	Input,
-	Item,
-	Modifier,
-	npc_dota_brewmaster_earth,
-	npc_dota_brewmaster_storm,
-	npc_dota_brewmaster_void,
-	npc_dota_visage_familiar,
-	RendererSDK,
-	Unit,
-	Vector2,
-	Vector3
-} from "github.com/octarine-public/wrapper/index"
-
-import { ETeamState } from "../enum"
+import { EMeepoClones } from "../enum"
+import { BaseGUI } from "../gui/index"
 import { ItemGUI } from "../gui/items"
 import { ModifierGUI } from "../gui/modifiers"
 import { SpellGUI } from "../gui/spells"
@@ -24,143 +7,297 @@ import { MenuManager } from "../menu/index"
 import { ItemMenu } from "../menu/items"
 import { BaseModifierMenu, ModifierMenu } from "../menu/modifiers"
 import { SpellMenu } from "../menu/spells"
+import { IsTeamSelected } from "../menu/team"
+import { UnitBody } from "./body"
 
-const TP_END_KIND = RendererSDK.AllocateAnchorKind()
+/** The spells each Meepo casts on its own: everything else a clone has is the main Meepo's. */
+const meepoOwnSpells = new Set(["meepo_earthbind", "meepo_poof"])
 
 export class UnitData {
+	/**
+	 * The HUD a bar may stand under, as it stood at the start of the frame: the shop and the
+	 * scoreboard open and shut and the window is resized on the client, with no tick to say so -
+	 * and a paused replay sends no ticks at all. Counted up whenever any of it changes, so a bar's
+	 * cover and size are taken again then rather than every frame.
+	 */
+	private static hud = 0
+	private static shopOpen = false
+	private static scoreboardOpen = false
+	private static readonly window = new Vector2()
+	/**
+	 * What every unit's strips are switched to this frame, read off the menu once for all of
+	 * them rather than once a unit.
+	 */
+	private static itemState = false
+	private static spellState = false
+	private static modifierState = false
+	private static meepoClones = EMeepoClones.Full
+
+	/**
+	 * How near the cursor the unit stands, which orders the strips that overlap: taken only for
+	 * the units drawn, and only while there are two of them or more.
+	 */
 	public Priority: number = Infinity
 	private items: Item[] = []
 	private spells: [Ability, number][] = []
+	/** The spells a compact Meepo clone keeps. */
+	private ownSpells: [Ability, number][] = []
 	private modifiers: Modifier[] = []
 
 	private readonly itemGUI = new ItemGUI()
 	private readonly spellGUI = new SpellGUI()
 	private readonly modifierGUI = new ModifierGUI()
+	/** The body under each bar the unit has: where it stands, and where a teleport lands it. */
+	private readonly body = new UnitBody()
+	private readonly bodyEnd = new UnitBody()
 
-	private static readonly drawAnchor = new Vector2()
+	/**
+	 * What the unit's strips read off it, taken once a server tick: all of it is networked, but
+	 * for the bar's size, which is laid out for the window and is taken again with the HUD.
+	 */
+	private readTick = -1
+	private readHud = -1
+	private teleported = false
+	private shown = false
+	private silenced = false
+	private passiveDisabled = false
+	private muted = false
+	private tethered = false
+	private barOffset = 0
+	private visualShield = false
+	private readonly barSize = new Vector2()
+	private readonly barCorrection = new Vector2()
+	/** Where the bars stood the last time their cover was asked, and the answer, kept for the tick and the HUD. */
+	private coverTick = -1
+	private coverHud = -1
+	private covered = false
+	private readonly coverStart = new Vector2().Invalidate()
+	private readonly coverEnd = new Vector2().Invalidate()
+	private readonly feet = new Vector3()
+	private readonly bar = new Vector2()
+	private readonly barEnd = new Vector2()
+	/**
+	 * What {@link UnitData.Prepare} found the unit draws this frame: which strips, whether as a
+	 * compact Meepo clone, and where its bars stand.
+	 */
+	private compact = false
+	private spellsDrawn = false
+	private itemsDrawn = false
+	private modifiersDrawn = false
+	private start: Nullable<Vector2>
+	private end: Nullable<Vector2>
+	/**
+	 * What the unit is, taken once: the unit a UnitData is for never changes, nor does its
+	 * class, and the strips ask it of every unit drawn every frame.
+	 */
+	private readonly familiar: boolean
+	private readonly panda: boolean
+	private readonly meepo: boolean
 
-	constructor(public readonly Owner: Unit) {}
+	constructor(public readonly Owner: Unit) {
+		this.familiar = Owner instanceof npc_dota_visage_familiar
+		this.panda =
+			Owner instanceof npc_dota_brewmaster_void ||
+			Owner instanceof npc_dota_brewmaster_storm ||
+			Owner instanceof npc_dota_brewmaster_earth
+		this.meepo = Owner instanceof npc_dota_hero_meepo
+	}
 
 	public get IsTeleported() {
 		return this.Owner.TPStartPosition.IsValid && this.Owner.TPEndPosition.IsValid
 	}
-	protected get Positions(): [Nullable<Vector2>, Nullable<Vector2>] {
+	/** Where the unit's bars stand this frame, or where a teleport takes it from and to. */
+	protected Positions(teleported: boolean): void {
 		const owner = this.Owner,
-			start = this.IsTeleported ? owner.TPStartPosition : owner.Position,
-			end = this.IsTeleported ? owner.TPEndPosition : undefined
-		return [
-			this.HealthBarPosition(owner, start),
-			end?.IsValid ? this.HealthBarPosition(owner, end) : undefined
-		]
+			start = teleported ? owner.TPStartPosition : owner.Position,
+			end = teleported ? owner.TPEndPosition : undefined
+		this.start = this.HealthBarPosition(start, this.body, this.bar)
+		this.end = end?.IsValid
+			? this.HealthBarPosition(end, this.bodyEnd, this.barEnd)
+			: undefined
 	}
-	public DrawContent2D(menu: MenuManager): void {
-		this.Priority = Infinity
-		if (!this.isShown()) {
+	/**
+	 * Reads the menu and the HUD the bars stand under this frame, before any unit is drawn: once
+	 * for every unit, rather than once a unit. Answers whether any strip is switched on at all.
+	 */
+	public static BeginFrame(menu: MenuManager): boolean {
+		UnitData.itemState = menu.ItemMenu.State.value
+		UnitData.spellState = menu.SpellMenu.State.value
+		UnitData.modifierState = menu.ModifierMenu.State.value
+		UnitData.meepoClones = menu.MeepoClones.SelectedID as EMeepoClones
+		UnitData.readHud()
+		return UnitData.itemState || UnitData.spellState || UnitData.modifierState
+	}
+	private static readHud(): void {
+		const shop = GUIInfo.OpenShop.IsOpen,
+			scoreboard = GUIInfo.Scoreboard.IsOpen,
+			window = RendererSDK.WindowSize
+		if (
+			shop === UnitData.shopOpen &&
+			scoreboard === UnitData.scoreboardOpen &&
+			window.x === UnitData.window.x &&
+			window.y === UnitData.window.y
+		) {
 			return
 		}
+		UnitData.shopOpen = shop
+		UnitData.scoreboardOpen = scoreboard
+		UnitData.window.CopyFrom(window)
+		UnitData.hud++
+	}
+	/**
+	 * Reads what the strips take off the unit, once a server tick: its number is set before its
+	 * data is applied, and it runs on through a pause, which holds the game's tick still.
+	 */
+	private readOwner(): void {
+		const tick = GameState.CurrentServerTick,
+			hud = UnitData.hud
+		if (this.readTick === tick && this.readHud === hud) {
+			return
+		}
+		this.readTick = tick
+		this.readHud = hud
+		const owner = this.Owner
+		this.teleported = this.IsTeleported
+		this.shown =
+			(this.teleported || owner.IsFogVisible || owner.IsVisible) &&
+			owner.IsAlive &&
+			!owner.IsHideWorldHud &&
+			!(owner.IsCreep && !owner.IsSpawned)
+		if (!this.shown) {
+			return
+		}
+		this.silenced = owner.IsSilenced
+		this.passiveDisabled = owner.IsPassiveDisabled
+		this.muted = owner.IsMuted
+		this.tethered = owner.IsTethered
+		this.barOffset = owner.HealthBarOffset
+		this.visualShield = owner.HasVisualShield
+		this.barSize.CopyFrom(owner.HealthBarSize)
+		this.barCorrection.CopyFrom(owner.HealthBarPositionCorrection)
+	}
+	/**
+	 * Whether the bars stand under the HUD, asked again only once they move, the HUD changes or a
+	 * server tick lands - the last for what the HUD lays out without a flag to watch, such as the
+	 * shop's own panels.
+	 */
+	private isCovered(start: Nullable<Vector2>, end: Nullable<Vector2>): boolean {
+		const tick = GameState.CurrentServerTick,
+			hud = UnitData.hud
+		if (
+			this.coverTick === tick &&
+			this.coverHud === hud &&
+			UnitData.same(this.coverStart, start) &&
+			UnitData.same(this.coverEnd, end)
+		) {
+			return this.covered
+		}
+		this.coverTick = tick
+		this.coverHud = hud
+		UnitData.keep(this.coverStart, start)
+		UnitData.keep(this.coverEnd, end)
+		this.covered = BaseGUI.Covered(start, end)
+		return this.covered
+	}
+	private static same(held: Vector2, position: Nullable<Vector2>): boolean {
+		return position === undefined
+			? !held.IsValid
+			: held.x === position.x && held.y === position.y
+	}
+	private static keep(held: Vector2, position: Nullable<Vector2>): void {
+		if (position === undefined) {
+			held.Invalidate()
+		} else {
+			held.CopyFrom(position)
+		}
+	}
+	/**
+	 * Settles whether the unit has anything on screen this frame, before any unit is drawn: which
+	 * of its strips are switched on and have cells, whether it is shown, and where its bars stand.
+	 * A unit with both bars off screen or under the HUD has nothing to draw and costs no more
+	 * than this; only the units this answers yes for are put in order and drawn.
+	 */
+	public Prepare(): boolean {
+		const clone = this.cloneMode()
+		if (clone === EMeepoClones.Hidden) {
+			return false
+		}
+		const compact = clone === EMeepoClones.Compact,
+			spells = compact ? this.ownSpells : this.spells
+		const spellsDrawn = UnitData.spellState && spells.length > 0
+		const itemsDrawn = UnitData.itemState && !compact && this.items.length > 0
+		const modifiersDrawn = UnitData.modifierState && this.modifiers.length > 0
+		if (!spellsDrawn && !itemsDrawn && !modifiersDrawn) {
+			return false
+		}
+		this.readOwner()
+		if (!this.shown) {
+			return false
+		}
+		this.compact = compact
+		this.spellsDrawn = spellsDrawn
+		this.itemsDrawn = itemsDrawn
+		this.modifiersDrawn = modifiersDrawn
+		this.Positions(this.teleported)
+		const start = this.start,
+			end = this.end
+		return (start !== undefined || end !== undefined) && !this.isCovered(start, end)
+	}
+	/** Draws the strips {@link UnitData.Prepare} found the unit has on screen this frame. */
+	public Draw(menu: MenuManager) {
 		const itemMenu = menu.ItemMenu,
 			spellMenu = menu.SpellMenu,
 			modifierMenu = menu.ModifierMenu
 
-		if (
-			!itemMenu.State.value &&
-			!spellMenu.State.value &&
-			!modifierMenu.State.value
-		) {
-			return
-		}
-		if (!this.items.length && !this.spells.length && !this.modifiers.length) {
-			return
-		}
+		const spells = this.compact ? this.ownSpells : this.spells,
+			spellsDrawn = this.spellsDrawn,
+			itemsDrawn = this.itemsDrawn,
+			modifiersDrawn = this.modifiersDrawn
 
-		let [position, positionEnd] = this.Positions
-		if (position !== undefined && UnitData.hudContains(position)) {
-			position = undefined
-		}
-		if (positionEnd !== undefined && UnitData.hudContains(positionEnd)) {
-			positionEnd = undefined
-		}
-		if (position === undefined && positionEnd === undefined) {
-			return
-		}
-		this.setPriority(position, positionEnd)
-		const scale = menu.Scale.value
-			? this.getDistanceScale(position, positionEnd)
-			: 1
-		const alpha =
-			menu.Opacity.value * (255 / 100) * (menu.OpacityByCursor.value ? -1 : 1)
+		const position = this.start,
+			positionEnd = this.end
+		const distanceScale = this.getDistanceScale(position, positionEnd)
 
-		this.UpdateGUI(
-			scale,
-			UnitData.drawAnchor,
-			undefined,
-			itemMenu,
-			spellMenu,
-			modifierMenu
-		)
+		const scale = menu.Scale.value ? distanceScale : 1
+		const alpha = menu.Opacity.value * 2.55 * (menu.OpacityByCursor.value ? -1 : 1)
 
-		const index = this.Owner.Index
-		if (position !== undefined) {
-			RendererSDK.DrawEntityRelative(
-				index,
-				AnchorKind.HealthBar,
-				() => this.Positions[0],
-				() => this.DrawBlock(menu, alpha, position)
-			)
-		}
-		if (this.IsTeleported && positionEnd !== undefined) {
-			RendererSDK.DrawEntityRelative(
-				index,
-				TP_END_KIND,
-				() => this.Positions[1],
-				() => this.DrawBlock(menu, alpha, positionEnd)
-			)
-		}
-	}
-	private DrawBlock(menu: MenuManager, alpha: number, realAnchor: Vector2) {
-		const owner = this.Owner
-		this.itemGUI.realAnchor.CopyFrom(realAnchor)
-		this.spellGUI.realAnchor.CopyFrom(realAnchor)
-		this.modifierGUI.realAnchor.CopyFrom(realAnchor)
-		if (menu.ItemMenu.State.value && this.items.length) {
+		this.UpdateGUI(scale, position, positionEnd, itemMenu, spellMenu, modifierMenu)
+
+		if (itemsDrawn) {
 			this.itemGUI.Draw(
 				alpha,
-				menu.ItemMenu,
+				itemMenu,
 				this.items,
-				this.GetAdditionalPosition(menu.ItemMenu),
-				owner.IsMuted,
-				owner.IsTethered
+				this.GetAdditionalPosition(itemMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, itemMenu, spellsDrawn)
+				),
+				this.muted,
+				this.tethered
 			)
 		}
-		if (menu.SpellMenu.State.value && this.spells.length) {
+
+		if (spellsDrawn) {
 			this.spellGUI.Draw(
 				alpha,
-				menu.SpellMenu,
-				this.spells,
-				this.GetAdditionalPosition(menu.SpellMenu),
-				owner.IsSilenced,
-				owner.IsPassiveDisabled
+				spellMenu,
+				spells,
+				this.GetAdditionalPosition(spellMenu),
+				this.silenced,
+				this.passiveDisabled
 			)
 		}
-		if (menu.ModifierMenu.State.value && this.modifiers.length) {
+
+		if (modifiersDrawn) {
 			this.modifierGUI.Draw(
 				alpha,
-				menu.ModifierMenu,
+				modifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(menu.ModifierMenu)
+				this.GetAdditionalPosition(modifierMenu).AddScalarX(
+					this.spellGUI.ColumnShift(spellMenu, modifierMenu, spellsDrawn) +
+						this.itemGUI.ColumnShift(itemMenu, modifierMenu, itemsDrawn)
+				)
 			)
 		}
-	}
-	private isShown(): boolean {
-		const owner = this.Owner
-		const isVisible = this.IsTeleported || owner.IsFogVisible || owner.IsVisible
-		if (!isVisible || !owner.IsAlive || owner.IsHideWorldHud) {
-			return false
-		}
-		if (owner.IsCreep && !owner.IsSpawned) {
-			return false
-		}
-		return true
 	}
 	public UnitItemsChanged(newItems: Item[]) {
 		this.items = newItems
@@ -169,6 +306,7 @@ export class UnitData {
 	public UnitAbilitiesChanged(newAbils: [Ability, number][]) {
 		this.spells = newAbils
 		this.spells.orderBy(([, idx]) => idx)
+		this.updateOwnSpells()
 	}
 	public ModifierCreated(modifier: Modifier, menu: ModifierMenu) {
 		this.modifiers.push(modifier)
@@ -194,28 +332,25 @@ export class UnitData {
 			case entity instanceof Ability:
 				this.spells.removeCallback(([x]) => x === entity)
 				this.spells.orderBy(([, idx]) => idx)
+				this.updateOwnSpells()
 				break
 		}
 	}
 	public DisposeAll() {
 		this.items.clear()
 		this.spells.clear()
+		this.ownSpells.clear()
 		this.modifiers.clear()
 	}
 	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
 		const owner = this.Owner
 		if (
-			owner instanceof npc_dota_visage_familiar &&
+			this.familiar &&
 			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
 		) {
 			return menu.Familiar.Position
 		}
-		if (
-			(owner instanceof npc_dota_brewmaster_void ||
-				owner instanceof npc_dota_brewmaster_storm ||
-				owner instanceof npc_dota_brewmaster_earth) &&
-			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
-		) {
+		if (this.panda && (menu instanceof SpellMenu || menu instanceof ModifierMenu)) {
 			return menu.Pandas.Position
 		}
 		if (owner.IsCreep && menu instanceof SpellMenu) {
@@ -245,7 +380,7 @@ export class UnitData {
 		const itemState = itemMenu.State.value,
 			spellState = spellMenu.State.value,
 			modifierState = modifierMenu.State.value,
-			healthBarSize = this.Owner.HealthBarSize
+			healthBarSize = this.barSize
 
 		if (itemState) {
 			this.itemGUI.Update(
@@ -253,7 +388,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				itemMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 		if (spellState) {
@@ -262,7 +399,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				spellMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 		if (modifierState) {
@@ -271,7 +410,9 @@ export class UnitData {
 				positionEnd,
 				healthBarSize,
 				modifierMenu.Size.value,
-				scale
+				scale,
+				this.body,
+				this.bodyEnd
 			)
 		}
 	}
@@ -284,13 +425,10 @@ export class UnitData {
 		for (let i = 0, end = modifiers.length; i < end; i++) {
 			const modifier = modifiers[i]
 			if (modifier === undefined || !modifier.IsValid) {
-				this.modifiers.remove(modifier)
 				continue
 			}
 			const keyName = this.getKeyName(modifier)
 			if (!this.stateModifiers(modifier, menu)) {
-				modifiersMap.delete(keyName)
-				this.modifiers.remove(modifier)
 				continue
 			}
 			const modifierInMap = modifiersMap.get(keyName)
@@ -303,21 +441,36 @@ export class UnitData {
 		}
 		return [...modifiersMap.values()].orderBy(x => -x.RemainingTime)
 	}
-	public HealthBarPosition(
-		owner: Unit,
-		origin: Nullable<Vector3> = undefined
+	/** Where the bar over `origin` is drawn, into `out`, measuring `body` under it on the way. */
+	private HealthBarPosition(
+		origin: Vector3,
+		body: UnitBody,
+		out: Vector2
 	): Nullable<Vector2> {
-		const position = (origin ?? owner.Position)
-			.Clone()
-			.AddScalarZ(owner.HealthBarOffset)
-		const screenPosition = RendererSDK.WorldToScreen(position)
-		if (screenPosition === undefined) {
+		const height = this.barOffset
+		const head = RendererSDK.WorldToScreen(
+			this.feet.CopyFrom(origin).AddScalarZ(height)
+		)
+		if (head === undefined) {
 			return undefined
 		}
-		if (owner.HasVisualShield) {
-			screenPosition.AddScalarY(5)
+		out.CopyFrom(head)
+		if (this.visualShield) {
+			out.AddScalarY(5)
 		}
-		return screenPosition.SubtractForThis(owner.HealthBarPositionCorrection)
+		out.SubtractForThis(this.barCorrection)
+		body.Measure(out, head, origin, height)
+		return out
+	}
+	/** How this unit is drawn if it is a Meepo clone, or nothing if it is not one. */
+	private cloneMode(): Nullable<EMeepoClones> {
+		if (!this.meepo || !this.Owner.IsClone) {
+			return undefined
+		}
+		return UnitData.meepoClones
+	}
+	private updateOwnSpells() {
+		this.ownSpells = this.spells.filter(([abil]) => meepoOwnSpells.has(abil.Name))
 	}
 	private getKeyName(modifier: Modifier) {
 		if (modifier.Name === "modifier_rubick_spell_steal") {
@@ -330,7 +483,7 @@ export class UnitData {
 			return true
 		}
 		if (modifier.IsDisable() || modifier.IsShield() || modifier.IsChannel()) {
-			return this.entityTeamState(menu.Important)
+			return IsTeamSelected(this.Owner, menu.Important.TeamState)
 		}
 		if (modifier.IsAura) {
 			return this.stateAuras(menu)
@@ -353,42 +506,32 @@ export class UnitData {
 		return !this.isDisabledModifier(menu.Debuffs)
 	}
 	private isDisabledModifier(menu: BaseModifierMenu) {
-		return (
-			!menu.State.value ||
-			!this.entityTeamState(menu) ||
-			GameState.RawGameTime / 60 >= menu.DisableByTme.value
-		)
-	}
-	private entityTeamState(menu: BaseModifierMenu) {
-		switch (menu.TeamState.SelectedID) {
-			case ETeamState.All:
-				return true
-			case ETeamState.Ally:
-				return !this.Owner.IsEnemy() && !this.Owner.IsMyHero
-			case ETeamState.AllyAndLocal:
-				return !this.Owner.IsEnemy() || this.Owner.IsMyHero
-			case ETeamState.Enemy:
-				return this.Owner.IsEnemy()
-			default:
-				return false
-		}
+		return !menu.State.value || !IsTeamSelected(this.Owner, menu.TeamState)
 	}
 	private getDistanceScale(start: Nullable<Vector2>, end: Nullable<Vector2>) {
 		const position = start ?? end
 		return position !== undefined
-			? this.CalculateScale(Input.CursorOnScreen.Distance(position))
+			? this.CalculateScale(InputManager.CursorOnScreen.Distance(position))
 			: 1
 	}
-	private setPriority(start: Nullable<Vector2>, end: Nullable<Vector2>) {
-		const w2s = RendererSDK.WorldToScreen(this.Owner.Position) ?? start ?? end
-		this.Priority =
-			w2s !== undefined ? w2s.DistanceSqr(Input.CursorOnScreen) : Infinity
-	}
-	private static hudContains(position: Vector2): boolean {
-		return (
-			GUIInfo.ContainsShop(position) ||
-			GUIInfo.ContainsMiniMap(position) ||
-			GUIInfo.ContainsScoreboard(position)
-		)
+	/**
+	 * Takes {@link UnitData.Priority} for the frame {@link UnitData.Prepare} settled: off where the
+	 * unit stands, or off its bars where that is off screen.
+	 */
+	public UpdatePriority() {
+		const start = this.start,
+			end = this.end
+		let w2s = RendererSDK.WorldToScreen(this.Owner.Position)
+		if (w2s === undefined) {
+			w2s = start
+		}
+		if (w2s === undefined) {
+			w2s = end
+		}
+		if (w2s === undefined) {
+			this.Priority = Infinity
+			return
+		}
+		this.Priority = w2s.DistanceSqr(InputManager.CursorOnScreen)
 	}
 }
