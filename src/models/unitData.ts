@@ -57,6 +57,9 @@ export class UnitData {
 	/** The body under each bar the unit has: where it stands, and where a teleport lands it. */
 	private readonly body = new UnitBody()
 	private readonly bodyEnd = new UnitBody()
+	/** The corner of each bar as a render anchor, which the strips stand on. */
+	private readonly anchor = new CRenderAnchor()
+	private readonly anchorEnd = new CRenderAnchor()
 
 	/**
 	 * What the unit's strips read off it, taken once a server tick: all of it is networked, but
@@ -115,15 +118,42 @@ export class UnitData {
 	public get IsTeleported() {
 		return this.Owner.TPStartPosition.IsValid && this.Owner.TPEndPosition.IsValid
 	}
-	/** Where the unit's bars stand this frame, or where a teleport takes it from and to. */
+	/**
+	 * Where the unit's bars stand this frame, or where a teleport takes it from and to, and the
+	 * anchors on their corners: a unit in sight is followed by its own origin, anything else is
+	 * pinned where the script has it. A unit in sight off the screen has no bar to stand on.
+	 */
 	protected Positions(teleported: boolean): void {
 		const owner = this.Owner,
 			start = teleported ? owner.TPStartPosition : owner.Position,
-			end = teleported ? owner.TPEndPosition : undefined
-		this.start = this.HealthBarPosition(start, this.body, this.bar)
+			end = teleported ? owner.TPEndPosition : undefined,
+			follows = !teleported && owner.IsVisible
+		this.start =
+			follows && !owner.IsOnScreen
+				? undefined
+				: this.HealthBarPosition(start, this.body, this.bar)
+		if (this.start !== undefined) {
+			this.place(this.anchor, start, follows)
+		}
 		this.end = end?.IsValid
 			? this.HealthBarPosition(end, this.bodyEnd, this.barEnd)
 			: undefined
+		if (end !== undefined && this.end !== undefined) {
+			this.place(this.anchorEnd, end, false)
+		}
+	}
+	/**
+	 * Defines `anchor` on the corner of the bar over `origin`, as {@link UnitData.HealthBarPosition}
+	 * lays it out: on the unit itself when it `follows` it.
+	 */
+	private place(anchor: CRenderAnchor, origin: Vector3, follows: boolean): void {
+		const x = -this.barCorrection.x,
+			y = (this.visualShield ? 5 : 0) - this.barCorrection.y
+		if (follows) {
+			anchor.SetEntity(this.Owner.Index, 0, 0, this.barOffset, x, y)
+		} else {
+			anchor.SetWorld(origin.x, origin.y, origin.z + this.barOffset, x, y)
+		}
 	}
 	/**
 	 * Reads the menu and the HUD the bars stand under this frame, before any unit is drawn: once
@@ -351,6 +381,8 @@ export class UnitData {
 		this.ownSpells.clear()
 		this.modifiers.clear()
 		this.modifierGUI.Dispose()
+		this.anchor.Free()
+		this.anchorEnd.Free()
 	}
 	/** Where the strip of `menu` is set off the unit's bar, written into `out`. */
 	protected GetAdditionalPosition(
@@ -397,6 +429,7 @@ export class UnitData {
 			healthBarSize = this.barSize
 
 		if (itemState) {
+			this.itemGUI.Anchor(this.anchor, this.anchorEnd)
 			this.itemGUI.Update(
 				position,
 				positionEnd,
@@ -408,6 +441,7 @@ export class UnitData {
 			)
 		}
 		if (spellState) {
+			this.spellGUI.Anchor(this.anchor, this.anchorEnd)
 			this.spellGUI.Update(
 				position,
 				positionEnd,
@@ -419,6 +453,7 @@ export class UnitData {
 			)
 		}
 		if (modifierState) {
+			this.modifierGUI.Anchor(this.anchor, this.anchorEnd)
 			this.modifierGUI.Update(
 				position,
 				positionEnd,

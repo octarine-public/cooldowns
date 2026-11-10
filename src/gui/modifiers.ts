@@ -152,11 +152,10 @@ export class ModifierGUI extends BaseGUI {
 			}
 		}
 		this.BeginStrip(recPosition, additionalPosition)
-		const sheet = timers?.Open(
-			recPosition,
-			BaseGUI.Anchor(recPosition.x, additionalPosition.x),
-			BaseGUI.Anchor(recPosition.y, additionalPosition.y)
-		)
+		const sheet =
+			timers !== null
+				? this.OpenSheet(timers, recPosition, additionalPosition)
+				: undefined
 		for (let index = 0; index < modifiers.length; index++) {
 			const modifier = modifiers[index]
 			// nothing of this strip moves: a modifier is drawn whole in its own lane the frame it
@@ -372,7 +371,10 @@ export class ModifierGUI extends BaseGUI {
 		// the surface this row is laid out on still frames and drags it
 		const extent = this.extentOf(position)
 		this.canvas.Reserve(position.pos1, extent)
-		const at = this.at.CopyFrom(position.pos1).AddForThis(this.origin()),
+		const at = this.at
+				.CopyFrom(position.pos1)
+				.AddForThis(this.origin())
+				.SubtractForThis(this.anchorPoint),
 			timers = sheet.Canvas
 		if (ModifierGUI.isBacked(modifier.Name)) {
 			this.backing.SetA(alpha)

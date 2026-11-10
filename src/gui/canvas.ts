@@ -136,7 +136,8 @@ class Layer {
  * whatever the strips drawn before it did this frame.
  */
 class Group extends Layer {
-	/** The corner, stacking order and visibility last written to the container. */
+	/** The anchor slot, corner, stacking order and visibility last written to the container. */
+	public anchor = -1
 	public left?: number
 	public top?: number
 	public stack?: number
@@ -205,6 +206,10 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 	private layoutUnit = 1
 	/** How many times the host has freed elements without telling their holder, read once a frame. */
 	private freed = 0
+	/** The anchor the groups stood next are tied to, and where its point stands, see {@link HudCanvas.Anchor}. */
+	private anchorSlot = -1
+	private anchorX = 0
+	private anchorY = 0
 
 	/**
 	 * `grouped` says strips get groups of their own, see {@link HudCanvas.BeginGroup}: the game's
@@ -235,6 +240,8 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		OpenGrayFrame()
 		OpenRoundedFrame()
 		this.frame++
+		this.anchorSlot = -1
+		this.anchorX = this.anchorY = 0
 		this.base.Reset()
 		this.layer = this.base
 		this.group = undefined
@@ -275,6 +282,19 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 			live[kept++] = group
 		}
 		live.length = kept
+	}
+
+	/**
+	 * Ties the groups stood from here on to render anchor `slot`, whose point stands at the whole
+	 * pixel `x`, `y` this frame: a container's corner is written from that point, and the core
+	 * moves the container with it as each frame is presented, so a strip keeps up with its bar
+	 * even on a frame whose script pass ran late, and one that stands still against its bar
+	 * writes nothing as the camera moves. -1 stands them on the screen.
+	 */
+	public Anchor(slot: number, x: number, y: number): void {
+		this.anchorSlot = slot
+		this.anchorX = slot < 0 ? 0 : x
+		this.anchorY = slot < 0 ? 0 : y
 	}
 
 	/**
@@ -407,12 +427,19 @@ export class HudCanvas implements GuiCanvas, TextSurface {
 		return true
 	}
 
-	/** Stands the group's container at `x`, `y`, next in the stack, writing only what moved. */
+	/**
+	 * Stands the group's container at `x`, `y`, next in the stack, on the anchor the canvas is
+	 * tied to, writing only what moved.
+	 */
 	private stand(group: Group, x: number, y: number): void {
 		const container = group.container,
-			left = (group.originX = Math.round(x)),
-			top = (group.originY = Math.round(y)),
+			left = (group.originX = Math.round(x)) - this.anchorX,
+			top = (group.originY = Math.round(y)) - this.anchorY,
 			stack = this.base.order++
+		if (group.anchor !== this.anchorSlot) {
+			group.anchor = this.anchorSlot
+			container.setAnchor(group.anchor)
+		}
 		if (group.left !== left) {
 			group.left = left
 			MenuSDK.WritePx(container, "left", left)

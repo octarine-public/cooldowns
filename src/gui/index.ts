@@ -4,7 +4,7 @@ import { TextStyleMenu } from "../menu/style"
 import { UnitBody } from "../models/body"
 import { easeOut, ISlotMotion, SlotMotion } from "./motion"
 import { DrawStyledText, Unmeasured } from "./text"
-import { TimerBoard } from "./timers"
+import { TimerBoard, TimerSheet } from "./timers"
 import {
 	ArtWash,
 	GuiCanvas,
@@ -25,6 +25,8 @@ export type {
 } from "./types"
 
 const ORIGIN = new Vector2()
+/** Where the anchor of the strip being opened lands this frame, as the core places it. */
+const projected: [number, number] = [0, 0]
 
 /** The accent wash over the face of a cell that has just landed, at its brightest. */
 const RING_TINT = 90
@@ -137,6 +139,16 @@ export abstract class BaseGUI {
 	/** The unit's body under each bar, which a strip set below the bar follows; none in the preview. */
 	private body: Nullable<UnitBody>
 	private bodyEnd: Nullable<UnitBody>
+	/** The render anchor each bar's corner stands on, see {@link BaseGUI.Anchor}; none in the preview. */
+	private anchor: Nullable<CRenderAnchor>
+	private anchorEnd: Nullable<CRenderAnchor>
+	/**
+	 * Where the anchor of the strip being drawn stands this frame, which a round icon's timer is
+	 * laid out from; nought while the strip stands on the screen.
+	 */
+	protected readonly anchorPoint = new Vector2()
+	/** The render anchor the strip being drawn stands on, which its sheet of round timers is tied to too. */
+	private stoodOn: Nullable<CRenderAnchor>
 	/** How far the cell being drawn is into its entrance, as the fade on everything it draws. */
 	protected fade = 1
 	/** The wash the strip being drawn colours an icon its owner cannot pay for in. */
@@ -207,6 +219,19 @@ export abstract class BaseGUI {
 		isDisable?: boolean,
 		isUniqueDisabled?: boolean
 	): void
+
+	/**
+	 * Ties the strips at the bar to `anchor` and those where a teleport lands it to `anchorEnd`,
+	 * each defined on its bar's corner: the core moves them with the bar as each frame is
+	 * presented. None, or an anchor the host has no slot for, lays them out on the screen.
+	 */
+	public Anchor(
+		anchor: Nullable<CRenderAnchor>,
+		anchorEnd: Nullable<CRenderAnchor>
+	): void {
+		this.anchor = anchor
+		this.anchorEnd = anchorEnd
+	}
 
 	/**
 	 * Where a strip set `offset` from the bar stands at its anchor, or where a teleport lands.
@@ -404,15 +429,37 @@ export abstract class BaseGUI {
 		this.stamp.final = false
 		this.shading = false
 		this.unmeasured = Unmeasured()
+		this.stoodOn = this.standOn(rec)
 		this.canvas.BeginGroup(
 			rec,
 			BaseGUI.Anchor(rec.x, additionalPosition.x),
 			BaseGUI.Anchor(rec.y, additionalPosition.y)
 		)
 	}
+	/**
+	 * Opens the sheet of round timers of the strip at the bar `rec`, between
+	 * {@link BaseGUI.BeginStrip} and {@link BaseGUI.EndStrip}: on the render anchor the strip
+	 * stands on, where it stands on one.
+	 */
+	protected OpenSheet(
+		timers: TimerBoard,
+		rec: Rectangle,
+		additionalPosition: Vector2
+	): TimerSheet {
+		const point = this.anchorPoint
+		return timers.Open(
+			rec,
+			BaseGUI.Anchor(rec.x, additionalPosition.x) - point.x,
+			BaseGUI.Anchor(rec.y, additionalPosition.y) - point.y,
+			this.stoodOn
+		)
+	}
 	/** Closes the strip's group, and notes what its stamp needs to know of the drawing. */
 	protected EndStrip(): void {
 		this.canvas.EndGroup()
+		this.stoodOn = undefined
+		this.anchorPoint.x = this.anchorPoint.y = 0
+		this.canvas.Anchor(-1, 0, 0)
 		const stamp = this.stamp
 		stamp.final = Unmeasured() === this.unmeasured
 		stamp.shaded = this.shading
@@ -524,10 +571,29 @@ export abstract class BaseGUI {
 		) {
 			return false
 		}
-		return (
-			(timers === null || timers.Keep(rec, x, y)) &&
+		const anchor = this.standOn(rec),
+			point = this.anchorPoint
+		const kept =
+			(timers === null || timers.Keep(rec, x - point.x, y - point.y, anchor)) &&
 			this.canvas.KeepGroup(rec, x, y)
-		)
+		point.x = point.y = 0
+		this.canvas.Anchor(-1, 0, 0)
+		return kept
+	}
+	/**
+	 * Ties the canvas to the anchor of the bar `rec`, standing on the pixel the anchor lands on, and
+	 * answers with that anchor; none while the strip stands on the screen.
+	 */
+	private standOn(rec: Rectangle): Nullable<CRenderAnchor> {
+		const anchor = rec === this.positionEnd ? this.anchorEnd : this.anchor
+		if (anchor === undefined || anchor.Slot < 0 || !anchor.Project(projected)) {
+			return undefined
+		}
+		const point = this.anchorPoint
+		point.x = projected[0]
+		point.y = projected[1]
+		this.canvas.Anchor(anchor.Slot, point.x, point.y)
+		return anchor
 	}
 	/** The stamp of the strip at the bar `rec`. */
 	private stampOf(rec: Rectangle): StripStamp {

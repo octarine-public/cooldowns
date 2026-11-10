@@ -41,6 +41,12 @@ export type GuiCanvas = Pick<MenuSDK.Canvas, "Rect" | "Circle" | "Arc"> & {
 	/** Counts a box drawn on another surface into this one's bounds, which frame and drag it. */
 	Reserve(position: Vector2, size: Vector2): void
 	/**
+	 * Ties the groups stood from here on to render anchor `slot`, whose point stands at the whole
+	 * pixel `x`, `y` this frame: their corners are written from that point, and the core moves
+	 * them with it as each frame is presented. -1 stands them on the screen.
+	 */
+	Anchor(slot: number, x: number, y: number): void
+	/**
 	 * Draws what follows into the group of `key`, standing at the whole pixel `x`, `y`: a strip
 	 * of its own that moves as one and keeps its elements whatever else is drawn.
 	 */
