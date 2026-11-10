@@ -57,8 +57,13 @@ export class UnitData {
 	/** The body under each bar the unit has: where it stands, and where a teleport lands it. */
 	private readonly body = new UnitBody()
 	private readonly bodyEnd = new UnitBody()
-	/** The corner of each bar as a render anchor, which the strips stand on. */
-	private readonly anchor = new CRenderAnchor()
+	/**
+	 * The corner of each bar as a render anchor, which the strips stand on: one on the unit
+	 * itself, which follows it, one pinned in the world where the script has the unit, and one
+	 * where a teleport lands it. Each keeps its kind for good, see {@link UnitData.Positions}.
+	 */
+	private readonly anchorOwner = new CRenderAnchor()
+	private readonly anchorWorld = new CRenderAnchor()
 	private readonly anchorEnd = new CRenderAnchor()
 
 	/**
@@ -90,9 +95,11 @@ export class UnitData {
 	private readonly barEnd = new Vector2()
 	/**
 	 * What {@link UnitData.Prepare} found the unit draws this frame: which strips, whether as a
-	 * compact Meepo clone, and where its bars stand.
+	 * compact Meepo clone, where its bars stand, and whether the bar it stands at follows the
+	 * unit itself.
 	 */
 	private compact = false
+	private follows = false
 	private spellsDrawn = false
 	private itemsDrawn = false
 	private modifiersDrawn = false
@@ -120,39 +127,37 @@ export class UnitData {
 	}
 	/**
 	 * Where the unit's bars stand this frame, or where a teleport takes it from and to, and the
-	 * anchors on their corners: a unit in sight is followed by its own origin, anything else is
-	 * pinned where the script has it. A unit in sight off the screen has no bar to stand on.
+	 * anchors on their corners, each on the corner {@link UnitData.HealthBarPosition} lays the bar
+	 * out from: a unit in sight is followed by its own origin, anything else is pinned where the
+	 * script has it. A unit in sight off the screen has no bar to stand on.
+	 *
+	 * The anchor on the unit is defined on every frame the unit draws, in sight or not: the core
+	 * hides an entity anchor for the one present after it is first pointed at its entity, so it
+	 * has to know this one before the unit comes into sight, and no anchor is ever redefined
+	 * between the unit and a world point.
 	 */
 	protected Positions(teleported: boolean): void {
 		const owner = this.Owner,
 			start = teleported ? owner.TPStartPosition : owner.Position,
 			end = teleported ? owner.TPEndPosition : undefined,
-			follows = !teleported && owner.IsVisible
+			follows = !teleported && owner.IsVisible,
+			height = this.barOffset,
+			x = -this.barCorrection.x,
+			y = (this.visualShield ? 5 : 0) - this.barCorrection.y
+		this.follows = follows
+		this.anchorOwner.SetEntity(owner.Handle, 0, 0, height, x, y)
 		this.start =
 			follows && !owner.IsOnScreen
 				? undefined
 				: this.HealthBarPosition(start, this.body, this.bar)
-		if (this.start !== undefined) {
-			this.place(this.anchor, start, follows)
+		if (this.start !== undefined && !follows) {
+			this.anchorWorld.SetWorld(start.x, start.y, start.z + height, x, y)
 		}
 		this.end = end?.IsValid
 			? this.HealthBarPosition(end, this.bodyEnd, this.barEnd)
 			: undefined
 		if (end !== undefined && this.end !== undefined) {
-			this.place(this.anchorEnd, end, false)
-		}
-	}
-	/**
-	 * Defines `anchor` on the corner of the bar over `origin`, as {@link UnitData.HealthBarPosition}
-	 * lays it out: on the unit itself when it `follows` it.
-	 */
-	private place(anchor: CRenderAnchor, origin: Vector3, follows: boolean): void {
-		const x = -this.barCorrection.x,
-			y = (this.visualShield ? 5 : 0) - this.barCorrection.y
-		if (follows) {
-			anchor.SetEntity(this.Owner.Index, 0, 0, this.barOffset, x, y)
-		} else {
-			anchor.SetWorld(origin.x, origin.y, origin.z + this.barOffset, x, y)
+			this.anchorEnd.SetWorld(end.x, end.y, end.z + height, x, y)
 		}
 	}
 	/**
@@ -381,7 +386,8 @@ export class UnitData {
 		this.ownSpells.clear()
 		this.modifiers.clear()
 		this.modifierGUI.Dispose()
-		this.anchor.Free()
+		this.anchorOwner.Free()
+		this.anchorWorld.Free()
 		this.anchorEnd.Free()
 	}
 	/** Where the strip of `menu` is set off the unit's bar, written into `out`. */
@@ -426,10 +432,11 @@ export class UnitData {
 		const itemState = itemMenu.State.value,
 			spellState = spellMenu.State.value,
 			modifierState = modifierMenu.State.value,
-			healthBarSize = this.barSize
+			healthBarSize = this.barSize,
+			anchor = this.follows ? this.anchorOwner : this.anchorWorld
 
 		if (itemState) {
-			this.itemGUI.Anchor(this.anchor, this.anchorEnd)
+			this.itemGUI.Anchor(anchor, this.anchorEnd)
 			this.itemGUI.Update(
 				position,
 				positionEnd,
@@ -441,7 +448,7 @@ export class UnitData {
 			)
 		}
 		if (spellState) {
-			this.spellGUI.Anchor(this.anchor, this.anchorEnd)
+			this.spellGUI.Anchor(anchor, this.anchorEnd)
 			this.spellGUI.Update(
 				position,
 				positionEnd,
@@ -453,7 +460,7 @@ export class UnitData {
 			)
 		}
 		if (modifierState) {
-			this.modifierGUI.Anchor(this.anchor, this.anchorEnd)
+			this.modifierGUI.Anchor(anchor, this.anchorEnd)
 			this.modifierGUI.Update(
 				position,
 				positionEnd,
