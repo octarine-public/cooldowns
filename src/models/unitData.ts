@@ -47,6 +47,13 @@ export class UnitData {
 	private readonly itemGUI = new ItemGUI()
 	private readonly spellGUI = new SpellGUI()
 	private readonly modifierGUI = new ModifierGUI()
+	/**
+	 * Where each strip is set off its bar this frame: one for each strip, since each is moved on
+	 * from there by the columns beside it.
+	 */
+	private readonly itemOffset = new Vector2()
+	private readonly spellOffset = new Vector2()
+	private readonly modifierOffset = new Vector2()
 	/** The body under each bar the unit has: where it stands, and where a teleport lands it. */
 	private readonly body = new UnitBody()
 	private readonly bodyEnd = new UnitBody()
@@ -74,6 +81,8 @@ export class UnitData {
 	private readonly coverStart = new Vector2().Invalidate()
 	private readonly coverEnd = new Vector2().Invalidate()
 	private readonly feet = new Vector3()
+	/** Where the point a bar hangs from projects, read by the body under it before the next bar. */
+	private readonly head = new Vector2()
 	private readonly bar = new Vector2()
 	private readonly barEnd = new Vector2()
 	/**
@@ -268,7 +277,7 @@ export class UnitData {
 				alpha,
 				itemMenu,
 				this.items,
-				this.GetAdditionalPosition(itemMenu).AddScalarX(
+				this.GetAdditionalPosition(itemMenu, this.itemOffset).AddScalarX(
 					this.spellGUI.ColumnShift(spellMenu, itemMenu, spellsDrawn)
 				),
 				this.muted,
@@ -281,7 +290,7 @@ export class UnitData {
 				alpha,
 				spellMenu,
 				spells,
-				this.GetAdditionalPosition(spellMenu),
+				this.GetAdditionalPosition(spellMenu, this.spellOffset),
 				this.silenced,
 				this.passiveDisabled
 			)
@@ -292,7 +301,7 @@ export class UnitData {
 				alpha,
 				modifierMenu,
 				this.modifiers,
-				this.GetAdditionalPosition(modifierMenu).AddScalarX(
+				this.GetAdditionalPosition(modifierMenu, this.modifierOffset).AddScalarX(
 					this.spellGUI.ColumnShift(spellMenu, modifierMenu, spellsDrawn) +
 						this.itemGUI.ColumnShift(itemMenu, modifierMenu, itemsDrawn)
 				)
@@ -341,32 +350,37 @@ export class UnitData {
 		this.spells.clear()
 		this.ownSpells.clear()
 		this.modifiers.clear()
+		this.modifierGUI.Dispose()
 	}
-	protected GetAdditionalPosition(menu: ItemMenu | SpellMenu | ModifierMenu) {
+	/** Where the strip of `menu` is set off the unit's bar, written into `out`. */
+	protected GetAdditionalPosition(
+		menu: ItemMenu | SpellMenu | ModifierMenu,
+		out: Vector2
+	): Vector2 {
 		const owner = this.Owner
 		if (
 			this.familiar &&
 			(menu instanceof SpellMenu || menu instanceof ModifierMenu)
 		) {
-			return menu.Familiar.Position
+			return menu.Familiar.PositionInto(out)
 		}
 		if (this.panda && (menu instanceof SpellMenu || menu instanceof ModifierMenu)) {
-			return menu.Pandas.Position
+			return menu.Pandas.PositionInto(out)
 		}
 		if (owner.IsCreep && menu instanceof SpellMenu) {
-			return menu.Creep.Position
+			return menu.Creep.PositionInto(out)
 		}
 		switch (true) {
 			case owner.IsHero:
-				return menu.Hero.Position
+				return menu.Hero.PositionInto(out)
 			case owner.IsRoshan:
-				return menu.Roshan.Position
+				return menu.Roshan.PositionInto(out)
 			case owner.IsCourier:
-				return menu.Courier.Position
+				return menu.Courier.PositionInto(out)
 			case owner.IsSpiritBear:
-				return menu.SpiritBear.Position
+				return menu.SpiritBear.PositionInto(out)
 			default:
-				return new Vector2()
+				return out.SetVector(0, 0)
 		}
 	}
 	protected UpdateGUI(
@@ -449,7 +463,9 @@ export class UnitData {
 	): Nullable<Vector2> {
 		const height = this.barOffset
 		const head = RendererSDK.WorldToScreen(
-			this.feet.CopyFrom(origin).AddScalarZ(height)
+			this.feet.CopyFrom(origin).AddScalarZ(height),
+			true,
+			this.head
 		)
 		if (head === undefined) {
 			return undefined
@@ -521,7 +537,7 @@ export class UnitData {
 	public UpdatePriority() {
 		const start = this.start,
 			end = this.end
-		let w2s = RendererSDK.WorldToScreen(this.Owner.Position)
+		let w2s = RendererSDK.WorldToScreen(this.Owner.Position, true, this.head)
 		if (w2s === undefined) {
 			w2s = start
 		}

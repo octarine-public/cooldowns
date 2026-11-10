@@ -1,6 +1,7 @@
 import "./translations"
 
-import { surface } from "../render"
+import { surface, timers } from "../render"
+import { BaseGUI } from "./gui/index"
 import { MenuManager } from "./menu/index"
 import { UnitBody } from "./models/body"
 import { UnitData } from "./models/unitData"
@@ -53,6 +54,7 @@ new (class CCooldowns {
 	}
 	protected Draw() {
 		surface.Begin()
+		timers.Begin()
 		try {
 			if (
 				!this.state ||
@@ -63,6 +65,7 @@ new (class CCooldowns {
 				return
 			}
 			UnitBody.BeginFrame()
+			BaseGUI.BeginFrame()
 			if (!UnitData.BeginFrame(this.menu)) {
 				return
 			}

@@ -53,7 +53,11 @@ export abstract class BaseSettingsMenu {
 	}
 
 	public get Position() {
-		return new Vector2(
+		return this.PositionInto(new Vector2())
+	}
+	/** Where the strip is set off its bar, in the window's pixels, written into `out`. */
+	public PositionInto(out: Vector2): Vector2 {
+		return out.SetVector(
 			GUIInfo.ScaleWidth(this.PositionX.value),
 			GUIInfo.ScaleHeight(this.PositionY.value)
 		)

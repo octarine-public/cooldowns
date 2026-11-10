@@ -20,6 +20,7 @@ class Vector2 {
 	AddScalarX(value) { this.x += value; return this }
 	AddScalarY(value) { this.y += value; return this }
 	Subtract(value) { return new Vector2(this.x - value.x, this.y - value.y) }
+	SubtractForThis(value) { this.x -= value.x; this.y -= value.y; return this }
 	SubtractScalarX(value) { this.x -= value; return this }
 	MultiplyScalar(value) { return new Vector2(this.x * value, this.y * value) }
 	DivideScalar(value) { return new Vector2(this.x / value, this.y / value) }
@@ -151,11 +152,14 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	// The SDK canvas the preview draws its round modifiers on, keeping every call it takes, and
 	// the readings pushed onto the same surface, kept in the same list as "Text".
 	const timers = { calls: [] }
-	for (const name of ["Circle", "Image", "Arc", "CircleTimer", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values]) }
+	// The SDK canvas reads what it is handed as it is called and keeps none of it, so a caller may
+	// hand it the same scratch vector, colour or style for every cell: the calls keep copies.
+	const copyOf = value => value instanceof Vector2 || value instanceof Color ? value.Clone() : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, part]) => [key, copyOf(part)])) : value
+	for (const name of ["Circle", "Image", "Arc", "CircleTimer", "TextIn"]) timers[name] = (...values) => { timers.calls.push([name, ...values.map(copyOf)]) }
 	const timerText = { Push(command) { timers.calls.push(["Text", command]) } }
 	const cache = new Map()
 	function load(name) {
-		if (name === "render") return { canvas: {}, canvasText: { Push() {} }, surface: {}, previewCanvas: timers, previewCanvasText: timerText }
+		if (name === "render") return { timers: null, surface: {}, previewTimers: new (load("src/gui/timers").SharedTimers)(timers, timerText) }
 		if (cache.has(name)) return cache.get(name).exports
 		const base = path.join(__dirname, "..", name)
 		const filename = fs.existsSync(`${base}.ts`) ? `${base}.ts` : `${base}.tsx`

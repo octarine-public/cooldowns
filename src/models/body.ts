@@ -1,5 +1,21 @@
-/** How tall a body of each height stands at the camera's default distance, this frame. */
+/**
+ * How tall a body of each height stands at the camera's default distance, under the camera's
+ * angles and in the window they were measured with, see {@link measured}.
+ */
 const heights = new Map<number, number>()
+/**
+ * The camera's angles, its default distance and the window `heights` holds for: nothing else
+ * moves a body's height, so they are measured again only once one of these changed rather than
+ * every frame - the camera following a hero turns none of them.
+ */
+const measured = {
+	pitch: NaN,
+	yaw: NaN,
+	roll: NaN,
+	distance: NaN,
+	width: NaN,
+	height: NaN
+}
 /** Where the head and the feet being measured stand, in fractional screen pixels. */
 const top: [number, number] = [0, 0]
 const bottom: [number, number] = [0, 0]
@@ -28,11 +44,29 @@ export class UnitBody {
 
 	/**
 	 * Takes this frame's camera to measure bodies through, and forgets the default camera's
-	 * heights, since the camera may have turned since.
+	 * heights once the camera has turned, its default distance changed or the window was resized.
 	 */
 	public static BeginFrame(): void {
 		const window = RendererSDK.WindowSize
 		Source2SDK.Projection.BeginFrame(window.x, window.y)
+		const angles = CameraSDK.Angles,
+			distance = CameraSDK.DefaultDistance
+		if (
+			measured.pitch === angles.x &&
+			measured.yaw === angles.y &&
+			measured.roll === angles.z &&
+			measured.distance === distance &&
+			measured.width === window.x &&
+			measured.height === window.y
+		) {
+			return
+		}
+		measured.pitch = angles.x
+		measured.yaw = angles.y
+		measured.roll = angles.z
+		measured.distance = distance
+		measured.width = window.x
+		measured.height = window.y
 		heights.clear()
 	}
 

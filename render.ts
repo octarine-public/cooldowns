@@ -1,4 +1,5 @@
 import { HudCanvas, SurfaceText } from "./src/gui/canvas"
+import { SharedTimers, StripTimers } from "./src/gui/timers"
 
 /**
  * The one overlay every strip is drawn on - frames, icons and readings as the script's own
@@ -11,28 +12,21 @@ export const surface = new HudCanvas(true)
 
 /**
  * The SDK's own canvas, for what is drawn the way teleport-esp draws its markers: a round
- * modifier uses the same circular timer component, with readings sized like item text. Its
- * panel is registered on the first draw, after the overlay's below, so a timer stands over
- * anything the overlay paints at the same spot.
+ * modifier uses the same circular timer component, with readings sized like item text, on a
+ * surface of its strip's own, so a strip that has not changed is only moved after its bar. Each
+ * panel is registered on its strip's first draw, after the overlay's below, so a timer stands
+ * over anything the overlay paints at the same spot.
  */
-export const canvas = new MenuSDK.Canvas("cooldowns")
-/** The readings over a round modifier, on the surface that canvas draws on. */
-export const canvasText = new SurfaceText(
-	MenuSDK.HudSurfaceOf("cooldowns", MenuSDK.EPanelLayer.World)
-)
+export const timers = new StripTimers("cooldowns-timers")
 
 /**
  * The same for the preview: it stands with the menu, so its timers go out on the menu's layer,
  * at the preview's frame plus where the preview lays them out. A surface on that layer stands
  * over the menu's own panels, so a timer shows over the stage rather than under the card.
  */
-export const previewCanvas = new MenuSDK.Canvas(
-	"cooldowns-preview",
-	MenuSDK.EPanelLayer.Menu
-)
-/** The readings over a round modifier in the preview, on the surface that canvas draws on. */
-export const previewCanvasText = new SurfaceText(
-	MenuSDK.HudSurfaceOf("cooldowns-preview", MenuSDK.EPanelLayer.Menu)
+export const previewTimers = new SharedTimers(
+	new MenuSDK.Canvas("cooldowns-preview", MenuSDK.EPanelLayer.Menu),
+	new SurfaceText(MenuSDK.HudSurfaceOf("cooldowns-preview", MenuSDK.EPanelLayer.Menu))
 )
 
 MenuSDK.RegisterPanel(

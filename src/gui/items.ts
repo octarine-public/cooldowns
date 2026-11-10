@@ -1,7 +1,7 @@
 import { BaseMenu } from "../menu/base"
 import { ItemMenu } from "../menu/items"
 import { UnitBody } from "../models/body"
-import { BaseGUI, CellShapeStyle, ItemDisplay } from "./index"
+import { BaseGUI, CellShapeStyle, ItemDisplay, StripStamp } from "./index"
 
 /** What a cell shows of its item, read once a tick. */
 interface ItemReading {
@@ -92,6 +92,11 @@ export class ItemGUI extends BaseGUI {
 		)
 	}
 
+	/** The item rows every item strip reads: the cells' shape and whether one on cooldown is dimmed. */
+	protected PutLook(stamp: StripStamp, menu: ItemMenu): void {
+		stamp.Put(menu.SquareMode.SelectedID)
+		stamp.Put(menu.DimOnCooldown.value)
+	}
 	/**
 	 * A cell as the game's own inventory slot draws its states: the icon washed blue while its
 	 * owner cannot pay for it, optionally shaded on cooldown, and its rim in the colour of what
@@ -121,8 +126,6 @@ export class ItemGUI extends BaseGUI {
 			stamp.Put(vecSize.x)
 			stamp.Put(vecSize.y)
 			stamp.Put(border)
-			stamp.Put(menu.SquareMode.SelectedID)
-			stamp.Put(menu.DimOnCooldown.value)
 			stamp.Put(isDisable)
 			stamp.Put(isTethered)
 			for (let index = 0; index < items.length; index++) {

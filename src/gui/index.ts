@@ -1,9 +1,10 @@
-import { canvas as timerCanvas, canvasText, surface } from "../../render"
+import { surface, timers as stripTimers } from "../../render"
 import { BaseMenu } from "../menu/base"
 import { TextStyleMenu } from "../menu/style"
 import { UnitBody } from "../models/body"
 import { easeOut, ISlotMotion, SlotMotion } from "./motion"
 import { DrawStyledText, Unmeasured } from "./text"
+import { TimerBoard } from "./timers"
 import {
 	ArtWash,
 	GuiCanvas,
@@ -14,6 +15,7 @@ import {
 } from "./types"
 
 export { DrawStyledText } from "./text"
+export type { TimerSheet } from "./timers"
 export type {
 	CellShapeStyle,
 	ItemDisplay,
@@ -76,7 +78,24 @@ export class StripStamp {
 	}
 }
 
+/**
+ * What every strip of one menu is drawn from beyond its own cells - the window, the menu's rows
+ * and its text style - read once a frame by the first strip drawn from it, and named by a version
+ * that moves only when any of it changed. A strip's stamp then holds the version rather than
+ * every row again: two dozen values a strip, every frame, cost a box apiece once the stamp's calls
+ * were too many to inline.
+ */
+class MenuLook {
+	public frame = -1
+	public version = 0
+	public readonly stamp = new StripStamp()
+}
+
 export abstract class BaseGUI {
+	/** The frame being drawn, see {@link BaseGUI.BeginFrame}. */
+	private static frame = 0
+	/** Each menu's look, by the menu: as many as there are strip kinds. */
+	private static readonly looks = new Map<BaseMenu, MenuLook>()
 	protected static readonly border = 2
 	/**
 	 * The rim of a cell whose spell or item cannot be used: on cooldown, disabled, muted. A
@@ -136,21 +155,20 @@ export abstract class BaseGUI {
 	private unmeasured = 0
 
 	/**
-	 * `timers` is the SDK canvas a round icon is drawn on as its circular timer, the way
-	 * teleport-esp draws its markers, and `origin` is where this surface's own top left corner
-	 * stands on that canvas: nowhere in the game, where both are the screen, and at the stage's
-	 * frame in the preview. A surface with no such canvas draws its rings itself. `preview` says
-	 * the strip is a preview's: its motion runs on the stage's clock and stands still with it.
-	 * `timerText` is where the readings over a round icon go out: the surface `timers` draws on.
+	 * `timers` is where a round icon is drawn as its circular timer on the SDK canvas, the way
+	 * teleport-esp draws its markers, and the readings over it, a strip at a time; `origin` is
+	 * where this surface's own top left corner stands on that canvas: nowhere in the game, where
+	 * both are the screen, and at the stage's frame in the preview. A surface with no such board
+	 * draws its rings itself. `preview` says the strip is a preview's: its motion runs on the
+	 * stage's clock and stands still with it.
 	 */
 	constructor(
 		protected readonly canvas: GuiCanvas = surface,
 		protected readonly textSurface: TextSurface = surface,
 		private readonly cursor: () => Vector2 = () => InputManager.CursorOnScreen,
 		private readonly preview = false,
-		protected readonly timers: MenuSDK.Canvas | null = timerCanvas,
-		protected readonly origin: () => Vector2 = () => ORIGIN,
-		protected readonly timerText: TextSurface = canvasText
+		protected readonly timers: TimerBoard | null = stripTimers,
+		protected readonly origin: () => Vector2 = () => ORIGIN
 	) {}
 
 	public Update(
@@ -399,13 +417,17 @@ export abstract class BaseGUI {
 		stamp.final = Unmeasured() === this.unmeasured
 		stamp.shaded = this.shading
 	}
+	/** Opens a frame: each menu's look is read again, once, by the first strip drawn from it. */
+	public static BeginFrame(): void {
+		BaseGUI.frame++
+	}
 	/**
 	 * Opens the stamp of the strip at the bar `rec` and puts in it what every strip's `count`
 	 * cells are drawn from: the server tick and the game's clock, which every reading moves
-	 * with; the window, which the strip is scaled for; the bar's width, which the cells are laid
-	 * along; the strip's opacity; and the rows of the menu every strip reads, its text style
-	 * whole. The caller puts its own after these and asks {@link BaseGUI.Keep}. There is none in
-	 * the preview, whose cells run on the stage's clock and are drawn afresh every frame.
+	 * with; the bar's width, which the cells are laid along; the strip's opacity; and the look of
+	 * its menu, see {@link BaseGUI.lookOf}. The caller puts its own after these and asks
+	 * {@link BaseGUI.Keep}. There is none in the preview, whose cells run on the stage's clock
+	 * and are drawn afresh every frame.
 	 */
 	protected Restamp(
 		rec: Rectangle,
@@ -416,17 +438,40 @@ export abstract class BaseGUI {
 		if (this.preview) {
 			return undefined
 		}
-		const stamp = this.stampOf(rec),
-			window = RendererSDK.WindowSize,
-			style = menu.TextStyle
+		const stamp = this.stampOf(rec)
 		stamp.Begin()
 		stamp.Put(count)
 		stamp.Put(GameState.CurrentServerTick)
 		stamp.Put(GameState.RawGameTime)
-		stamp.Put(window.x)
-		stamp.Put(window.y)
 		stamp.Put(rec.Width)
 		stamp.Put(mainAlpha)
+		stamp.Put(this.lookOf(menu))
+		return stamp
+	}
+	/** Puts the rows of `menu` that only this kind of strip reads into its look, see {@link BaseGUI.lookOf}. */
+	protected abstract PutLook(stamp: StripStamp, menu: BaseMenu): void
+	/**
+	 * The version of what every strip of `menu` is drawn from beyond its own cells: the window,
+	 * which the strips are scaled for; the menu's rows every strip reads, its text style whole;
+	 * the faces the host has loaded; and the rows only this kind of strip reads
+	 * ({@link BaseGUI.PutLook}). Read at most once a frame, see {@link MenuLook}.
+	 */
+	private lookOf(menu: BaseMenu): number {
+		let look = BaseGUI.looks.get(menu)
+		if (look === undefined) {
+			look = new MenuLook()
+			BaseGUI.looks.set(menu, look)
+		}
+		if (look.frame === BaseGUI.frame) {
+			return look.version
+		}
+		look.frame = BaseGUI.frame
+		const stamp = look.stamp,
+			window = RendererSDK.WindowSize,
+			style = menu.TextStyle
+		stamp.Begin()
+		stamp.Put(window.x)
+		stamp.Put(window.y)
 		stamp.Put(menu.Size.value)
 		stamp.Put(menu.Rounding.value)
 		stamp.Put(menu.IsVertical)
@@ -441,7 +486,11 @@ export abstract class BaseGUI {
 		stamp.Put(style.EffectColor.SelectedColor.data32)
 		stamp.Put(style.EffectOpacity.value)
 		stamp.Put(MenuSDK.FontEpoch())
-		return stamp
+		this.PutLook(stamp, menu)
+		if (!stamp.Close()) {
+			look.version++
+		}
+		return look.version
 	}
 	/**
 	 * Holds the strip at the bar `rec` over this frame as it stands, moved to where the bar is,
@@ -451,14 +500,16 @@ export abstract class BaseGUI {
 	 * cursor dims a cell by its distance - a strip drawn at an opacity under nought - the strip
 	 * is held only while the cursor stands too far from every cell to dim any of them, and its
 	 * last drawing dimmed none: `cellSize` is how far that reaches, as {@link BaseGUI.GetAlpha}
-	 * has it.
+	 * has it. A strip drawn on a board of round timers as well is held only while its sheet on
+	 * `timers` can be held too.
 	 */
 	protected Keep(
 		stamp: StripStamp,
 		rec: Rectangle,
 		additionalPosition: Vector2,
 		mainAlpha: number,
-		cellSize: Vector2
+		cellSize: Vector2,
+		timers: TimerBoard | null = null
 	): boolean {
 		if (!stamp.Close() || !stamp.final || !this.motion.Still) {
 			return false
@@ -473,7 +524,10 @@ export abstract class BaseGUI {
 		) {
 			return false
 		}
-		return this.canvas.KeepGroup(rec, x, y)
+		return (
+			(timers === null || timers.Keep(rec, x, y)) &&
+			this.canvas.KeepGroup(rec, x, y)
+		)
 	}
 	/** The stamp of the strip at the bar `rec`. */
 	private stampOf(rec: Rectangle): StripStamp {

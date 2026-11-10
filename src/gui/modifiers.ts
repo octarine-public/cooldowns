@@ -1,7 +1,14 @@
 import { EModeImage } from "../enum"
 import { ModifierMenu } from "../menu/modifiers"
 import { UnitBody } from "../models/body"
-import { BaseGUI, DrawStyledText, ModifierDisplay, TextSurface } from "./index"
+import {
+	BaseGUI,
+	DrawStyledText,
+	ModifierDisplay,
+	StripStamp,
+	TextSurface,
+	TimerSheet
+} from "./index"
 
 export class ModifierGUI extends BaseGUI {
 	private static readonly minSize = 18
@@ -18,7 +25,38 @@ export class ModifierGUI extends BaseGUI {
 	private static readonly debuffColor = new Color(242, 82, 87)
 	/** The band on an icon's edge, ring or frame: a twelfth of its size, and a pixel at least. */
 	private static readonly bandFraction = 0.08
+	/**
+	 * The readings a countdown shows, minted once each: the tenths of its last ten seconds and the
+	 * whole seconds before them, by the tenth or the second they stand for. A countdown reads the
+	 * same few strings over and over, from every strip.
+	 */
+	private static readonly tenths = new Map<number, string>()
+	private static readonly seconds = new Map<number, string>()
+	/** The stack counts the strips show, minted once each. */
+	private static readonly counts = new Map<number, string>()
 	private readonly size = new Vector2()
+	/**
+	 * Scratch the cell being drawn is laid out and painted in: the canvases read a box, a colour
+	 * and a style as they are called and keep none of them, so one of each serves every cell of
+	 * the strip in turn.
+	 */
+	private readonly cell = new Vector2()
+	private readonly box = new Rectangle()
+	private readonly extent = new Vector2()
+	private readonly middle = new Vector2()
+	private readonly at = new Vector2()
+	private readonly timerBox = new Rectangle()
+	private readonly offsetBox = new Rectangle()
+	private readonly reading = new Color()
+	private readonly backing = new Color(0, 0, 0)
+	private readonly bandAt = new Vector2()
+	private readonly bandSize = new Vector2()
+	private readonly artStyle: { color: Color; circle: boolean } = {
+		color: this.white,
+		circle: false
+	}
+	private readonly backingStyle: { readonly color: Color } = { color: this.backing }
+	private readonly bandStyle: { color: Color } = { color: this.cellRim }
 
 	public Update(
 		position: Nullable<Vector2>,
@@ -38,8 +76,13 @@ export class ModifierGUI extends BaseGUI {
 			body,
 			bodyEnd
 		)
-		const size = ModifierGUI.minSize + additionalSize
-		this.size.CopyFrom(GUIInfo.ScaleVector(size * scale, size * scale))
+		const size = (ModifierGUI.minSize + additionalSize) * scale
+		this.size.SetVector(GUIInfo.ScaleWidth(size), GUIInfo.ScaleHeight(size))
+	}
+	/** Lets go of the sheets the strips' round timers were drawn on: the unit is gone. */
+	public Dispose(): void {
+		this.timers?.Drop?.(this.position)
+		this.timers?.Drop?.(this.positionEnd)
 	}
 	public Draw(
 		mainAlpha: number,
@@ -63,6 +106,11 @@ export class ModifierGUI extends BaseGUI {
 			this.Follow(additionalPosition, rise, true)
 		)
 	}
+	/** The modifier rows every modifier strip reads: the icons' shape and whether the time left is shown. */
+	protected PutLook(stamp: StripStamp, menu: ModifierMenu): void {
+		stamp.Put(menu.ModeImage.SelectedID)
+		stamp.Put(menu.Remaining.value)
+	}
 	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
@@ -79,32 +127,42 @@ export class ModifierGUI extends BaseGUI {
 
 		const vertical = menu.IsVertical
 
-		// a round icon is drawn on the SDK canvas, which keeps nothing from one frame to the next:
-		// such a strip is drawn every frame, and its group on this canvas holds nothing to keep
-		const round = this.timers !== null && modeImage === EModeImage.Round
-		const stamp = round
-			? undefined
-			: this.Restamp(recPosition, mainAlpha, menu, modifiers.length)
+		// a round icon is drawn as the SDK's circular timer, on a sheet of the strip's own that is
+		// held with the strip's group
+		const timers = modeImage === EModeImage.Round ? this.timers : null
+		const stamp = this.Restamp(recPosition, mainAlpha, menu, modifiers.length)
 		if (stamp !== undefined) {
 			stamp.Put(vecSize.x)
 			stamp.Put(vecSize.y)
 			stamp.Put(border)
-			stamp.Put(modeImage)
-			stamp.Put(menu.Remaining.value)
 			for (let index = 0; index < modifiers.length; index++) {
 				stamp.Put(modifiers[index])
 			}
-			if (this.Keep(stamp, recPosition, additionalPosition, mainAlpha, vecSize)) {
+			if (
+				this.Keep(
+					stamp,
+					recPosition,
+					additionalPosition,
+					mainAlpha,
+					vecSize,
+					timers
+				)
+			) {
 				return
 			}
 		}
 		this.BeginStrip(recPosition, additionalPosition)
+		const sheet = timers?.Open(
+			recPosition,
+			BaseGUI.Anchor(recPosition.x, additionalPosition.x),
+			BaseGUI.Anchor(recPosition.y, additionalPosition.y)
+		)
 		for (let index = 0; index < modifiers.length; index++) {
 			const modifier = modifiers[index]
 			// nothing of this strip moves: a modifier is drawn whole in its own lane the frame it
 			// lands and gone the frame it ends, with no entrance, no cascade and no glide
 			const lane = vertical ? index : index - modifiers.length / 2
-			const vecPos = this.GetPosition(
+			const vecPos = this.cellAt(
 				recPosition,
 				vecSize,
 				border + 1,
@@ -125,24 +183,25 @@ export class ModifierGUI extends BaseGUI {
 				ratio = 100
 			}
 
-			const position = new Rectangle(vecPos.Clone(), vecPos.Add(vecSize)),
+			const position = this.box,
 				isShieldBuff = modifier.IsShield() && modifier.IsBuff()
+			position.pos1.CopyFrom(vecPos)
+			position.pos2.CopyFrom(vecPos).AddForThis(vecSize)
 
-			const outlinedColor = (
-				isShieldBuff ||
-				modifier.IsBuff() ||
-				modifier.IsChannel() ||
-				(modifier.ForceVisible && !modifier.IsEnemy(modifier.Caster))
-					? BaseGUI.buffColor
-					: ModifierGUI.debuffColor
-			)
-				.Clone()
+			const outlinedColor = this.cellRim
+				.CopyFrom(
+					isShieldBuff ||
+						modifier.IsBuff() ||
+						modifier.IsChannel() ||
+						(modifier.ForceVisible && !modifier.IsEnemy(modifier.Caster))
+						? BaseGUI.buffColor
+						: ModifierGUI.debuffColor
+				)
 				.SetA(alpha)
 
-			const timers = this.timers
-			if (timers !== null && modeImage === EModeImage.Round) {
+			if (sheet !== undefined) {
 				this.circleTimer(
-					timers,
+					sheet,
 					menu,
 					modifier,
 					position,
@@ -157,10 +216,10 @@ export class ModifierGUI extends BaseGUI {
 
 			this.InnerFillImage(modifier.Name, modeImage, position, alpha)
 
-			this.canvas.Image(modifier.GetTexturePath(), vecPos, vecSize, {
-				color: Color.White.SetA(alpha),
-				circle: modeImage === EModeImage.Round
-			})
+			const art = this.artStyle
+			art.color.SetA(alpha)
+			art.circle = modeImage === EModeImage.Round
+			this.canvas.Image(modifier.GetTexturePath(), vecPos, vecSize, art)
 			this.outline(ratio, position, modeImage, outlinedColor)
 			this.readings(this.textSurface, menu, position, charge, cooldown)
 		}
@@ -185,7 +244,7 @@ export class ModifierGUI extends BaseGUI {
 		if (charge !== 0) {
 			DrawStyledText(
 				style,
-				charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString(),
+				ModifierGUI.countText(charge),
 				box,
 				TextFlags.Right | TextFlags.Bottom,
 				height * ModifierGUI.countShare,
@@ -199,13 +258,17 @@ export class ModifierGUI extends BaseGUI {
 		}
 		const minOffset = 3,
 			noCharge = charge === 0
-		const textBox =
-			!noCharge && menu.Size.value >= minOffset
-				? box.Clone().Add(GUIInfo.ScaleVector(minOffset, minOffset))
-				: box
+		let textBox = box
+		if (!noCharge && menu.Size.value >= minOffset) {
+			const dx = GUIInfo.ScaleWidth(minOffset),
+				dy = GUIInfo.ScaleHeight(minOffset)
+			textBox = this.offsetBox
+			textBox.pos1.CopyFrom(box.pos1).AddScalarX(dx).AddScalarY(dy)
+			textBox.pos2.CopyFrom(box.pos2).AddScalarX(dx).AddScalarY(dy)
+		}
 		DrawStyledText(
 			style,
-			cooldown.toFixed(cooldown <= 10 ? 1 : 0),
+			ModifierGUI.timeText(cooldown),
 			textBox,
 			noCharge ? TextFlags.Center : TextFlags.Left | TextFlags.Top,
 			height * ModifierGUI.timeShare,
@@ -219,24 +282,49 @@ export class ModifierGUI extends BaseGUI {
 	 * end, as the spell and item columns do, its cells under each other from the bar's top. A
 	 * column is laid from the bar's end rather than its middle so one offset clears every bar:
 	 * Roshan's is twice a hero's, and a column pushed clear of a hero's stood on his. The cell is
-	 * laid out from the strip's whole-pixel anchor, as every strip's is.
+	 * laid out from the strip's whole-pixel anchor, as every strip's is, into the strip's scratch.
 	 */
-	protected GetPosition(
+	private cellAt(
 		rec: Rectangle,
 		size: Vector2,
 		border: number,
 		lane: number,
 		additional: Vector2,
-		vertical = false
-	) {
+		vertical: boolean
+	): Vector2 {
 		const pitch = border * 2
-		const pos1 = vertical
-			? new Vector2(rec.Width + pitch, lane * (size.y + pitch))
-			: new Vector2(rec.Width / 2 + border + lane * (size.x + pitch), 0)
-		return pos1
-			.RoundForThis()
+		return this.cell
+			.SetVector(
+				Math.round(
+					vertical
+						? rec.Width + pitch
+						: rec.Width / 2 + border + lane * (size.x + pitch)
+				),
+				vertical ? Math.round(lane * (size.y + pitch)) : 0
+			)
 			.AddScalarX(BaseGUI.Anchor(rec.x, additional.x))
 			.AddScalarY(BaseGUI.Anchor(rec.y, additional.y))
+	}
+	/** The text of a stack count: as it is, or in thousands to a tenth from a thousand on. */
+	private static countText(charge: number): string {
+		let text = ModifierGUI.counts.get(charge)
+		if (text === undefined) {
+			text = charge >= 1000 ? (charge / 1000).toFixed(1) + "k" : charge.toString()
+			ModifierGUI.counts.set(charge, text)
+		}
+		return text
+	}
+	/** The text of the time left: to a tenth over the last ten seconds, in whole seconds before them. */
+	private static timeText(cooldown: number): string {
+		const fine = cooldown <= 10,
+			key = Math.round(fine ? cooldown * 10 : cooldown),
+			texts = fine ? ModifierGUI.tenths : ModifierGUI.seconds
+		let text = texts.get(key)
+		if (text === undefined) {
+			text = fine ? (key / 10).toFixed(1) : key.toString()
+			texts.set(key, text)
+		}
+		return text
 	}
 	/**
 	 * What is left of the modifier, on the icon's own edge and over its art: a ring on a round
@@ -252,7 +340,10 @@ export class ModifierGUI extends BaseGUI {
 		if (modeImage === EModeImage.Round) {
 			ModifierGUI.ring(
 				this.canvas,
-				position.pos1.Add(position.Size.DivideScalar(2)),
+				this.middle.SetVector(
+					position.x + position.Width / 2,
+					position.y + position.Height / 2
+				),
 				Math.min(position.Width, position.Height),
 				ratio,
 				color
@@ -267,7 +358,7 @@ export class ModifierGUI extends BaseGUI {
 	 * are a square icon's, laid out the overlay's way on the surface the portrait stands on.
 	 */
 	private circleTimer(
-		timers: MenuSDK.Canvas,
+		sheet: TimerSheet,
 		menu: ModifierMenu,
 		modifier: ModifierDisplay,
 		position: Rectangle,
@@ -279,25 +370,40 @@ export class ModifierGUI extends BaseGUI {
 	) {
 		const size = Math.min(position.Width, position.Height)
 		// the surface this row is laid out on still frames and drags it
-		const extent = position.Size
+		const extent = this.extentOf(position)
 		this.canvas.Reserve(position.pos1, extent)
-		const at = position.pos1.Add(this.origin())
+		const at = this.at.CopyFrom(position.pos1).AddForThis(this.origin()),
+			timers = sheet.Canvas
 		if (ModifierGUI.isBacked(modifier.Name)) {
-			timers.Circle(at, extent, { color: Color.Black.SetA(alpha) })
+			this.backing.SetA(alpha)
+			timers.Circle(at, extent, this.backingStyle)
 		}
-		timers.Image(modifier.GetTexturePath(), at, extent, {
-			circle: true,
-			color: Color.White.SetA(alpha)
-		})
-		ModifierGUI.ring(timers, at.AddScalar(size / 2), size, ratio, color)
+		const art = this.artStyle
+		art.color.SetA(alpha)
+		art.circle = true
+		timers.Image(modifier.GetTexturePath(), at, extent, art)
+		ModifierGUI.ring(
+			timers,
+			this.middle.SetVector(at.x + size / 2, at.y + size / 2),
+			size,
+			ratio,
+			color
+		)
+		const box = this.timerBox
+		box.pos1.CopyFrom(at)
+		box.pos2.CopyFrom(at).AddForThis(extent)
 		this.readings(
-			this.timerText,
+			sheet.Text,
 			menu,
-			new Rectangle(at, at.Add(extent)),
+			box,
 			charge,
 			cooldown,
-			menu.TextStyle.Color.SelectedColor.Clone().SetA(alpha)
+			this.reading.CopyFrom(menu.TextStyle.Color.SelectedColor).SetA(alpha)
 		)
+	}
+	/** The size of the box `position`, into the strip's scratch. */
+	private extentOf(position: Rectangle): Vector2 {
+		return this.extent.CopyFrom(position.pos2).SubtractForThis(position.pos1)
 	}
 	/** The band's width for an icon that size: a twelfth of it, and a pixel at least. */
 	private static bandWidth(size: number): number {
@@ -373,22 +479,29 @@ export class ModifierGUI extends BaseGUI {
 						: angle < 2 * Math.PI - corner
 							? 3
 							: 4
-		const runs: [number, number, number, number][] = [
-			[first === 0 ? px : mid, y0, x1, y0 + band],
-			[x1 - band, first === 1 ? py : y0 + band, x1, y1 - band],
-			[x0, y1 - band, first === 2 ? px : x1, y1],
-			[x0, y0 + band, x0 + band, first === 3 ? py : y1 - band],
-			[first === 4 ? px : x0, y0, mid, y0 + band]
-		]
-		for (let side = first; side < runs.length; side++) {
-			const [left, top, right, bottom] = runs[side]
-			if (right > left && bottom > top) {
-				this.canvas.Rect(
-					new Vector2(left, top),
-					new Vector2(right - left, bottom - top),
-					{ color }
-				)
-			}
+		this.bandStyle.color = color
+		if (first <= 0) {
+			this.side(first === 0 ? px : mid, y0, x1, y0 + band)
+		}
+		if (first <= 1) {
+			this.side(x1 - band, first === 1 ? py : y0 + band, x1, y1 - band)
+		}
+		if (first <= 2) {
+			this.side(x0, y1 - band, first === 2 ? px : x1, y1)
+		}
+		if (first <= 3) {
+			this.side(x0, y0 + band, x0 + band, first === 3 ? py : y1 - band)
+		}
+		this.side(first === 4 ? px : x0, y0, mid, y0 + band)
+	}
+	/** One side of the frame, from `left`, `top` to `right`, `bottom`, if the sweep leaves any of it. */
+	private side(left: number, top: number, right: number, bottom: number): void {
+		if (right > left && bottom > top) {
+			this.canvas.Rect(
+				this.bandAt.SetVector(left, top),
+				this.bandSize.SetVector(right - left, bottom - top),
+				this.bandStyle
+			)
 		}
 	}
 	private InnerFillImage(
@@ -400,14 +513,11 @@ export class ModifierGUI extends BaseGUI {
 		if (!ModifierGUI.isBacked(modifierName)) {
 			return
 		}
+		this.backing.SetA(alpha)
 		if (modeImage !== EModeImage.Round) {
-			this.canvas.Rect(position.pos1, position.Size, {
-				color: Color.Black.SetA(alpha)
-			})
+			this.canvas.Rect(position.pos1, this.extentOf(position), this.backingStyle)
 			return
 		}
-		this.canvas.Circle(position.pos1, position.Size, {
-			color: Color.Black.SetA(alpha)
-		})
+		this.canvas.Circle(position.pos1, this.extentOf(position), this.backingStyle)
 	}
 }

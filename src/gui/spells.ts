@@ -2,7 +2,7 @@ import { BaseMenu } from "../menu/base"
 import { SpellMenu } from "../menu/spells"
 import { TextStyleMenu } from "../menu/style"
 import { UnitBody } from "../models/body"
-import { BaseGUI, CellShapeStyle, SpellDisplay } from "./index"
+import { BaseGUI, CellShapeStyle, SpellDisplay, StripStamp } from "./index"
 
 /** What a cell shows of its spell, read once a tick. */
 interface SpellReading {
@@ -106,6 +106,12 @@ export class SpellGUI extends BaseGUI {
 			isPassiveDisabled
 		)
 	}
+	/** The spell rows every spell strip reads: how minimal its cells are and the colours of its readings. */
+	protected PutLook(stamp: StripStamp, menu: SpellMenu): void {
+		stamp.Put(menu.IsMinimalistic.value)
+		stamp.Put(menu.LevelColor.SelectedColor.data32)
+		stamp.Put(menu.ChargeColor.SelectedColor.data32)
+	}
 	public DrawAt(
 		recPosition: Rectangle,
 		mainAlpha: number,
@@ -126,9 +132,6 @@ export class SpellGUI extends BaseGUI {
 			stamp.Put(vecSize.x)
 			stamp.Put(vecSize.y)
 			stamp.Put(border)
-			stamp.Put(menu.IsMinimalistic.value)
-			stamp.Put(menu.LevelColor.SelectedColor.data32)
-			stamp.Put(menu.ChargeColor.SelectedColor.data32)
 			stamp.Put(isSilenced)
 			stamp.Put(isPassiveDisabled)
 			for (let index = 0; index < spells.length; index++) {
