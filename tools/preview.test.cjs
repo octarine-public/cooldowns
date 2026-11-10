@@ -68,6 +68,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	const makeElement = () => document.createElement("div")
 	const sdk = {
 		PreviewMotion: { value: true }, PreviewClock: () => now, DrawClock: () => now,
+		EThemeScope: { Menu: 0, Panels: 1, World: 2 }, MotionEnabled: () => true,
 		HudColors: { accent: new Color(94, 160, 255) },
 		DpToPx: value => value * ratio, ToLayoutUnits: value => value / ratio,
 		HostCursorPosition: () => [0, 0],
@@ -196,7 +197,7 @@ function runtime(ratio = 1, gameScale = 1, seed) {
 	const group = name => Object.assign(new BaseMenu({ node: root, nodeName: name, textStyle: style, animation, noMana, defaultSize: 1, texture: name }), {
 		Hero: unit("Heroes"), SpiritBear: unit("Bear"), Courier: unit("Courier"), Roshan: unit("Roshan"), Familiar: unit("Familiars"), Pandas: unit("Pandas"), Creep: unit("Creeps")
 	})
-	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, Animation: animation, NoMana: noMana, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
+	const menu = { Node: root, General: node("General", root), Style: style, State: { value: true }, Scale: { value: false }, Opacity: slider(100), OpacityByCursor: { value: false }, Animation: animation, get Animates() { return animation.value && sdk.MotionEnabled(sdk.EThemeScope.World) }, NoMana: noMana, SpellMenu: group("Spells"), ItemMenu: group("Items"), ModifierMenu: group("Modifiers") }
 	Object.assign(menu.SpellMenu, { IsMinimalistic: { value: false }, LevelColor: { SelectedColor: Color.Yellow }, ChargeColor: { SelectedColor: Color.Green } })
 	Object.assign(menu.ItemMenu, { SquareMode: { SelectedID: 0 }, DimOnCooldown: { value: false } })
 	Object.assign(menu.ModifierMenu, { Remaining: { value: true }, ModeImage: { SelectedID: 0 }, ModePosition: { SelectedID: 1 } })
