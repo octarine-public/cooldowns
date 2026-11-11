@@ -142,8 +142,17 @@ export class UnitData {
 			end = teleported ? owner.TPEndPosition : undefined,
 			follows = !teleported && owner.IsVisible,
 			height = this.barOffset,
-			x = -this.barCorrection.x,
-			y = (this.visualShield ? 5 : 0) - this.barCorrection.y
+			// What stands on an anchor is laid out around the screen's corner and moved to the
+			// anchor as the frame is presented, and the host draws no text laid out off the
+			// screen: a strip above its bar lost every reading. The anchors stand half a screen
+			// up and left of the bars' corners instead, so the strips are laid out around the
+			// middle of the screen.
+			window = RendererSDK.WindowSize,
+			x = -this.barCorrection.x - Math.floor(window.x / 2),
+			y =
+				(this.visualShield ? 5 : 0) -
+				this.barCorrection.y -
+				Math.floor(window.y / 2)
 		this.follows = follows
 		this.anchorOwner.SetEntity(owner.Handle, 0, 0, height, x, y)
 		this.start =

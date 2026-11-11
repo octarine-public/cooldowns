@@ -8,6 +8,11 @@ interface ItemReading {
 	item?: ItemDisplay
 	tick: number
 	cooldown: number
+	/**
+	 * Whether the countdown is the time the item has left rather than a cooldown - the Aegis
+	 * counting down to when it disappears: the cell reads the time and looks ready all the while.
+	 */
+	expiring: boolean
 	charges: number
 	texture: string
 	rootDisables: boolean
@@ -166,7 +171,7 @@ export class ItemGUI extends BaseGUI {
 				.CopyFrom(
 					noMana
 						? BaseGUI.noManaOutlineColor
-						: isMuted || cooldown > 0
+						: isMuted || (cooldown > 0 && !reading.expiring)
 							? BaseGUI.cooldownColor
 							: ItemGUI.outlineColor
 				)
@@ -189,7 +194,7 @@ export class ItemGUI extends BaseGUI {
 				radius,
 				circle: rounding === 0
 			})
-			if (cooldown > 0 && menu.DimOnCooldown.value) {
+			if (cooldown > 0 && !reading.expiring && menu.DimOnCooldown.value) {
 				this.Shade(vecPos, vecSize, rounding, alpha)
 			}
 			this.Ring(
@@ -249,6 +254,7 @@ export class ItemGUI extends BaseGUI {
 			reading = this.readings[index] = {
 				tick: -1,
 				cooldown: 0,
+				expiring: false,
 				charges: 0,
 				texture: "",
 				rootDisables: false,
@@ -263,6 +269,7 @@ export class ItemGUI extends BaseGUI {
 		reading.item = item
 		reading.tick = tick
 		reading.cooldown = item.Cooldown
+		reading.expiring = item instanceof item_aegis
 		reading.charges = item.DisplayCharges
 		reading.texture = item.TexturePath
 		reading.rootDisables = item.HasBehavior(
