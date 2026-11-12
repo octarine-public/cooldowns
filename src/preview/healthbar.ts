@@ -287,14 +287,9 @@ export class PreviewHealthBar {
 		this.root = element ?? undefined
 		this.parts.length = 0
 		this.drawn = undefined
-		if (
-			this.root !== undefined &&
-			!this.fontLoaded &&
-			typeof LoadFont === "function"
-		) {
-			this.fontLoaded = LoadFont(
+		if (this.root !== undefined && !this.fontLoaded) {
+			this.fontLoaded = MenuSDK.LoadFontFace(
 				`${__OCT_PACKAGE_ROOT__}/scripts_files/cooldowns/fonts/dotahypatiasansprobold.ttf`,
-				false,
 				800
 			)
 		}
